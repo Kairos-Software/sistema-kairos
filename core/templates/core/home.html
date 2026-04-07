@@ -1,0 +1,77 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Inicio{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/home.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="home-hero">
+    <div class="hero-tag">Panel principal</div>
+    <h1>Bienvenido, <span>{{ user.get_full_name|default:user.username }}</span></h1>
+    <p>Sistema de gestión Grupo Kairos — todo bajo control.</p>
+    <div class="hero-stats">
+        <div class="hero-stat">
+            <strong>KAIROS</strong>
+            <span>Sistema</span>
+        </div>
+        <div class="hero-divider"></div>
+        <div class="hero-stat">
+            <strong>v2.0</strong>
+            <span>Versión</span>
+        </div>
+        <div class="hero-divider"></div>
+        <div class="hero-stat">
+            <strong>Online</strong>
+            <span>Estado</span>
+        </div>
+    </div>
+</div>
+
+<p class="section-label">Módulos disponibles</p>
+<div class="home-cards">
+
+    <!-- USUARIOS -->
+    <a href="{% url 'core:gestion_usuarios' %}" class="home-module-card">
+        <div class="card-canvas-area">
+            <div id="canvas-users" style="width:100%;height:100%;"></div>
+            <span class="card-module-badge">Módulo</span>
+        </div>
+        <div class="card-body-area">
+            <h5>Usuarios <span class="card-arrow">→</span></h5>
+            <p>Administrá los usuarios del sistema y sus permisos de acceso.</p>
+        </div>
+    </a>
+
+    <!-- CLIENTES -->
+    <a href="{% url 'core:gestion_clientes' %}" class="home-module-card">
+        <div class="card-canvas-area">
+            <div id="canvas-clients" style="width:100%;height:100%;"></div>
+            <span class="card-module-badge">Módulo</span>
+        </div>
+        <div class="card-body-area">
+            <h5>Clientes <span class="card-arrow">→</span></h5>
+            <p>Gestioná tu cartera de clientes y toda su información comercial.</p>
+        </div>
+    </a>
+
+    <!-- COBRANZAS -->
+    <a href="{% url 'cobranzas:index' %}" class="home-module-card">
+        <div class="card-canvas-area">
+            <div id="canvas-cobranzas" style="width:100%;height:100%;"></div>
+            <span class="card-module-badge">Módulo</span>
+        </div>
+        <div class="card-body-area">
+            <h5>Cobranzas <span class="card-arrow">→</span></h5>
+            <p>Gestión de servicios, deudas y pagos.</p>
+        </div>
+    </a>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'core/js/home.js' %}"></script>
+{% endblock %}

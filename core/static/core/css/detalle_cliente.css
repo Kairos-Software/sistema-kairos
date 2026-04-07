@@ -1,0 +1,204 @@
+/* ════════════════════════════════════════════════
+   Detalle de Cliente — Grupo Kairos
+   ════════════════════════════════════════════════ */
+
+/* ── Back link ── */
+.back-link {
+    font-size: .75rem; font-weight: 700; color: #aaa;
+    text-decoration: none; display: inline-block; margin-bottom: 1rem;
+    transition: color .15s;
+}
+.back-link:hover { color: #E85C0D; }
+
+/* ════ HERO ════ */
+.dc-hero {
+    background: linear-gradient(145deg, #111 0%, #1c1c1c 100%);
+    border-radius: 16px; border: 1px solid #2a2a2a;
+    padding: 1.6rem 2rem; margin-bottom: 1.5rem;
+    position: relative; overflow: hidden;
+}
+.dc-hero::after {
+    content: ''; position: absolute; bottom: -80px; right: -80px;
+    width: 240px; height: 240px;
+    border: 40px solid rgba(232,92,13,.05); border-radius: 50%; pointer-events: none;
+}
+.dc-hero-body { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+
+/* Avatar */
+.dc-avatar-wrap { flex-shrink: 0; }
+.dc-avatar-img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(232,92,13,.4); display: block; }
+.dc-avatar {
+    width: 72px; height: 72px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Rajdhani', sans-serif; font-size: 2rem; font-weight: 700; color: #fff;
+}
+.dc-avatar.tipo-persona { background: linear-gradient(135deg, #E85C0D, #c94e0a); border: 3px solid rgba(232,92,13,.3); }
+.dc-avatar.tipo-empresa { background: linear-gradient(135deg, #8e44ad, #6c3483); border: 3px solid rgba(142,68,173,.3); }
+
+/* Info */
+.dc-hero-info { flex: 1; min-width: 200px; }
+.dc-hero-badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.dc-hero-nombre {
+    font-family: 'Rajdhani', sans-serif; font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700; color: #fff; margin: 0 0 .3rem; letter-spacing: .5px; line-height: 1.1;
+}
+.dc-hero-meta { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; font-size: .83rem; color: #999; margin-bottom: .3rem; }
+.meta-chip { background: rgba(232,92,13,.15); color: #E85C0D; border: 1px solid rgba(232,92,13,.3); font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: .5px; }
+.meta-sep { color: #444; }
+.dc-hero-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: .4rem; }
+.tag-chip { font-size: .65rem; font-weight: 700; background: rgba(232,92,13,.2); color: #E85C0D; padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(232,92,13,.4); }
+
+/* Score */
+.dc-hero-score {
+    display: flex; flex-direction: column; align-items: center;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px; padding: .8rem 1.2rem; flex-shrink: 0;
+}
+.score-label { font-size: .58rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #555; }
+.score-value { font-family: 'Rajdhani', sans-serif; font-size: 2.4rem; font-weight: 700; line-height: 1; }
+.score-value.score-alto  { color: #2ecc71; }
+.score-value.score-medio { color: #f1c40f; }
+.score-value.score-bajo  { color: #e74c3c; }
+.score-sub { font-size: .65rem; color: #555; margin-top: 1px; }
+
+/* ════ BADGES ════ */
+.tipo-badge    { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; }
+.tipo-persona  { background:rgba(41,128,185,.15); color:#2980b9; border:1px solid rgba(41,128,185,.3); }
+.tipo-empresa  { background:rgba(142,68,173,.15); color:#8e44ad; border:1px solid rgba(142,68,173,.3); }
+.estado-badge  { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; }
+.estado-activo     { background:rgba(46,204,113,.12); color:#27ae60; border:1px solid rgba(46,204,113,.28); }
+.estado-inactivo   { background:rgba(150,150,150,.12);color:#888;    border:1px solid rgba(150,150,150,.2); }
+.estado-potencial  { background:rgba(241,196,15,.12); color:#b7950b; border:1px solid rgba(241,196,15,.3); }
+.estado-suspendido { background:rgba(231,76,60,.12);  color:#c0392b; border:1px solid rgba(231,76,60,.28); }
+.riesgo-badge  { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; }
+.riesgo-bajo   { background:rgba(46,204,113,.12);  color:#27ae60; border:1px solid rgba(46,204,113,.28); }
+.riesgo-medio  { background:rgba(230,126,34,.12);  color:#d35400; border:1px solid rgba(230,126,34,.28); }
+.riesgo-alto   { background:rgba(192,57,43,.12);   color:#c0392b; border:1px solid rgba(192,57,43,.28); }
+.canal-badge   { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; background:rgba(52,152,219,.12); color:#2980b9; border:1px solid rgba(52,152,219,.28); }
+
+/* ════ GRID PRINCIPAL ════ */
+.dc-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; align-items:start; }
+@media(max-width:900px){ .dc-grid{ grid-template-columns:1fr; } }
+.dc-col { display:flex; flex-direction:column; gap:1.2rem; }
+
+/* ════ CARDS ════ */
+.dc-card { background:#fff; border-radius:14px; border:1px solid #e8e8ee; padding:1.3rem 1.4rem; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+.dc-card-dark { background:#fafafa; }
+.dc-card-title {
+    font-family:'Rajdhani',sans-serif; font-size:.78rem; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase; color:#999;
+    margin:0 0 1rem; padding-bottom:.55rem; border-bottom:1px solid #f0f0f5; display:block;
+}
+.dc-card-title-row {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:1rem; padding-bottom:.55rem; border-bottom:1px solid #f0f0f5;
+}
+.dc-card-title-row span:first-child {
+    font-family:'Rajdhani',sans-serif; font-size:.78rem; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase; color:#999;
+}
+.dc-card-count { background:#f0f0f8; color:#888; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:10px; border:1px solid #e8e8ee; }
+.dc-section-sub { font-size:.72rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#ccc; margin:.8rem 0 .5rem; }
+.sin-datos { font-size:.83rem; color:#ccc; margin:.3rem 0 0; font-style:italic; }
+
+/* ════ FIELD GRID ════ */
+.field-grid { display:grid; grid-template-columns:1fr 1fr; gap:.85rem .75rem; }
+@media(max-width:600px){ .field-grid{ grid-template-columns:1fr; } }
+.field-item { display:flex; flex-direction:column; gap:.18rem; }
+.field-item.field-wide { grid-column:1/-1; }
+.fi-label { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.9px; color:#ccc; }
+.fi-value { font-size:.88rem; color:#222; font-weight:500; line-height:1.4; }
+.fi-value a { color:#E85C0D; text-decoration:none; }
+.fi-value a:hover { text-decoration:underline; }
+.fi-hint { font-size:.78rem; color:#aaa; font-weight:400; }
+.fi-mono { font-family:monospace; font-size:.83rem; letter-spacing:.5px; }
+.proximo-contacto { color:#E85C0D; }
+
+.field-textarea-wrap { display:flex; flex-direction:column; gap:.2rem; }
+.fi-textarea { font-size:.86rem; color:#444; line-height:1.6; background:#fafafa; border:1px solid #f0f0f5; border-radius:8px; padding:.7rem .9rem; min-height:48px; }
+.fi-textarea p { margin:0 0 .4rem; }
+.fi-textarea p:last-child { margin:0; }
+.tags-wrap { display:flex; flex-wrap:wrap; gap:4px; margin-top:.15rem; }
+
+/* ════ TELÉFONOS ════ */
+.tel-list { display:flex; flex-direction:column; gap:.5rem; }
+.tel-item { background:#fafafa; border:1px solid #f0f0f5; border-radius:10px; padding:.7rem .9rem; transition:border-color .15s; }
+.tel-item:hover { border-color:#e0e0ea; }
+.tel-item.tel-titular { background:#fff8f5; border-color:rgba(232,92,13,.2); }
+.tel-num-wrap { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+.tel-numero { font-size:.95rem; font-weight:700; color:#111; }
+.tel-flags { display:flex; gap:.3rem; flex-wrap:wrap; }
+.tel-flag { font-size:.62rem; font-weight:700; padding:2px 7px; border-radius:10px; background:#f0f0f8; color:#888; border:1px solid #e8e8ee; }
+.tel-flag.flag-titular { background:rgba(232,92,13,.1); color:#c94e0a; border-color:rgba(232,92,13,.2); }
+.tel-flag.flag-wa      { background:#dcf8c6; color:#128c7e; border-color:#b2dfaf; }
+.tel-desc { font-size:.75rem; color:#aaa; display:block; margin-top:.2rem; }
+
+/* ════ MAPA ════ */
+.mapa-wrap { margin-top:1rem; }
+.mapa-detalle-container { height:260px; border-radius:10px; overflow:hidden; border:1px solid #e8e8ee; }
+.mapa-coords { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; font-size:.74rem; color:#aaa; margin-top:.5rem; }
+.coords-pin { background:rgba(232,92,13,.12); color:#E85C0D; font-size:.62rem; font-weight:700; padding:2px 7px; border-radius:10px; border:1px solid rgba(232,92,13,.2); letter-spacing:.8px; text-transform:uppercase; }
+.mapa-coords a { color:#E85C0D; text-decoration:none; font-weight:700; }
+.mapa-coords a:hover { text-decoration:underline; }
+.btn-maps { display:inline-block; background:#E85C0D; color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:700; text-decoration:none; transition:background .15s; }
+.btn-maps:hover { background:#c94e0a; }
+
+/* ════ GRUPO FAMILIAR ════ */
+.conv-list { display:flex; flex-direction:column; gap:.35rem; margin-top:.4rem; }
+.conv-item {
+    display:flex; align-items:center; gap:.65rem; padding:.5rem .7rem;
+    border-radius:8px; background:#fafafa; border:1px solid #f0f0f5;
+    text-decoration:none; transition:background .15s;
+}
+.conv-item:hover { background:#fff8f5; border-color:rgba(232,92,13,.2); }
+.conv-avatar { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:.85rem; color:#fff; flex-shrink:0; }
+.conv-avatar.tipo-persona { background:#E85C0D; }
+.conv-avatar.tipo-empresa { background:#8e44ad; }
+.conv-nombre { font-size:.85rem; font-weight:700; color:#111; display:block; }
+.conv-unidad { font-size:.72rem; color:#aaa; display:block; }
+
+/* ════ CONTACTOS ════ */
+.contacto-list { display:flex; flex-direction:column; gap:.6rem; }
+.contacto-item { display:flex; align-items:flex-start; gap:.75rem; padding:.8rem; background:#fafafa; border-radius:10px; border:1px solid #f0f0f5; }
+.contacto-avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; background:#111; color:#E85C0D; display:flex; align-items:center; justify-content:center; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:.9rem; }
+.contacto-body { flex:1; min-width:0; }
+.contacto-body strong { font-size:.88rem; color:#111; display:block; margin-bottom:.15rem; }
+.contacto-rol { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#E85C0D; display:block; margin-bottom:.4rem; }
+.contacto-datos { display:grid; grid-template-columns:auto 1fr; gap:.2rem .6rem; font-size:.78rem; align-items:baseline; }
+.contacto-notas { font-size:.75rem; color:#aaa; font-style:italic; margin:.35rem 0 0; }
+
+/* ════ GALERÍA ════ */
+.galeria-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:.5rem; margin-top:.4rem; }
+.galeria-item { position:relative; border-radius:8px; overflow:hidden; aspect-ratio:1; cursor:zoom-in; background:#f0f0f0; }
+.galeria-item img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .2s; }
+.galeria-item:hover img { transform:scale(1.05); }
+.galeria-overlay { position:absolute; inset:0; background:rgba(0,0,0,0); display:flex; align-items:flex-end; padding:.4rem; transition:background .2s; pointer-events:none; }
+.galeria-item:hover .galeria-overlay { background:rgba(0,0,0,.5); }
+.galeria-tipo { font-size:.62rem; color:#fff; font-weight:700; opacity:0; transition:opacity .2s; }
+.galeria-item:hover .galeria-tipo { opacity:1; }
+
+/* ════ LIGHTBOX ════ */
+.lightbox-overlay { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.94); align-items:center; justify-content:center; }
+.lightbox-overlay.active { display:flex; }
+.lb-close { position:fixed; top:1.2rem; right:1.5rem; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:50%; width:44px; height:44px; font-size:1.2rem; cursor:pointer; z-index:10001; display:flex; align-items:center; justify-content:center; transition:background .15s; }
+.lb-close:hover { background:#c0392b; }
+.lb-counter { position:fixed; top:1.4rem; left:50%; transform:translateX(-50%); color:rgba(255,255,255,.5); font-size:.82rem; font-weight:700; letter-spacing:1px; z-index:10001; pointer-events:none; }
+.lb-nav { position:fixed; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#fff; width:52px; height:52px; border-radius:50%; font-size:1.8rem; cursor:pointer; z-index:10001; display:flex; align-items:center; justify-content:center; transition:background .15s; line-height:1; }
+.lb-nav:hover { background:rgba(232,92,13,.7); }
+.lb-prev { left:1.2rem; }
+.lb-next { right:1.2rem; }
+.lb-content { display:flex; flex-direction:column; align-items:center; gap:.6rem; max-width:90vw; max-height:90vh; }
+.lb-img { max-width:88vw; max-height:82vh; object-fit:contain; border-radius:8px; transition:opacity .2s; display:block; }
+.lb-caption { color:rgba(255,255,255,.5); font-size:.82rem; margin:0; text-align:center; }
+
+/* ════ RESPONSIVE ════ */
+@media(max-width:768px){
+    .dc-hero-body { flex-direction:column; align-items:flex-start; }
+    .dc-hero-score { width:100%; flex-direction:row; justify-content:center; gap:1rem; align-items:center; }
+    .score-value { font-size:1.8rem; }
+}
+@media(max-width:480px){
+    .dc-hero { padding:1.2rem; }
+    .field-grid { grid-template-columns:1fr; }
+    .field-item.field-wide { grid-column:unset; }
+}

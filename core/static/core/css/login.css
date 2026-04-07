@@ -1,0 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@300;400;600;700&display=swap');
+
+:root {
+    --gk-orange: #E85C0D;
+    --gk-green: #2ECC40;
+    --gk-dark: #111111;
+}
+
+body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--gk-dark);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Fondo decorativo */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 60% 50% at 15% 50%, rgba(232,92,13,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 60% at 85% 20%, rgba(46,204,64,0.07) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    bottom: -100px;
+    right: -100px;
+    width: 400px;
+    height: 400px;
+    border: 40px solid rgba(232,92,13,0.06);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.login-wrapper {
+    width: 100%;
+    max-width: 420px;
+    padding: 1.5rem;
+    z-index: 1;
+}
+
+.login-logo {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.login-logo-img {
+    max-width: 260px;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+
+.login-logo p {
+    font-size: 0.72rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #666;
+    margin-top: 0.5rem;
+    font-weight: 600;
+}
+
+/* Card */
+.login-card {
+    background: #1a1a1a;
+    border-radius: 16px;
+    border: 1px solid #2a2a2a;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(232,92,13,0.1);
+}
+
+.login-card-header {
+    background: linear-gradient(135deg, var(--gk-orange), #c94e0a);
+    padding: 1.5rem 2rem 1.2rem;
+    text-align: center;
+}
+
+.login-card-header h4 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+    color: #fff;
+    margin: 0;
+}
+
+.login-card-header p {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.75);
+    margin: 0.25rem 0 0;
+    letter-spacing: 0.5px;
+}
+
+.login-card-body {
+    padding: 2rem;
+}
+
+/* Form fields */
+.login-card-body label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888;
+    margin-bottom: 0.4rem;
+    display: block;
+}
+
+.login-card-body input,
+.login-card-body select {
+    background: #222 !important;
+    border: 1px solid #333 !important;
+    border-radius: 8px !important;
+    color: #eee !important;
+    padding: 0.65rem 1rem !important;
+    font-size: 0.95rem !important;
+    font-family: 'Nunito', sans-serif !important;
+    width: 100%;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-card-body input:focus,
+.login-card-body select:focus {
+    border-color: var(--gk-orange) !important;
+    box-shadow: 0 0 0 3px rgba(232,92,13,0.15) !important;
+    outline: none !important;
+}
+
+.login-card-body p {
+    margin-bottom: 1.2rem;
+}
+
+.btn-login {
+    background: var(--gk-orange);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 0.75rem;
+    width: 100%;
+    margin-top: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-login:hover {
+    background: #c94e0a;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(232,92,13,0.35);
+}
+
+/* Footer */
+.login-footer {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.72rem;
+    color: #444;
+    letter-spacing: 0.5px;
+}

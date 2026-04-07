@@ -1,0 +1,39 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión — Sistema KAIROS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'core/css/login.css' %}">
+</head>
+<body>
+    <div class="login-wrapper">
+
+        <div class="login-logo">
+            <img src="{% static 'core/img/gk.png' %}" alt="Grupo Kairos" class="login-logo-img">
+            <p>Servicios que simplifican tu vida</p>
+        </div>
+
+        <div class="login-card">
+            <div class="login-card-header">
+                <h4>Iniciar sesión</h4>
+                <p>Accedé al sistema de gestión</p>
+            </div>
+            <div class="login-card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit" class="btn-login">Ingresar</button>
+                </form>
+            </div>
+        </div>
+
+        <p class="login-footer">© {% now "Y" %} Grupo Kairos · Todos los derechos reservados</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'core/js/login.js' %}"></script>
+</body>
+</html>

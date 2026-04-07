@@ -1,0 +1,289 @@
+/* ════════════════════════════════════════════════
+   Detalle de Usuario — Grupo Kairos
+   ════════════════════════════════════════════════ */
+
+/* ── Back link ── */
+.back-link {
+    font-size: .75rem; font-weight: 700; color: #aaa;
+    text-decoration: none; display: inline-block; margin-bottom: 1rem;
+    transition: color .15s; letter-spacing: .3px;
+}
+.back-link:hover { color: #E85C0D; }
+
+/* ════ HERO ════ */
+.du-hero {
+    background: linear-gradient(145deg, #111 0%, #1c1c1c 100%);
+    border-radius: 16px;
+    border: 1px solid #2a2a2a;
+    padding: 1.6rem 2rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+.du-hero::after {
+    content: '';
+    position: absolute; bottom: -80px; right: -80px;
+    width: 240px; height: 240px;
+    border: 40px solid rgba(232,92,13,.05);
+    border-radius: 50%; pointer-events: none;
+}
+.du-hero-body {
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    flex-wrap: wrap;
+}
+
+/* Avatar */
+.du-avatar-wrap { flex-shrink: 0; }
+.du-avatar-img {
+    width: 72px; height: 72px; border-radius: 50%;
+    object-fit: cover; border: 3px solid rgba(232,92,13,.4);
+    cursor: pointer; display: block;
+}
+.du-avatar-placeholder {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, #E85C0D, #c94e0a);
+    border: 3px solid rgba(232,92,13,.3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Rajdhani', sans-serif; font-size: 2rem;
+    font-weight: 700; color: #fff; cursor: pointer;
+}
+
+/* Info */
+.du-hero-info { flex: 1; min-width: 200px; }
+.du-hero-badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.du-hero-nombre {
+    font-family: 'Rajdhani', sans-serif; font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700; color: #fff; margin: 0 0 .3rem; letter-spacing: .5px; line-height: 1.1;
+}
+.du-hero-meta {
+    display: flex; align-items: center; gap: .35rem; flex-wrap: wrap;
+    font-size: .83rem; color: #999; margin-bottom: .3rem;
+}
+.meta-chip {
+    background: rgba(232,92,13,.15); color: #E85C0D;
+    border: 1px solid rgba(232,92,13,.3);
+    font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 4px;
+    font-family: monospace; letter-spacing: .5px;
+}
+.meta-sep { color: #444; }
+.du-hero-sub { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .78rem; color: #666; margin-top: .2rem; }
+
+/* Stats rápidos */
+.du-hero-stats {
+    display: flex; gap: .6rem; flex-shrink: 0; flex-wrap: wrap;
+}
+.hero-stat-item {
+    display: flex; flex-direction: column; align-items: center;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+    border-radius: 10px; padding: .6rem 1rem; min-width: 64px;
+}
+.hsi-value {
+    font-family: 'Rajdhani', sans-serif; font-size: 1.5rem;
+    font-weight: 700; color: #fff; line-height: 1;
+}
+.hsi-label {
+    font-size: .6rem; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: #555; margin-top: 2px;
+}
+
+/* ════ BADGES ════ */
+.estado-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; }
+.estado-activo       { background:rgba(46,204,113,.15); color:#27ae60; border:1px solid rgba(46,204,113,.3); }
+.estado-licencia     { background:rgba(52,152,219,.15); color:#2980b9; border:1px solid rgba(52,152,219,.3); }
+.estado-suspendido   { background:rgba(231,76,60,.15);  color:#c0392b; border:1px solid rgba(231,76,60,.3); }
+.estado-egresado     { background:rgba(150,150,150,.12);color:#888;    border:1px solid rgba(150,150,150,.2); }
+.estado-periodo_prueba { background:rgba(241,196,15,.12); color:#b7950b; border:1px solid rgba(241,196,15,.3); }
+.contrato-badge { display:inline-block; background:#f5f5f5; border:1px solid #e0e0ea; color:#666; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; }
+.rol-badge { display:inline-block; background:rgba(232,92,13,.1); border:1px solid rgba(232,92,13,.25); color:#c94e0a; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; }
+.badge-ok { background:rgba(46,204,113,.15); color:#27ae60; border:1px solid rgba(46,204,113,.3); padding:2px 8px; border-radius:4px; font-size:.75rem; font-weight:700; }
+.badge-no { background:rgba(231,76,60,.12); color:#c0392b; border:1px solid rgba(231,76,60,.28); padding:2px 8px; border-radius:4px; font-size:.75rem; font-weight:700; }
+.gs-badge { background:rgba(231,76,60,.1); color:#c0392b; border:1px solid rgba(231,76,60,.25); padding:2px 10px; border-radius:20px; font-size:.82rem; font-weight:700; font-family:'Rajdhani',sans-serif; letter-spacing:1px; }
+
+/* ════ GRID PRINCIPAL ════ */
+.du-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; align-items:start; }
+@media(max-width:900px){ .du-grid{ grid-template-columns:1fr; } }
+.du-col { display:flex; flex-direction:column; gap:1.2rem; }
+
+/* ════ CARDS ════ */
+.du-card {
+    background: #fff; border-radius: 14px;
+    border: 1px solid #e8e8ee; padding: 1.3rem 1.4rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,.04);
+}
+.du-card-dark { background: #fafafa; }
+
+.du-card-title {
+    font-family: 'Rajdhani', sans-serif; font-size: .78rem; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; color: #999;
+    margin: 0 0 1rem; padding-bottom: .55rem;
+    border-bottom: 1px solid #f0f0f5; display: block;
+}
+.du-card-title-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem; padding-bottom: .55rem; border-bottom: 1px solid #f0f0f5;
+}
+.du-card-title-row span:first-child {
+    font-family: 'Rajdhani', sans-serif; font-size: .78rem; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; color: #999;
+}
+.du-card-count {
+    background: #f0f0f8; color: #888;
+    font-size: .7rem; font-weight: 700; padding: 2px 8px;
+    border-radius: 10px; border: 1px solid #e8e8ee;
+}
+.sin-datos { font-size: .83rem; color: #ccc; margin: .3rem 0 0; font-style: italic; }
+
+/* ════ FIELD GRID ════ */
+.field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .85rem .75rem;
+}
+@media(max-width:600px){ .field-grid{ grid-template-columns:1fr; } }
+
+.field-item { display: flex; flex-direction: column; gap: .18rem; }
+.field-item.field-wide { grid-column: 1 / -1; }
+
+.fi-label {
+    font-size: .63rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .9px; color: #ccc;
+}
+.fi-value {
+    font-size: .88rem; color: #222; font-weight: 500; line-height: 1.4;
+}
+.fi-value a { color: #E85C0D; text-decoration: none; }
+.fi-value a:hover { text-decoration: underline; }
+.fi-hint { font-size: .78rem; color: #aaa; font-weight: 400; }
+.fi-mono { font-family: monospace; font-size: .83rem; letter-spacing: .5px; }
+
+/* Textarea-like fields */
+.field-textarea-wrap { margin-top: .85rem; display: flex; flex-direction: column; gap: .2rem; }
+.fi-textarea {
+    font-size: .86rem; color: #444; line-height: 1.6;
+    background: #fafafa; border: 1px solid #f0f0f5;
+    border-radius: 8px; padding: .7rem .9rem;
+    min-height: 48px;
+}
+.fi-textarea p { margin: 0 0 .4rem; }
+.fi-textarea p:last-child { margin: 0; }
+
+/* ════ FOTO ════ */
+.foto-wrap { display: flex; flex-direction: column; gap: .6rem; }
+.foto-grande {
+    width: 100%; border-radius: 10px; object-fit: cover;
+    max-height: 220px; display: block; cursor: pointer;
+    border: 1px solid #eee;
+}
+.foto-nota { font-size: .72rem; color: #bbb; text-align: center; margin: 0; }
+.foto-empty {
+    display: flex; flex-direction: column; align-items: center;
+    gap: .5rem; padding: 1.5rem;
+    background: #fafafa; border: 1px dashed #e0e0ea; border-radius: 10px;
+    color: #ccc;
+}
+.foto-empty svg { width: 48px; height: 48px; }
+.foto-empty span { font-size: .82rem; }
+
+/* ════ TIMELINE (estudios / experiencia) ════ */
+.timeline-list { display: flex; flex-direction: column; gap: 0; }
+.timeline-item {
+    display: flex; gap: .9rem; padding: .8rem 0;
+    border-bottom: 1px solid #f5f5f8; position: relative;
+}
+.timeline-item:last-child { border-bottom: none; padding-bottom: 0; }
+.tl-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #E85C0D; flex-shrink: 0; margin-top: .28rem;
+    box-shadow: 0 0 0 3px rgba(232,92,13,.15);
+}
+.tl-dot-exp { background: #2980b9; box-shadow: 0 0 0 3px rgba(41,128,185,.15); }
+.tl-body { flex: 1; min-width: 0; }
+.tl-main { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .25rem; }
+.tl-main strong { font-size: .9rem; color: #111; }
+.tl-badge {
+    font-size: .62rem; font-weight: 700; padding: 2px 7px;
+    border-radius: 10px; text-transform: uppercase; letter-spacing: .5px;
+}
+.tl-badge-completo  { background:rgba(46,204,113,.12); color:#27ae60; border:1px solid rgba(46,204,113,.28); }
+.tl-badge-en_curso  { background:rgba(241,196,15,.12); color:#b7950b; border:1px solid rgba(241,196,15,.3); }
+.tl-badge-incompleto{ background:rgba(150,150,150,.12); color:#888; border:1px solid rgba(150,150,150,.2); }
+.tl-badge-actual    { background:rgba(232,92,13,.12); color:#c94e0a; border:1px solid rgba(232,92,13,.28); }
+.tl-sub { font-size: .78rem; color: #999; display: flex; flex-wrap: wrap; gap: .25rem .1rem; align-items: center; }
+.tl-sep { color: #ddd; padding: 0 .15rem; }
+.tl-obs { font-size: .8rem; color: #888; margin: .3rem 0 0; font-style: italic; line-height: 1.4; }
+.tl-ref { font-size: .75rem; color: #bbb; margin: .2rem 0 0; }
+
+/* ════ CAPACITACIONES ════ */
+.cap-list { display: flex; flex-direction: column; gap: .6rem; }
+.cap-item {
+    background: #fafafa; border: 1px solid #f0f0f5;
+    border-radius: 10px; padding: .8rem 1rem;
+    transition: border-color .15s;
+}
+.cap-item:hover { border-color: #e0e0ea; }
+.cap-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-bottom: .3rem; }
+.cap-top strong { font-size: .88rem; color: #111; }
+.resultado-badge { font-size: .65rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.resultado-aprobado    { background:rgba(46,204,113,.12); color:#27ae60; border:1px solid rgba(46,204,113,.28); }
+.resultado-desaprobado { background:rgba(231,76,60,.12);  color:#c0392b; border:1px solid rgba(231,76,60,.28); }
+.resultado-en_curso    { background:rgba(241,196,15,.12); color:#b7950b; border:1px solid rgba(241,196,15,.3); }
+.resultado-pendiente   { background:rgba(150,150,150,.12);color:#888;    border:1px solid rgba(150,150,150,.2); }
+.resultado-no_aplica   { background:#f5f5f5; color:#aaa; border:1px solid #e0e0ea; }
+.cap-meta { display: flex; flex-wrap: wrap; gap: .25rem .8rem; font-size: .75rem; color: #aaa; margin-bottom: .4rem; }
+.cap-flags { display: flex; flex-wrap: wrap; gap: .3rem; }
+.cap-flag { font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; letter-spacing: .3px; }
+.flag-obligatoria { background:rgba(232,92,13,.1); color:#c94e0a; border:1px solid rgba(232,92,13,.2); }
+.flag-cert         { background:rgba(46,204,113,.1); color:#27ae60; border:1px solid rgba(46,204,113,.2); }
+.flag-vencido      { background:rgba(231,76,60,.1); color:#c0392b; border:1px solid rgba(231,76,60,.2); }
+.cap-obs { font-size: .78rem; color: #bbb; margin: .35rem 0 0; font-style: italic; }
+
+/* ════ DOCUMENTOS ════ */
+.doc-list { display: flex; flex-direction: column; gap: .5rem; }
+.doc-item {
+    display: flex; align-items: flex-start; gap: .75rem;
+    background: #fafafa; border: 1px solid #f0f0f5;
+    border-radius: 10px; padding: .75rem .9rem;
+    transition: border-color .15s;
+}
+.doc-item:hover { border-color: #e0e0ea; }
+.doc-item.doc-vencido   { background:#fdf8f8; border-color:#f5d0d0; }
+.doc-item.doc-por-vencer{ background:#fffdf5; border-color:#f5e8b0; }
+.doc-icon-wrap { flex-shrink: 0; color: #ccc; width: 20px; height: 20px; margin-top: .1rem; }
+.doc-icon-wrap svg { width: 20px; height: 20px; }
+.doc-body { flex: 1; min-width: 0; }
+.doc-nombre { font-size: .88rem; font-weight: 700; color: #E85C0D; text-decoration: none; display: block; }
+.doc-nombre:hover { text-decoration: underline; }
+.doc-meta { display: flex; flex-wrap: wrap; gap: .25rem .8rem; font-size: .74rem; color: #aaa; margin-top: .15rem; }
+.texto-vencido   { color: #c0392b; font-weight: 700; }
+.texto-por-vencer{ color: #b7950b; font-weight: 700; }
+
+/* ════ LIGHTBOX ════ */
+.lightbox-overlay {
+    display: none; position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,.94); align-items: center; justify-content: center;
+}
+.lightbox-overlay.active { display: flex; }
+.lb-close {
+    position: fixed; top: 1.2rem; right: 1.5rem;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+    color: #fff; border-radius: 50%; width: 44px; height: 44px;
+    font-size: 1.2rem; cursor: pointer; z-index: 10001;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+}
+.lb-close:hover { background: #c0392b; }
+.lb-content { display: flex; flex-direction: column; align-items: center; gap: .6rem; max-width: 90vw; max-height: 90vh; }
+.lb-img { max-width: 88vw; max-height: 82vh; object-fit: contain; border-radius: 8px; transition: opacity .2s; display: block; }
+
+/* ════ RESPONSIVE ════ */
+@media(max-width:768px){
+    .du-hero-body { flex-direction: column; align-items: flex-start; }
+    .du-hero-stats { width: 100%; justify-content: space-between; }
+}
+@media(max-width:480px){
+    .du-hero { padding: 1.2rem 1.2rem; }
+    .field-grid { grid-template-columns: 1fr; }
+    .field-item.field-wide { grid-column: unset; }
+}

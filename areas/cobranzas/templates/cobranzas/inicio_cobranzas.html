@@ -1,0 +1,40 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Inicio - Cobranzas{% endblock %}
+
+{% block cobranzas_content %}
+
+{# ── HERO ── #}
+<div class="cobr-hero">
+    <h1>Panel de <span>Cobranzas</span></h1>
+    <p>Gestión de servicios, deudas y pagos — Grupo Kairos.</p>
+</div>
+
+{# ── MÓDULOS PRÓXIMAMENTE ── #}
+<p class="page-subtitle" style="margin-bottom:.9rem;">Funciones disponibles próximamente</p>
+<div class="cobr-pronto-grid">
+    <div class="cobr-pronto-card">
+        <div class="cobr-pronto-icon">💰</div>
+        <div class="cobr-pronto-info">
+            <strong>Abrir caja</strong>
+            <span>Próximamente</span>
+        </div>
+    </div>
+    <div class="cobr-pronto-card">
+        <div class="cobr-pronto-icon">📊</div>
+        <div class="cobr-pronto-info">
+            <strong>Reportes</strong>
+            <span>Próximamente</span>
+        </div>
+    </div>
+    <div class="cobr-pronto-card">
+        <div class="cobr-pronto-icon">📁</div>
+        <div class="cobr-pronto-info">
+            <strong>Historial</strong>
+            <span>Próximamente</span>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
