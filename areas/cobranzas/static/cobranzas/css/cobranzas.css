@@ -390,15 +390,88 @@
 /* ══════════════════════════════════════
    PAGINACIÓN
    ══════════════════════════════════════ */
-.paginacion { display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-top: 1.2rem; }
-.pag-btn {
-    padding: 0.4rem 1rem; background: #fff;
-    border: 1px solid #e8e8ee; border-radius: 8px;
-    font-size: 0.8rem; font-weight: 700; color: #555;
-    text-decoration: none; transition: all 0.15s;
+.paginacion {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 1.4rem;
+    flex-wrap: wrap;
 }
-.pag-btn:hover { border-color: #E85C0D; color: #E85C0D; background: rgba(232,92,13,0.05); }
-.pag-info { font-size: 0.78rem; color: #aaa; font-weight: 700; }
+
+.pag-nav {
+    padding: 0.42rem 1rem;
+    background: #fff;
+    border: 1px solid #e0e0ea;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #555;
+    text-decoration: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.pag-nav:hover:not(.pag-disabled) {
+    border-color: #E85C0D;
+    color: #E85C0D;
+    background: rgba(232,92,13,0.05);
+}
+.pag-disabled {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+}
+
+.pag-numeros {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.pag-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 0.3rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    text-decoration: none;
+    border: 1px solid #e0e0ea;
+    background: #fff;
+    color: #555;
+    transition: all 0.15s;
+}
+.pag-num:hover {
+    border-color: #E85C0D;
+    color: #E85C0D;
+    background: rgba(232,92,13,0.05);
+}
+.pag-num-activo {
+    background: #E85C0D;
+    border-color: #E85C0D;
+    color: #fff !important;
+    cursor: default;
+    box-shadow: 0 2px 8px rgba(232,92,13,0.3);
+}
+.pag-ellipsis {
+    font-size: 0.85rem;
+    color: #bbb;
+    padding: 0 0.2rem;
+    font-weight: 700;
+}
+
+.pag-resumen {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #bbb;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
 
 /* ══════════════════════════════════════
    ALERTAS
@@ -480,4 +553,99 @@
     .page-header { flex-direction: column; }
     .filtros-bar { flex-direction: column; align-items: stretch; }
     .search-wrapper { min-width: unset; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   AÑADIR al final de cobranzas.css
+   Estilos para el selector de código con autoincremento
+   ══════════════════════════════════════════════════════════ */
+
+/* Preview del código que se asignará */
+.codigo-preview {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.38rem 0.9rem;
+    background: rgba(232,92,13,0.08);
+    border: 1.5px dashed rgba(232,92,13,0.35);
+    color: #c94e0a;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 8px;
+    letter-spacing: 1.5px;
+    min-width: 70px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.codigo-hint {
+    font-size: 0.72rem;
+    color: #aaa;
+    font-weight: 600;
+    font-style: italic;
+}
+
+/* Wrap del sector código */
+.codigo-selector-wrap {
+    padding: 0.6rem 0.8rem;
+    background: #fafafa;
+    border: 1px solid #e8e8ee;
+    border-radius: 10px;
+}
+
+/* Acciones de prefijo (botones debajo del select) */
+.prefijo-acciones {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-prefijo-accion {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.22rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid;
+    background: #fff;
+    white-space: nowrap;
+    text-transform: uppercase;
+}
+
+.btn-prefijo-agregar {
+    color: #888;
+    border-color: #ddd;
+    background: #fff;
+}
+.btn-prefijo-agregar:hover {
+    background: #f5f5f8;
+    border-color: #bbb;
+    color: #444;
+}
+
+.btn-prefijo-eliminar {
+    color: #c0392b;
+    border-color: rgba(192,57,43,0.22);
+    background: rgba(192,57,43,0.03);
+}
+.btn-prefijo-eliminar:hover {
+    background: rgba(192,57,43,0.1);
+    border-color: rgba(192,57,43,0.4);
+}
+
+/* Panel de confirmación de eliminar prefijo */
+.eliminar-prefijo-confirm {
+    padding: 0.6rem 0.8rem;
+    background: rgba(192,57,43,0.05);
+    border: 1px solid rgba(192,57,43,0.2);
+    border-radius: 8px;
+    font-size: 0.83rem;
+    color: #555;
 }

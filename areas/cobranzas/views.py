@@ -4,14 +4,57 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View
 from django.core.paginator import Paginator
 from django.db.models import Q
+import re
 
 from core.permisos import chequear_permiso
 from .models import Servicio
 from .forms import ServicioForm
 
+# ─────────────────────────────────────────────
+# Prefijos almacenados en memoria (JSON-like).
+# Se pueden agregar dinámicamente desde el form.
+# En una instalación nueva empiezan con estos defaults.
+# ─────────────────────────────────────────────
+PREFIJOS_DEFAULT = ['EX', 'TR']
+
+# Guardamos en módulo para que persista mientras corre el proceso.
+# Para persistencia real entre reinicios usá caché/DB; esto es suficiente
+# para la mayoría de los casos de uso.
+_prefijos_extra: list[str] = []
+
+
+def get_todos_prefijos() -> list[str]:
+    """Devuelve prefijos default + los agregados dinámicamente, sin duplicados, ordenados."""
+    todos = list(dict.fromkeys(PREFIJOS_DEFAULT + _prefijos_extra))
+    return sorted(todos)
+
+
+def get_siguiente_codigo(prefijo: str) -> str:
+    """
+    Busca el último número usado para ese prefijo en la DB
+    y retorna el siguiente código. Ej: si existe EX3, retorna EX4.
+    """
+    prefijo_upper = prefijo.upper().strip()
+    # Busca todos los códigos que empiecen con ese prefijo seguido de dígitos
+    existentes = (
+        Servicio.objects
+        .filter(codigo__istartswith=prefijo_upper)
+        .values_list('codigo', flat=True)
+    )
+    max_num = 0
+    patron = re.compile(rf'^{re.escape(prefijo_upper)}(\d+)$', re.IGNORECASE)
+    for cod in existentes:
+        m = patron.match(cod)
+        if m:
+            max_num = max(max_num, int(m.group(1)))
+    return f"{prefijo_upper}{max_num + 1}"
+
+
+# ─────────────────────────────────────────────
+# Vistas
+# ─────────────────────────────────────────────
 
 class InicioCobranzasView(LoginRequiredMixin, View):
-    """Página de inicio del módulo Cobranzas"""
     def get(self, request):
         return render(request, 'cobranzas/inicio_cobranzas.html')
 
@@ -32,12 +75,11 @@ class GestionServiciosView(LoginRequiredMixin, View):
                 Q(proveedor__icontains=q)
             )
 
-        # Filtro por monto exacto
         monto = request.GET.get('monto', '').strip()
         if monto:
             try:
-                monto = float(monto)
-                qs = qs.filter(monto=monto)
+                monto_f = float(monto)
+                qs = qs.filter(monto=monto_f)
             except ValueError:
                 pass
 
@@ -45,7 +87,11 @@ class GestionServiciosView(LoginRequiredMixin, View):
         if activo in ('true', 'false'):
             qs = qs.filter(activo=(activo == 'true'))
 
-        paginator = Paginator(qs, 25)
+        # Orden alfanumérico: la DB ya ordena por 'codigo' (Meta.ordering),
+        # pero forzamos aquí para que ningún filtro lo rompa.
+        qs = qs.order_by('codigo')
+
+        paginator = Paginator(qs, 8)
         servicios = paginator.get_page(request.GET.get('page', 1))
 
         context = {
@@ -56,6 +102,7 @@ class GestionServiciosView(LoginRequiredMixin, View):
             'puede_editar': chequear_permiso(request.user, 'editar_servicios'),
             'puede_eliminar': chequear_permiso(request.user, 'eliminar_servicios'),
             'sin_permiso': False,
+            'prefijos': get_todos_prefijos(),
         }
         return render(request, 'cobranzas/gestion_servicios.html', context)
 
@@ -112,3 +159,45 @@ class ServicioActivarAjax(LoginRequiredMixin, View):
         servicio.modificado_por = request.user
         servicio.save()
         return JsonResponse({'success': True, 'activo': servicio.activo})
+
+
+class ServicioSiguienteCodigoAjax(LoginRequiredMixin, View):
+    """Devuelve el siguiente código disponible para un prefijo dado."""
+    def get(self, request):
+        prefijo = request.GET.get('prefijo', '').strip().upper()
+        if not prefijo:
+            return JsonResponse({'error': 'Prefijo requerido'}, status=400)
+        siguiente = get_siguiente_codigo(prefijo)
+        return JsonResponse({'codigo': siguiente})
+
+
+class PrefijosAjax(LoginRequiredMixin, View):
+    """GET → lista de prefijos. POST → agrega un prefijo nuevo."""
+    def get(self, request):
+        return JsonResponse({'prefijos': get_todos_prefijos()})
+
+    def post(self, request):
+        if not chequear_permiso(request.user, 'crear_servicios'):
+            return JsonResponse({'error': 'Sin permiso'}, status=403)
+
+        accion = request.POST.get('accion', 'agregar')
+
+        if accion == 'eliminar':
+            prefijo = request.POST.get('prefijo', '').strip().upper()
+            if not prefijo:
+                return JsonResponse({'error': 'Prefijo vacío'}, status=400)
+            if prefijo in PREFIJOS_DEFAULT:
+                return JsonResponse({'error': f'El prefijo {prefijo} es predeterminado y no se puede eliminar.'}, status=400)
+            if prefijo in _prefijos_extra:
+                _prefijos_extra.remove(prefijo)
+            return JsonResponse({'prefijos': get_todos_prefijos()})
+
+        # accion == 'agregar' (default)
+        nuevo = request.POST.get('prefijo', '').strip().upper()
+        if not nuevo:
+            return JsonResponse({'error': 'Prefijo vacío'}, status=400)
+        if not re.match(r'^[A-Z]{1,10}$', nuevo):
+            return JsonResponse({'error': 'El prefijo solo puede contener letras (máx. 10)'}, status=400)
+        if nuevo not in _prefijos_extra and nuevo not in PREFIJOS_DEFAULT:
+            _prefijos_extra.append(nuevo)
+        return JsonResponse({'prefijos': get_todos_prefijos()})

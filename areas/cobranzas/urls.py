@@ -9,4 +9,6 @@ urlpatterns = [
     path('servicios/acciones/', views.ServicioCrearEditarAjax.as_view(), name='servicio_acciones'),
     path('servicios/eliminar/', views.ServicioEliminarAjax.as_view(), name='servicio_eliminar'),
     path('servicios/activar/', views.ServicioActivarAjax.as_view(), name='servicio_activar'),
+    path('servicios/siguiente-codigo/', views.ServicioSiguienteCodigoAjax.as_view(), name='servicio_siguiente_codigo'),
+    path('servicios/prefijos/', views.PrefijosAjax.as_view(), name='servicio_prefijos'),
 ]

@@ -9,7 +9,7 @@
 <div class="page-header">
     <div>
         <h1>Servicios de <span>Cobranzas</span></h1>
-        <p class="page-subtitle">
+        <p class="page-subtitle" id="contadorServicios">
             {{ servicios.paginator.count|default:0 }} servicio{{ servicios.paginator.count|pluralize }} registrado{{ servicios.paginator.count|pluralize }}
         </p>
     </div>
@@ -30,21 +30,18 @@
 <div class="alerta-inline alerta-error">No tenés permiso para ver los servicios.</div>
 {% else %}
 
-
 <form method="get" class="filtros-bar" id="formFiltros">
     <div class="search-wrapper">
         <svg class="search-icon" viewBox="0 0 20 20" fill="none">
             <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
             <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        <input type="text" name="q" value="{{ q }}"
+        {# El input dispara filtro en vivo; el name="q" queda para el fallback server-side #}
+        <input type="text" name="q" id="inputBusqueda" value="{{ q }}"
                placeholder="Buscar por código, descripción, proveedor..."
-               class="search-input" autocomplete="off"
-               onkeydown="if(event.key==='Enter'){this.form.submit()}">
-        {% if q %}
-        <button type="button" class="search-clear"
-                onclick="document.querySelector('[name=q]').value='';document.getElementById('formFiltros').submit()">×</button>
-        {% endif %}
+               class="search-input" autocomplete="off">
+        <button type="button" class="search-clear" id="btnLimpiarBusqueda"
+                style="{% if not q %}display:none{% endif %}">×</button>
     </div>
 
     <select name="activo" class="filtro-select" onchange="this.form.submit()">
@@ -53,7 +50,6 @@
         <option value="false" {% if filtro_activo == 'false' %}selected{% endif %}>Inactivos</option>
     </select>
 
-    {# Filtro monto: ahora con botón submit visible + Enter #}
     <div class="filtro-monto">
         <span class="filtro-monto-icon">$</span>
         <input type="number" name="monto"
@@ -88,14 +84,15 @@
                 {% if puede_editar or puede_eliminar %}<th>Acciones</th>{% endif %}
             </tr>
         </thead>
-        <tbody>
+        <tbody id="tbodyServicios">
             {% for servicio in servicios %}
             <tr data-id="{{ servicio.pk }}"
                 data-codigo="{{ servicio.codigo }}"
                 data-descripcion="{{ servicio.descripcion }}"
                 data-monto="{{ servicio.monto|floatformat:2 }}"
                 data-proveedor="{{ servicio.proveedor }}"
-                data-activo="{{ servicio.activo|yesno:'true,false' }}">
+                data-activo="{{ servicio.activo|yesno:'true,false' }}"
+                data-search="{{ servicio.codigo|lower }} {{ servicio.descripcion|lower }} {{ servicio.proveedor|lower }}">
                 <td><span class="codigo-badge">{{ servicio.codigo }}</span></td>
                 <td>{{ servicio.descripcion }}</td>
                 <td><strong>${{ servicio.monto|floatformat:2 }}</strong></td>
@@ -126,32 +123,59 @@
                 {% endif %}
             </tr>
             {% empty %}
-            <tr>
-                <td colspan="6" class="empty-state">
-                    No hay servicios{% if q %} para "{{ q }}"{% endif %}{% if request.GET.monto %} con monto ${{ request.GET.monto }}{% endif %}.
-                </td>
+            <tr id="rowEmpty">
+                <td colspan="6" class="empty-state">No hay servicios registrados.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
+{# Fila "sin resultados" para el filtro en vivo (oculta por defecto) #}
+<template id="tmplSinResultados">
+    <tr id="rowLiveEmpty">
+        <td colspan="6" class="empty-state">Sin resultados para "<span id="terminoBusqueda"></span>".</td>
+    </tr>
+</template>
+
 {# ── PAGINACIÓN ── #}
 {% if servicios.has_other_pages %}
-<div class="paginacion">
+<div class="paginacion" id="paginacion">
+
     {% if servicios.has_previous %}
     <a href="?page={{ servicios.previous_page_number }}&q={{ q }}&activo={{ filtro_activo }}&monto={{ request.GET.monto }}"
-       class="pag-btn">← Anterior</a>
+       class="pag-btn pag-nav">← Anterior</a>
+    {% else %}
+    <span class="pag-btn pag-nav pag-disabled">← Anterior</span>
     {% endif %}
-    <span class="pag-info">Página {{ servicios.number }} de {{ servicios.paginator.num_pages }}</span>
+
+    <div class="pag-numeros">
+        {% for num in servicios.paginator.page_range %}
+            {% if num == servicios.number %}
+                <span class="pag-num pag-num-activo">{{ num }}</span>
+            {% elif num == 1 or num == servicios.paginator.num_pages or num >= servicios.number|add:"-2" and num <= servicios.number|add:"2" %}
+                <a href="?page={{ num }}&q={{ q }}&activo={{ filtro_activo }}&monto={{ request.GET.monto }}"
+                   class="pag-num">{{ num }}</a>
+            {% elif num == servicios.number|add:"-3" or num == servicios.number|add:"3" %}
+                <span class="pag-ellipsis">…</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+
     {% if servicios.has_next %}
     <a href="?page={{ servicios.next_page_number }}&q={{ q }}&activo={{ filtro_activo }}&monto={{ request.GET.monto }}"
-       class="pag-btn">Siguiente →</a>
+       class="pag-btn pag-nav">Siguiente →</a>
+    {% else %}
+    <span class="pag-btn pag-nav pag-disabled">Siguiente →</span>
     {% endif %}
+
 </div>
+<p class="pag-resumen">
+    Mostrando {{ servicios.start_index }}–{{ servicios.end_index }} de {{ servicios.paginator.count }} servicio{{ servicios.paginator.count|pluralize }}
+</p>
 {% endif %}
 
-{% endif %}
+{% endif %}{# /sin_permiso #}
 
 {# ════ MODAL CREAR / EDITAR ════ #}
 {% if puede_crear or puede_editar %}
@@ -169,12 +193,74 @@
                 <form id="formServicio">
                     {% csrf_token %}
                     <input type="hidden" name="pk" id="servicioPk">
+                    {# Campo oculto: el código final construido (EX4) #}
+                    <input type="hidden" name="codigo" id="id_codigo">
+
                     <div class="row g-3">
-                        <div class="col-md-4">
+
+                        {# ── SELECTOR DE CÓDIGO ── #}
+                        <div class="col-12">
                             <label class="form-label">Código <span class="field-required">*</span></label>
-                            <input type="text" class="form-control" name="codigo" id="id_codigo" placeholder="Ej: EX1">
+                            <div class="codigo-selector-wrap" id="codigoSelectorWrap">
+
+                                {# Modo selección (nuevo servicio) #}
+                                <div id="codigoSelectorRow">
+                                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                                        <select class="form-control" id="selectPrefijo" style="width:auto;min-width:110px;">
+                                            <option value="">— Prefijo —</option>
+                                            {% for p in prefijos %}
+                                            <option value="{{ p }}">{{ p }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <span class="codigo-preview" id="codigoPreview">—</span>
+                                        <span class="codigo-hint" id="codigoHint"></span>
+                                    </div>
+                                    <div class="prefijo-acciones" id="prefijoAcciones">
+                                        <button type="button" class="btn-prefijo-accion btn-prefijo-agregar" id="btnAgregarPrefijo">
+                                            <svg viewBox="0 0 12 12" fill="none" width="10" height="10"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                            Agregar prefijo
+                                        </button>
+                                        <button type="button" class="btn-prefijo-accion btn-prefijo-eliminar" id="btnEliminarPrefijo" style="display:none;">
+                                            <svg viewBox="0 0 12 12" fill="none" width="10" height="10"><path d="M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                            Eliminar prefijo
+                                        </button>
+                                    </div>
+
+                                    {# Sub-panel "Agregar prefijo nuevo" (oculto) #}
+                                    <div id="nuevoPrefijoPannel" style="display:none;margin-top:.7rem;">
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <input type="text" class="form-control" id="inputNuevoPrefijo"
+                                                   placeholder="Ej: CM" maxlength="10"
+                                                   style="width:auto;min-width:110px;text-transform:uppercase;">
+                                            <button type="button" class="btn btn-primary btn-sm" id="btnConfirmarPrefijo">Confirmar</button>
+                                            <button type="button" class="btn btn-secondary btn-sm" id="btnCancelarPrefijo">Cancelar</button>
+                                        </div>
+                                        <div id="errorNuevoPrefijo" class="alerta-inline alerta-error mt-2" style="display:none;"></div>
+                                    </div>
+
+                                    {# Sub-panel "Eliminar prefijo" (oculto) #}
+                                    <div id="eliminarPrefijoPannel" style="display:none;margin-top:.7rem;">
+                                        <div class="eliminar-prefijo-confirm">
+                                            <span id="eliminarPrefijoTexto">¿Eliminar el prefijo <strong id="eliminarPrefijoNombre"></strong>?</span>
+                                            <div class="d-flex gap-2 mt-2">
+                                                <button type="button" class="btn btn-danger btn-sm" id="btnConfirmarEliminarPrefijo">Sí, eliminar</button>
+                                                <button type="button" class="btn btn-secondary btn-sm" id="btnCancelarEliminarPrefijo">Cancelar</button>
+                                            </div>
+                                        </div>
+                                        <div id="errorEliminarPrefijo" class="alerta-inline alerta-error mt-2" style="display:none;"></div>
+                                    </div>
+                                </div>
+
+                                {# Modo edición: muestra el código actual como texto + oculta el selector #}
+                                <div id="codigoEditDisplay" style="display:none;">
+                                    <span class="codigo-badge" id="codigoEditBadge"></span>
+                                    <span class="codigo-hint" style="margin-left:.5rem;">El código no se puede cambiar.</span>
+                                </div>
+
+                            </div>
                         </div>
-                        <div class="col-md-8">
+
+                        <div class="col-12">
                             <label class="form-label">Descripción <span class="field-required">*</span></label>
                             <input type="text" class="form-control" name="descripcion" id="id_descripcion"
                                    placeholder="Concepto / descripción del servicio">
@@ -236,8 +322,10 @@
 {{ block.super }}
 <script src="{% static 'cobranzas/js/gestion_servicios.js' %}"></script>
 <script>
-    window.servicioAccionesUrl = "{% url 'cobranzas:servicio_acciones' %}";
-    window.servicioEliminarUrl = "{% url 'cobranzas:servicio_eliminar' %}";
-    window.servicioActivarUrl  = "{% url 'cobranzas:servicio_activar' %}";
+    window.servicioAccionesUrl   = "{% url 'cobranzas:servicio_acciones' %}";
+    window.servicioEliminarUrl   = "{% url 'cobranzas:servicio_eliminar' %}";
+    window.servicioActivarUrl    = "{% url 'cobranzas:servicio_activar' %}";
+    window.servicioSiguienteUrl  = "{% url 'cobranzas:servicio_siguiente_codigo' %}";
+    window.servicioPrefijosUrl   = "{% url 'cobranzas:servicio_prefijos' %}";
 </script>
 {% endblock %}
