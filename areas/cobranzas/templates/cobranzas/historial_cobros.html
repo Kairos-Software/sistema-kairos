@@ -1,0 +1,257 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Historial de Cobros — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Historial de <span>Cobros</span></h1>
+        <p class="page-subtitle" id="subtituloHistorial">
+            {{ cobros|length }} cobro{{ cobros|length|pluralize }} registrado{{ cobros|length|pluralize }}
+        </p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'cobranzas:gestion_cobros' %}" class="btn-nuevo">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nuevo cobro
+        </a>
+        <a href="{% url 'cobranzas:index' %}" class="btn-volver">← Volver</a>
+    </div>
+</div>
+
+{# ── FILTROS ── #}
+<form method="get" class="filtros-bar" id="formFiltros">
+    <div class="filtro-fecha-wrap">
+        <label class="filtro-fecha-label">Desde</label>
+        <input type="date" name="desde" value="{{ desde }}" class="filtro-fecha-input">
+    </div>
+    <div class="filtro-fecha-wrap">
+        <label class="filtro-fecha-label">Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta }}" class="filtro-fecha-input">
+    </div>
+    <button type="submit" class="btn-nuevo" style="padding:.42rem .9rem;">Filtrar</button>
+    {% if desde or hasta %}
+    <a href="{% url 'cobranzas:historial_cobros' %}" class="btn-limpiar">× Limpiar</a>
+    {% endif %}
+</form>
+
+{% if cobros %}
+
+{# ── RESUMEN TOTALES DEL PERÍODO ── #}
+<div class="hist-resumen-grid">
+    <div class="hist-resumen-card">
+        <span class="hist-resumen-label">Total cobros</span>
+        <strong class="hist-resumen-valor">{{ cobros|length }}</strong>
+    </div>
+    <div class="hist-resumen-card">
+        <span class="hist-resumen-label">Total facturas</span>
+        <strong class="hist-resumen-valor" id="resumenFacturas">—</strong>
+    </div>
+    <div class="hist-resumen-card hist-resumen-card-destacado">
+        <span class="hist-resumen-label">Total adicionales</span>
+        <strong class="hist-resumen-valor" id="resumenAdicionales">—</strong>
+    </div>
+    <div class="hist-resumen-card hist-resumen-card-total">
+        <span class="hist-resumen-label">Total general</span>
+        <strong class="hist-resumen-valor" id="resumenGeneral">—</strong>
+    </div>
+</div>
+
+{# ── TABLA ── #}
+<div class="table-card">
+    <table class="table" id="tablaHistorial">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Fecha y hora</th>
+                <th>Usuario</th>
+                <th>Boletas</th>
+                <th>Total facturas</th>
+                <th>Total adicionales</th>
+                <th>Total cobrado</th>
+                <th>Métodos de pago</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cobro in cobros %}
+            <tr class="hist-fila"
+                data-total-boletas="{{ cobro.total_boletas }}"
+                data-total-adicionales="{{ cobro.total_adicionales }}"
+                data-total-general="{{ cobro.total_general }}">
+                <td><span class="hist-id">#{{ cobro.pk }}</span></td>
+                <td>
+                    <span class="hist-fecha">{{ cobro.fecha_cierre|date:"d/m/Y" }}</span>
+                    <span class="hist-hora">{{ cobro.fecha_cierre|date:"H:i" }}</span>
+                </td>
+                <td>
+                    <div class="hist-usuario">
+                        <div class="user-avatar-mini">{{ cobro.creado_por.username|first|upper }}</div>
+                        <span>{{ cobro.creado_por.username|default:"—" }}</span>
+                    </div>
+                </td>
+                <td>
+                    <span class="cobro-badge-count" style="margin:0;">{{ cobro.items.count }}</span>
+                </td>
+                <td><strong>${{ cobro.total_boletas|floatformat:2 }}</strong></td>
+                <td class="hist-adicional">${{ cobro.total_adicionales|floatformat:2 }}</td>
+                <td><strong class="hist-total">${{ cobro.total_general|floatformat:2 }}</strong></td>
+                <td>
+                    <div class="hist-metodos">
+                        {% for pago in cobro.pagos.all %}
+                        <span class="hist-metodo-pill hist-metodo-{{ pago.metodo }}">
+                            {{ pago.get_metodo_display }}: ${{ pago.monto|floatformat:2 }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td>
+                    <button class="btn-accion btn-editar hist-btn-detalle"
+                            data-id="{{ cobro.pk }}"
+                            data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                            data-pagos="{% for pago in cobro.pagos.all %}{{ pago.get_metodo_display }}|{{ pago.monto }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                            data-obs="{{ cobro.observaciones }}">
+                        Ver detalle
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="cobro-estado-vacio" style="padding:4rem 1rem;">
+    <svg viewBox="0 0 48 48" fill="none" width="44" height="44">
+        <rect x="6" y="8" width="36" height="34" rx="3" stroke="#ddd" stroke-width="2"/>
+        <path d="M14 18h20M14 25h14M14 32h8" stroke="#ddd" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <p>No hay cobros registrados{% if desde or hasta %} en ese período{% endif %}</p>
+</div>
+{% endif %}
+
+{# ════ MODAL DETALLE ════ #}
+<div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="detalleTitle">Detalle del cobro</h5>
+                    <p class="modal-subtitle" id="detalleSubtitle"></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="cobro-pagos-hint" style="margin-bottom:.8rem;">Boletas incluidas</p>
+                <div id="detalleItems" class="cobro-items-lista" style="margin-bottom:1rem;"></div>
+                <p class="cobro-pagos-hint" style="margin-bottom:.5rem;">Métodos de pago</p>
+                <div id="detallePagos" class="cobro-pagos-lista" style="margin-bottom:.8rem;"></div>
+                <div id="detalleObs" style="display:none;">
+                    <p class="cobro-pagos-hint" style="margin-bottom:.3rem;">Observaciones</p>
+                    <p id="detalleObsTexto" style="font-size:.83rem;color:#555;"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+const CANALES_HIST = { pagofacil: 'Pago Fácil', rapipago: 'Rapipago', otro: 'Otro' };
+
+function fmt(n) {
+    return '$' + parseFloat(n || 0).toLocaleString('es-AR', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+}
+
+// ── Calcular resumen desde las filas ──
+document.addEventListener('DOMContentLoaded', () => {
+    const filas = document.querySelectorAll('.hist-fila');
+    let sumBoletas = 0, sumAdicionales = 0, sumGeneral = 0;
+    filas.forEach(f => {
+        sumBoletas     += parseFloat(f.dataset.totalBoletas     || 0);
+        sumAdicionales += parseFloat(f.dataset.totalAdicionales || 0);
+        sumGeneral     += parseFloat(f.dataset.totalGeneral     || 0);
+    });
+    const el = id => document.getElementById(id);
+    if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(sumBoletas);
+    if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(sumAdicionales);
+    if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(sumGeneral);
+
+    // ── Botones de detalle ──
+    document.querySelectorAll('.hist-btn-detalle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id    = btn.dataset.id;
+            const items = btn.dataset.items ? btn.dataset.items.split(';;') : [];
+            const pagos = btn.dataset.pagos  ? btn.dataset.pagos.split(';;')  : [];
+            const obs   = btn.dataset.obs || '';
+
+            document.getElementById('detalleTitle').textContent    = `Cobro #${id}`;
+            document.getElementById('detalleSubtitle').textContent = `${items.length} boleta${items.length !== 1 ? 's' : ''}`;
+
+            document.getElementById('detalleItems').innerHTML = items.map(raw => {
+                const [cod, desc, factura, adicional, canal] = raw.split('|');
+                return `
+                    <div class="cobro-item-row">
+                        <div class="cobro-item-header">
+                            <span class="codigo-badge">${cod}</span>
+                            <span class="cobro-item-canal cobro-canal-${canal}">${CANALES_HIST[canal] || canal}</span>
+                        </div>
+                        <div class="cobro-item-desc">${desc}</div>
+                        <div class="cobro-item-montos">
+                            <div class="cobro-item-monto-col">
+                                <span class="cobro-monto-label">Factura</span>
+                                <span class="cobro-monto-val">${fmt(factura)}</span>
+                            </div>
+                            <span class="cobro-monto-mas">+</span>
+                            <div class="cobro-item-monto-col">
+                                <span class="cobro-monto-label">Adicional</span>
+                                <span class="cobro-monto-val cobro-monto-adicional">${fmt(adicional)}</span>
+                            </div>
+                            <span class="cobro-monto-mas">=</span>
+                            <div class="cobro-item-monto-col cobro-item-subtotal">
+                                <span class="cobro-monto-label">Subtotal</span>
+                                <span class="cobro-monto-val cobro-monto-total">${fmt(parseFloat(factura)+parseFloat(adicional))}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            document.getElementById('detallePagos').innerHTML = pagos.map(raw => {
+                const [metodo, monto] = raw.split('|');
+                return `<div class="cobro-pago-row" style="background:#f8f9fb;border-radius:6px;padding:.4rem .7rem;">
+                    <span style="font-size:.83rem;font-weight:600;">${metodo}</span>
+                    <span style="font-size:.83rem;font-weight:700;margin-left:auto;">${fmt(monto)}</span>
+                </div>`;
+            }).join('');
+
+            const obsDiv = document.getElementById('detalleObs');
+            if (obs) {
+                document.getElementById('detalleObsTexto').textContent = obs;
+                obsDiv.style.display = '';
+            } else {
+                obsDiv.style.display = 'none';
+            }
+
+            new bootstrap.Modal(document.getElementById('modalDetalle')).show();
+        });
+    });
+});
+</script>
+{% endblock %}

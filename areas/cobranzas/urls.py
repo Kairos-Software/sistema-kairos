@@ -1,9 +1,11 @@
 from django.urls import path
 from . import views
+from . import views_cobros
 
 app_name = 'cobranzas'
 
 urlpatterns = [
+    # ── Existentes ──────────────────────────────────────────
     path('', views.InicioCobranzasView.as_view(), name='index'),
     path('servicios/', views.GestionServiciosView.as_view(), name='gestion_servicios'),
     path('servicios/acciones/', views.ServicioCrearEditarAjax.as_view(), name='servicio_acciones'),
@@ -11,4 +13,10 @@ urlpatterns = [
     path('servicios/activar/', views.ServicioActivarAjax.as_view(), name='servicio_activar'),
     path('servicios/siguiente-codigo/', views.ServicioSiguienteCodigoAjax.as_view(), name='servicio_siguiente_codigo'),
     path('servicios/prefijos/', views.PrefijosAjax.as_view(), name='servicio_prefijos'),
+
+    # ── Cobros ──────────────────────────────────────────────
+    path('cobros/', views_cobros.GestionCobrosView.as_view(), name='gestion_cobros'),
+    path('cobros/buscar-servicio/', views_cobros.BuscarServicioAjax.as_view(), name='cobro_buscar_servicio'),
+    path('cobros/confirmar/', views_cobros.ConfirmarCobroAjax.as_view(), name='cobro_confirmar'),
+    path('cobros/historial/', views_cobros.HistorialCobrosView.as_view(), name='historial_cobros'),
 ]

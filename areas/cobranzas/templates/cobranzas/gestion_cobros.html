@@ -1,0 +1,280 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Gestión de Cobros — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+{# ── PAGE HEADER ── #}
+<div class="page-header">
+    <div>
+        <h1>Gestión de <span>Cobros</span></h1>
+        <p class="page-subtitle">Cargá las boletas y registrá el pago</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'cobranzas:historial_cobros' %}" class="btn-historial">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M5 6h6M5 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            Ver historial
+        </a>
+        <a href="{% url 'cobranzas:index' %}" class="btn-volver">← Volver</a>
+    </div>
+</div>
+
+
+<div class="cobro-layout">
+
+    {# ══ COLUMNA IZQUIERDA: buscador ══ #}
+    <div class="cobro-panel cobro-panel-buscar">
+
+        <div class="cobro-panel-header">
+            <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+                <circle cx="9" cy="9" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Buscar servicio
+        </div>
+
+        <div class="cobro-search-wrap">
+            <svg class="cobro-search-icon" viewBox="0 0 20 20" fill="none">
+                <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
+                <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input type="text" id="inputBuscarServicio"
+                   placeholder="Código, descripción, proveedor..."
+                   class="cobro-search-input" autocomplete="off">
+            <button type="button" class="cobro-search-clear" id="btnLimpiarBusqueda" style="display:none;">×</button>
+        </div>
+
+        {# Placeholder inicial #}
+        <div id="buscarPlaceholder" class="cobro-estado-vacio">
+            <svg viewBox="0 0 48 48" fill="none" width="36" height="36">
+                <circle cx="22" cy="22" r="13" stroke="#ddd" stroke-width="2"/>
+                <path d="M32 32L42 42" stroke="#ddd" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+            <p>Escribí para buscar un servicio</p>
+        </div>
+
+        {# Sin resultados #}
+        <div id="sinResultados" class="cobro-estado-vacio" style="display:none;">
+            <svg viewBox="0 0 48 48" fill="none" width="36" height="36">
+                <circle cx="24" cy="24" r="18" stroke="#ddd" stroke-width="2"/>
+                <path d="M16 16L32 32M32 16L16 32" stroke="#ddd" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <p>No se encontraron servicios activos</p>
+        </div>
+
+        {# Lista de resultados #}
+        <div id="resultadosBusqueda" style="display:none;">
+            <p class="cobro-resultados-label">Seleccioná para cargar</p>
+            <div id="listaResultados" class="cobro-lista-resultados"></div>
+        </div>
+
+        {# ══ PANEL DE CARGA ══ #}
+        <div id="panelAgregar" class="cobro-panel-carga" style="display:none;">
+
+            <div class="cobro-servicio-seleccionado">
+                <span class="codigo-badge" id="agrCodigo"></span>
+                <div class="cobro-servicio-info">
+                    <strong id="agrDescripcion"></strong>
+                    <span id="agrProveedor" class="cobro-servicio-proveedor"></span>
+                </div>
+                <button type="button" class="cobro-deseleccionar" id="btnDeseleccionar">✕</button>
+            </div>
+
+            <div class="cobro-carga-fields">
+
+                {# IMPORTE — campo principal, el usuario siempre lo carga #}
+                <div class="cobro-field-full">
+                    <label class="cobro-label-principal">
+                        Importe de la factura
+                        <span class="cobro-requerido">*</span>
+                    </label>
+                    <div class="cobro-input-grande-wrap">
+                        <span class="cobro-signo-grande">$</span>
+                        <input type="number" id="agrImporte" min="0" step="0.01"
+                               placeholder="0,00" class="cobro-input-grande">
+                    </div>
+                </div>
+
+                <div class="cobro-fields-row">
+                    {# ADICIONAL — viene del modelo, solo se muestra #}
+                    <div class="cobro-field-half">
+                        <label class="cobro-label-secundario">Adicional (nuestro)</label>
+                        <div class="cobro-adicional-pill">
+                            <span>$</span>
+                            <strong id="agrAdicional"></strong>
+                        </div>
+                    </div>
+
+                    {# CANAL #}
+                    <div class="cobro-field-half">
+                        <label class="cobro-label-secundario">Canal de cobro</label>
+                        <select id="agrCanal" class="cobro-select">
+                            <option value="pagofacil">Pago Fácil</option>
+                            <option value="rapipago">Rapipago</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                </div>
+
+            </div>
+
+            {# Subtotal en tiempo real #}
+            <div class="cobro-subtotal-preview" id="subtotalPreview" style="visibility:hidden;">
+                <span>Subtotal esta boleta:</span>
+                <strong id="subtotalPreviewMonto">$0,00</strong>
+            </div>
+
+            <button type="button" class="btn-cobro-agregar" id="btnAgregarItem">
+                <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                    <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Agregar boleta al cobro
+            </button>
+
+        </div>
+    </div>
+
+    {# ══ COLUMNA DERECHA: carrito + pagos ══ #}
+    <div class="cobro-panel cobro-panel-carrito">
+
+        <div id="carritoVacio" class="cobro-estado-vacio cobro-carrito-vacio-grande">
+            <svg viewBox="0 0 48 48" fill="none" width="44" height="44">
+                <rect x="6" y="14" width="36" height="26" rx="3" stroke="#ddd" stroke-width="2"/>
+                <path d="M16 14V10a8 8 0 0116 0v4" stroke="#ddd" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="18" cy="27" r="2" fill="#ddd"/>
+                <circle cx="30" cy="27" r="2" fill="#ddd"/>
+            </svg>
+            <p>Carrito vacío</p>
+            <span>Buscá y seleccioná un servicio para empezar</span>
+        </div>
+
+        <div id="carritoContenido" style="display:none;">
+
+            <div class="cobro-panel-header">
+                <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+                    <rect x="3" y="6" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M7 6V5a3 3 0 016 0v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Boletas cargadas
+                <span class="cobro-badge-count" id="badgeCount">0</span>
+            </div>
+
+            <div id="listaItems" class="cobro-items-lista"></div>
+
+            {# Totales #}
+            <div class="cobro-totales-bloque">
+                <div class="cobro-total-row">
+                    <span>Total facturas</span>
+                    <strong id="totalFacturas">$0,00</strong>
+                </div>
+                <div class="cobro-total-row cobro-total-adicional">
+                    <span>Total adicionales</span>
+                    <strong id="totalAdicionales">$0,00</strong>
+                </div>
+                <div class="cobro-total-row cobro-total-general">
+                    <span>Total a cobrar</span>
+                    <strong id="totalGeneral">$0,00</strong>
+                </div>
+            </div>
+
+            {# ══ PAGOS ══ #}
+            <div class="cobro-pagos-bloque">
+
+                <div class="cobro-panel-header cobro-pagos-header">
+                    <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+                        <rect x="2" y="6" width="16" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M5 6V5a1 1 0 011-1h8a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        <circle cx="10" cy="10.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+                    </svg>
+                    ¿Cómo paga el cliente?
+                </div>
+
+                <p class="cobro-pagos-hint">
+                    Si paga todo junto, completá el monto y listo.
+                    Si divide el pago entre varios métodos, agregá otro.
+                </p>
+
+                <div id="listaPagos" class="cobro-pagos-lista"></div>
+
+                <button type="button" class="btn-add-metodo" id="btnAgregarPago">
+                    + Agregar otro método de pago
+                </button>
+
+                <div class="cobro-balance-bloque">
+                    <div class="cobro-balance-row">
+                        <span>Asignado</span>
+                        <strong id="totalAsignado">$0,00</strong>
+                    </div>
+                    <div class="cobro-balance-row">
+                        <span id="balanceLabel">Pendiente</span>
+                        <strong id="balanceMonto" class="cobro-balance-pendiente">$0,00</strong>
+                    </div>
+                </div>
+
+                <textarea id="cobroObservaciones" class="cobro-textarea"
+                          rows="2" placeholder="Observaciones opcionales..."></textarea>
+
+                <div id="cobroError" class="alerta-inline alerta-error" style="display:none;margin-top:.5rem;"></div>
+
+                <button type="button" class="btn-cobro-confirmar" id="btnConfirmarCobro">
+                    <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                        <path d="M3 8.5l3.5 3.5L13 4" stroke="currentColor" stroke-width="2"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Confirmar cobro
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ════ MODAL ÉXITO ════ #}
+<div class="modal fade" id="modalExito" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content cobro-modal-exito">
+            <div class="modal-body text-center p-4">
+                <div class="cobro-exito-icono">
+                    <svg viewBox="0 0 48 48" fill="none" width="48" height="48">
+                        <circle cx="24" cy="24" r="20" stroke="#22c55e" stroke-width="2.5"/>
+                        <path d="M14 24.5l7 7L34 16" stroke="#22c55e" stroke-width="2.5"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h5 class="cobro-exito-titulo">¡Cobro registrado!</h5>
+                <p class="cobro-exito-id" id="exitoCobroId"></p>
+                <div class="cobro-exito-totales" id="exitoTotales"></div>
+                <div class="cobro-exito-pagos" id="exitoPagos"></div>
+                <p class="cobro-exito-fecha" id="exitoFecha"></p>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="button" class="btn-cobro-confirmar flex-fill"
+                            id="btnNuevoCobro" data-bs-dismiss="modal">
+                        Nuevo cobro
+                    </button>
+                    <a href="{% url 'cobranzas:historial_cobros' %}" class="btn-volver flex-fill text-center">
+                        Ver historial
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'cobranzas/js/gestion_cobros.js' %}"></script>
+<script>
+    window.cobroBuscarUrl    = "{% url 'cobranzas:cobro_buscar_servicio' %}";
+    window.cobroConfirmarUrl = "{% url 'cobranzas:cobro_confirmar' %}";
+</script>
+{% endblock %}

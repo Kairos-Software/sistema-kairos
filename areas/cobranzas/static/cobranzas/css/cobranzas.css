@@ -328,16 +328,26 @@
    ══════════════════════════════════════ */
 .table-card {
     background: #fff; border-radius: 14px;
-    border: 1px solid #e8e8ee; overflow: hidden;
+    border: 1px solid #e8e8ee;
+    /* overflow:hidden cortaba el botón "Ver detalle" — usar auto para scroll horizontal */
+    overflow-x: auto;
+    overflow-y: hidden;
     box-shadow: 0 1px 6px rgba(0,0,0,0.04);
 }
-.table { width: 100%; border-collapse: collapse; margin: 0; }
+.table { width: 100%; border-collapse: collapse; margin: 0; min-width: 800px; }
 .table thead th {
     font-family: 'Nunito', sans-serif;
     font-size: 0.65rem; font-weight: 700;
     letter-spacing: 1.5px; text-transform: uppercase; color: #aaa;
     padding: 0.8rem 1.1rem; background: #fafafa;
     border-bottom: 1px solid #f0f0f5; white-space: nowrap;
+}
+/* Última columna (acciones) nunca se comprime */
+.table thead th:last-child,
+.table tbody td:last-child {
+    white-space: nowrap;
+    width: 1%;
+    padding-right: 1.1rem;
 }
 .table tbody tr { border-bottom: 1px solid #f5f5f8; transition: background 0.12s; }
 .table tbody tr:last-child { border-bottom: none; }
