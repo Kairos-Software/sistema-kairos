@@ -61,6 +61,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let pkEliminar = null;
 
+    // ─── Último prefijo recordado ────────────────────────────────────────────
+    const STORAGE_KEY_PREFIJO = 'cobranzas_ultimo_prefijo';
+
+    function guardarUltimoPrefijo(prefijo) {
+        try { localStorage.setItem(STORAGE_KEY_PREFIJO, prefijo); } catch {}
+    }
+
+    function leerUltimoPrefijo() {
+        try { return localStorage.getItem(STORAGE_KEY_PREFIJO) || ''; } catch { return ''; }
+    }
+
     // ─── 1. BUSCADOR EN VIVO ────────────────────────────────────────────────
 
     const inputBusqueda     = document.getElementById('inputBusqueda');
@@ -169,6 +180,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 codigoHint.textContent    = '';
                 return;
             }
+            guardarUltimoPrefijo(val);
             cargarSiguienteCodigo(val);
         });
     }
@@ -216,6 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 actualizarSelectPrefijos(d.prefijos, nuevo);
                 cerrarPanelesPrefijo();
                 actualizarBtnEliminar();
+                guardarUltimoPrefijo(nuevo);
                 cargarSiguienteCodigo(nuevo);
             } catch {
                 mostrarErrorPrefijo('Error de conexión.');
@@ -325,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (formError) formError.style.display = 'none';
     }
 
-    function resetForm() {
+    function resetForm(mantenerPrefijo) {
         if (!form) return;
         form.reset();
         document.getElementById('servicioPk').value = '';
@@ -335,10 +348,18 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('id_proveedor').value   = '';
         idCodigo.value = '';
 
-        // Resetear selector de código
-        if (selectPrefijo) selectPrefijo.value = '';
-        if (codigoPreview) codigoPreview.textContent = '—';
-        if (codigoHint)    codigoHint.textContent    = '';
+        // Resetear selector de código: restaurar último prefijo si corresponde
+        const ultimoPrefijo = mantenerPrefijo || leerUltimoPrefijo();
+        if (selectPrefijo) {
+            selectPrefijo.value = ultimoPrefijo || '';
+        }
+        if (ultimoPrefijo && selectPrefijo && selectPrefijo.value === ultimoPrefijo) {
+            // Hay un prefijo recordado y existe en el select → cargar siguiente código
+            cargarSiguienteCodigo(ultimoPrefijo);
+        } else {
+            if (codigoPreview) codigoPreview.textContent = '—';
+            if (codigoHint)    codigoHint.textContent    = '';
+        }
         cerrarPanelesPrefijo();
         actualizarBtnEliminar();
 
@@ -367,7 +388,98 @@ document.addEventListener('DOMContentLoaded', function () {
         ocultarError();
     }
 
-    // ─── 5. BOTÓN NUEVO ──────────────────────────────────────────────────────
+    // ─── Helper: agregar fila a la tabla sin recargar ────────────────────────
+
+    function agregarFilaTabla(servicio) {
+        const tbody = document.getElementById('tbodyServicios');
+        if (!tbody) return;
+
+        // Quitar fila vacía si existe
+        const rowEmpty = tbody.querySelector('#rowEmpty, #rowLiveEmpty');
+        if (rowEmpty) rowEmpty.remove();
+
+        const puedeEditar  = document.querySelector('.btn-editar')  !== null;
+        const puedeEliminar= document.querySelector('.btn-eliminar') !== null;
+        const tieneAcciones= puedeEditar || puedeEliminar;
+
+        const estadoClass = servicio.activo ? 'estado-activo' : 'estado-inactivo';
+        const estadoText  = servicio.activo ? 'Activo' : 'Inactivo';
+        const montoFmt    = parseFloat(servicio.monto).toFixed(2);
+        const proveedor   = servicio.proveedor || '—';
+
+        const accionesHtml = tieneAcciones ? `
+            <td>
+                <div class="acciones-cell">
+                    ${puedeEditar ? `
+                    <button class="btn-accion btn-editar" data-id="${servicio.id}">Editar</button>
+                    <button class="btn-accion btn-activar" data-id="${servicio.id}" data-activo="${servicio.activo}">
+                        ${servicio.activo ? 'Desactivar' : 'Activar'}
+                    </button>` : ''}
+                    ${puedeEliminar ? `
+                    <button class="btn-accion btn-eliminar" data-id="${servicio.id}" data-codigo="${servicio.codigo}">Eliminar</button>
+                    ` : ''}
+                </div>
+            </td>` : '';
+
+        const tr = document.createElement('tr');
+        tr.dataset.id          = servicio.id;
+        tr.dataset.codigo      = servicio.codigo;
+        tr.dataset.descripcion = servicio.descripcion;
+        tr.dataset.monto       = montoFmt;
+        tr.dataset.proveedor   = servicio.proveedor || '';
+        tr.dataset.activo      = servicio.activo ? 'true' : 'false';
+        tr.dataset.search      = `${servicio.codigo.toLowerCase()} ${servicio.descripcion.toLowerCase()} ${(servicio.proveedor || '').toLowerCase()}`;
+
+        tr.innerHTML = `
+            <td><span class="codigo-badge">${servicio.codigo}</span></td>
+            <td>${servicio.descripcion}</td>
+            <td><strong>$${montoFmt}</strong></td>
+            <td>${proveedor}</td>
+            <td><span class="estado-badge ${estadoClass}">${estadoText}</span></td>
+            ${accionesHtml}
+        `;
+
+        // Insertar en orden alfanumérico por código
+        const filas = [...tbody.querySelectorAll('tr[data-id]')];
+        const siguiente = filas.find(f => f.dataset.codigo.localeCompare(servicio.codigo, undefined, {numeric:true}) > 0);
+        if (siguiente) tbody.insertBefore(tr, siguiente);
+        else tbody.appendChild(tr);
+
+        // Reenlazar eventos de la nueva fila
+        tr.querySelector('.btn-editar')?.addEventListener('click', () => {
+            poblarFormulario({
+                id: servicio.id, codigo: servicio.codigo,
+                descripcion: servicio.descripcion, monto: servicio.monto,
+                proveedor: servicio.proveedor, activo: servicio.activo === true
+            });
+            modal?.show();
+        });
+        tr.querySelector('.btn-activar')?.addEventListener('click', async (e) => {
+            const btn2 = e.currentTarget;
+            const fd = new FormData();
+            fd.append('pk', btn2.dataset.id);
+            fd.append('activo', btn2.dataset.activo !== 'true');
+            try {
+                const resp = await postForm(window.servicioActivarUrl, fd);
+                const data = await resp.json();
+                if (data.success) location.reload();
+                else alert('Error al cambiar estado.');
+            } catch { alert('Error de conexión.'); }
+        });
+        tr.querySelector('.btn-eliminar')?.addEventListener('click', (e) => {
+            const btn2 = e.currentTarget;
+            pkEliminar = btn2.dataset.id;
+            document.getElementById('nombreEliminar').textContent = btn2.dataset.codigo;
+            elimModal?.show();
+        });
+
+        // Actualizar contador
+        const contador = document.getElementById('contadorServicios');
+        if (contador) {
+            const totalFilas = tbody.querySelectorAll('tr[data-id]').length;
+            contador.textContent = `${totalFilas} servicio${totalFilas !== 1 ? 's' : ''} registrado${totalFilas !== 1 ? 's' : ''}`;
+        }
+    }
 
     if (btnNuevo) {
         btnNuevo.addEventListener('click', () => {
@@ -418,8 +530,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 const resp = await postForm(window.servicioAccionesUrl, fd);
                 const data = await resp.json();
                 if (data.success) {
-                    modal?.hide();
-                    location.reload();
+                    const pk = document.getElementById('servicioPk')?.value;
+                    if (pk) {
+                        // Edición: cerrar y recargar (comportamiento original)
+                        modal?.hide();
+                        location.reload();
+                    } else {
+                        // Creación: NO cerrar el modal, agregar fila y preparar siguiente
+                        const prefijo = selectPrefijo?.value || leerUltimoPrefijo();
+                        agregarFilaTabla(data.servicio);
+                        resetForm(prefijo);
+                        // Mostrar feedback breve sin cerrar
+                        if (formError) {
+                            formError.style.display = 'block';
+                            formError.style.backgroundColor = '#d4edda';
+                            formError.style.color = '#155724';
+                            formError.style.borderColor = '#c3e6cb';
+                            formError.textContent = `✓ Servicio ${data.servicio.codigo} guardado. Podés seguir cargando.`;
+                            setTimeout(() => {
+                                if (formError) formError.style.display = 'none';
+                                formError.style.backgroundColor = '';
+                                formError.style.color = '';
+                                formError.style.borderColor = '';
+                            }, 3000);
+                        }
+                        // Foco en descripción para agilizar la siguiente carga
+                        setTimeout(() => document.getElementById('id_descripcion')?.focus(), 100);
+                    }
                 } else {
                     const err = Object.entries(data.errors || {})
                         .map(([k, v]) => `${k}: ${v.join(', ')}`)
