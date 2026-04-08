@@ -66,6 +66,23 @@
         </button>
     </div>
 
+    {# ── SELECTOR DE ORDEN ── #}
+    <div class="filtro-orden-wrap">
+        <svg class="filtro-orden-icon" viewBox="0 0 16 16" fill="none" width="13" height="13">
+            <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <select id="selectOrden" class="filtro-select filtro-select-orden" title="Ordenar tabla">
+            <option value="codigo_asc">Código A → Z</option>
+            <option value="codigo_desc">Código Z → A</option>
+            <option value="monto_asc">Monto ↑ menor primero</option>
+            <option value="monto_desc">Monto ↓ mayor primero</option>
+            <option value="descripcion_asc">Descripción A → Z</option>
+            <option value="descripcion_desc">Descripción Z → A</option>
+            <option value="activo_desc">Estado activos primero</option>
+            <option value="activo_asc">Estado inactivos primero</option>
+        </select>
+    </div>
+
     {% if q or filtro_activo or request.GET.monto %}
     <a href="{% url 'cobranzas:gestion_servicios' %}" class="btn-limpiar">× Limpiar</a>
     {% endif %}
@@ -76,11 +93,19 @@
     <table class="table" id="tablaServicios">
         <thead>
             <tr>
-                <th>Código</th>
-                <th>Descripción</th>
-                <th>Monto</th>
+                <th class="th-sortable" data-col="codigo">
+                    Código <span class="th-sort-arrow" data-col="codigo"></span>
+                </th>
+                <th class="th-sortable" data-col="descripcion">
+                    Descripción <span class="th-sort-arrow" data-col="descripcion"></span>
+                </th>
+                <th class="th-sortable" data-col="monto">
+                    Monto <span class="th-sort-arrow" data-col="monto"></span>
+                </th>
                 <th>Proveedor</th>
-                <th>Estado</th>
+                <th class="th-sortable" data-col="activo">
+                    Estado <span class="th-sort-arrow" data-col="activo"></span>
+                </th>
                 {% if puede_editar or puede_eliminar %}<th>Acciones</th>{% endif %}
             </tr>
         </thead>

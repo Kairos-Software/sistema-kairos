@@ -1,0 +1,298 @@
+/* ═══════════════════════════════════════════════════════════
+   CONTADOR DE BILLETES — contador_billetes.css
+   Estilos exclusivos del panel flotante y el botón del sidebar
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Botón en el sidebar ─────────────────────────────────── */
+.btn-contador-sidebar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.85rem;
+    margin: 1px 0.6rem;
+    color: #888;
+    font-size: 0.83rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.18s ease;
+    position: relative;
+    letter-spacing: 0.2px;
+    background: none;
+    border: none;
+    width: calc(100% - 1.2rem);
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    text-align: left;
+}
+.btn-contador-sidebar:hover {
+    background: rgba(255,255,255,0.05);
+    color: #ddd;
+}
+
+/* Badge del atajo — naranja del sistema, bien visible sobre fondo negro */
+.kbd-hint {
+    margin-left: auto;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: rgba(232, 92, 13, 0.18);
+    color: #E85C0D;
+    border: 1px solid rgba(232, 92, 13, 0.40);
+    padding: 2px 7px;
+    border-radius: 5px;
+}
+.btn-contador-sidebar:hover .kbd-hint {
+    background: rgba(232, 92, 13, 0.28);
+    border-color: rgba(232, 92, 13, 0.6);
+    color: #f07333;
+}
+
+/* ── Panel flotante ──────────────────────────────────────── */
+#contadorBilletesPanel {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    width: 300px;
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e8e8ee;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Nunito', sans-serif;
+    animation: cbpSlideIn 0.18s ease;
+}
+#contadorBilletesPanel.abierto { display: flex; }
+
+@keyframes cbpSlideIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.cbp-header {
+    background: #111;
+    padding: 0.75rem 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: grab;
+    user-select: none;
+    border-radius: 16px 16px 0 0;
+    flex-shrink: 0;
+}
+.cbp-header:active { cursor: grabbing; }
+
+.cbp-icon { font-size: 0.95rem; line-height: 1; flex-shrink: 0; }
+
+.cbp-header h6 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+    letter-spacing: 1px;
+    flex: 1;
+}
+
+.cbp-header-acciones {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.cbp-btn-minimizar,
+.cbp-close {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.cbp-btn-minimizar:hover { color: #fff; background: rgba(255,255,255,0.12); }
+.cbp-close:hover         { color: #fff; background: rgba(192,57,43,0.4); }
+
+/* ── Barra minimizada ────────────────────────────────────── */
+.cbp-minimizado-bar {
+    display: none;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.9rem;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f5;
+    cursor: grab;
+}
+.cbp-minimizado-bar:active { cursor: grabbing; }
+
+/* Cuando el panel tiene .minimizado */
+#contadorBilletesPanel.minimizado .cbp-minimizado-bar { display: flex; }
+#contadorBilletesPanel.minimizado .cbp-body           { display: none; }
+#contadorBilletesPanel.minimizado .cbp-footer         { display: none; }
+
+.cbp-mini-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #bbb;
+    white-space: nowrap;
+}
+.cbp-mini-total {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #333;
+    flex: 1;
+    letter-spacing: 0.5px;
+}
+.cbp-mini-total.positivo { color: #E85C0D; }
+
+.cbp-btn-expandir {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(232,92,13,0.08);
+    border: 1px solid rgba(232,92,13,0.25);
+    border-radius: 7px;
+    padding: 0.22rem 0.6rem;
+    font-size: 0.67rem;
+    font-weight: 700;
+    color: #c94e0a;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    letter-spacing: 0.4px;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.cbp-btn-expandir:hover {
+    background: rgba(232,92,13,0.16);
+    border-color: rgba(232,92,13,0.45);
+}
+
+/* ── Cuerpo ──────────────────────────────────────────────── */
+.cbp-body {
+    padding: 0.55rem 0.9rem 0.45rem;
+    max-height: 56vh;
+    overflow-y: auto;
+}
+.cbp-body::-webkit-scrollbar { width: 4px; }
+.cbp-body::-webkit-scrollbar-thumb { background: #e0e0e8; border-radius: 4px; }
+
+.cbp-fila {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.28rem 0;
+    border-bottom: 1px solid #f5f5f8;
+}
+.cbp-fila:last-child { border-bottom: none; }
+
+.cbp-denominacion {
+    font-size: 0.79rem;
+    font-weight: 700;
+    color: #555;
+    white-space: nowrap;
+    min-width: 108px;
+}
+
+.cbp-cantidad {
+    width: 62px;
+    text-align: center;
+    border: 1px solid #e8e8ee;
+    border-radius: 7px;
+    padding: 0.28rem 0.35rem;
+    font-size: 0.87rem;
+    font-weight: 700;
+    color: #222;
+    font-family: 'Nunito', sans-serif;
+    background: #fafafa;
+    transition: all 0.15s;
+    outline: none;
+    -moz-appearance: textfield;
+}
+.cbp-cantidad::-webkit-inner-spin-button,
+.cbp-cantidad::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.cbp-cantidad:focus {
+    border-color: rgba(232,92,13,0.45);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(232,92,13,0.09);
+}
+
+.cbp-subtotal {
+    font-size: 0.79rem;
+    font-weight: 700;
+    color: #ccc;
+    min-width: 70px;
+    text-align: right;
+    font-family: 'Rajdhani', sans-serif;
+    letter-spacing: 0.5px;
+    transition: color 0.15s;
+}
+.cbp-subtotal.tiene-valor { color: #c94e0a; }
+
+/* ── Footer ──────────────────────────────────────────────── */
+.cbp-footer {
+    background: #fafafa;
+    border-top: 1px solid #f0f0f5;
+    padding: 0.7rem 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.cbp-footer-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #bbb;
+    margin-bottom: 1px;
+}
+
+.cbp-total-valor {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.22rem;
+    font-weight: 700;
+    color: #111;
+    letter-spacing: 0.5px;
+    transition: color 0.2s;
+}
+.cbp-total-valor.positivo { color: #E85C0D; }
+
+.cbp-btn-limpiar {
+    background: none;
+    border: 1px solid #e8e8ee;
+    border-radius: 7px;
+    padding: 0.28rem 0.7rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #bbb;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.cbp-btn-limpiar:hover {
+    background: rgba(192,57,43,0.07);
+    border-color: rgba(192,57,43,0.3);
+    color: #c0392b;
+}

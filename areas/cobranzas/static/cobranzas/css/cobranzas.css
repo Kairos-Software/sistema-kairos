@@ -649,3 +649,46 @@
     font-size: 0.83rem;
     color: #555;
 }
+/* ═══════════════════════════════════════════════════════════
+   ORDENAMIENTO DE TABLA — agregar al final de cobranzas.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Wrapper del select de orden en la barra de filtros ── */
+.filtro-orden-wrap {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+}
+
+.filtro-orden-icon {
+    color: #888;
+    flex-shrink: 0;
+}
+
+/* Variante más angosta para el select de orden */
+.filtro-select-orden {
+    min-width: 180px;
+}
+
+/* ── Headers de columna ordenables ── */
+.th-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color .15s;
+}
+
+.th-sortable:hover {
+    color: var(--color-primary, #0d6efd);
+}
+
+.th-sorted {
+    color: var(--color-primary, #0d6efd);
+}
+
+.th-sort-arrow {
+    font-size: .75rem;
+    opacity: .7;
+    display: inline-block;
+    min-width: 1ch; /* reserva espacio para evitar saltos de layout */
+}

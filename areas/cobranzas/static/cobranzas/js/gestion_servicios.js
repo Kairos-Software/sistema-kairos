@@ -72,11 +72,129 @@ document.addEventListener('DOMContentLoaded', function () {
         try { return localStorage.getItem(STORAGE_KEY_PREFIJO) || ''; } catch { return ''; }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ─── MÓDULO DE ORDENAMIENTO CLIENT-SIDE ─────────────────────────────
+    //
+    // Motivación: el ordenamiento en DB varía entre SQLite (dev) y
+    // PostgreSQL/MySQL (prod) por diferencias de collation y soporte de
+    // orden alfanumérico. Moverlo al cliente garantiza comportamiento
+    // idéntico en todos los entornos y le da al usuario control total.
+    //
+    // Preferencia persistida en localStorage → sobrevive navegación y
+    // recargas, sin necesidad de parámetros en la URL.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const STORAGE_KEY_ORDEN = 'cobranzas_orden_servicios';
+    const tbody             = document.getElementById('tbodyServicios');
+    const selectOrden       = document.getElementById('selectOrden');
+
+    /**
+     * Comparador alfanumérico natural.
+     * "EX2" < "EX10" < "TR1"  (en lugar del léxico "EX10" < "EX2")
+     */
+    function cmpAlfaNum(a, b) {
+        return a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' });
+    }
+
+    /**
+     * Ordena las filas visibles del tbody según la clave indicada.
+     * No toca filas sin data-id (ej: fila vacía).
+     *
+     * @param {string} clave  – formato "campo_direccion", ej: "codigo_asc"
+     */
+    function ordenarTabla(clave) {
+        if (!tbody) return;
+
+        const filas = [...tbody.querySelectorAll('tr[data-id]')];
+        if (!filas.length) return;
+
+        const [campo, dir] = clave.split('_');
+        const asc = (dir !== 'desc');
+
+        filas.sort((a, b) => {
+            let va, vb;
+
+            switch (campo) {
+                case 'monto':
+                    va = parseFloat(a.dataset.monto) || 0;
+                    vb = parseFloat(b.dataset.monto) || 0;
+                    return asc ? va - vb : vb - va;
+
+                case 'activo':
+                    // true=1, false=0
+                    va = a.dataset.activo === 'true' ? 1 : 0;
+                    vb = b.dataset.activo === 'true' ? 1 : 0;
+                    // desc → activos (1) primero; asc → inactivos (0) primero
+                    return asc ? va - vb : vb - va;
+
+                case 'descripcion':
+                    va = (a.dataset.descripcion || '').toLowerCase();
+                    vb = (b.dataset.descripcion || '').toLowerCase();
+                    return asc ? va.localeCompare(vb, 'es') : vb.localeCompare(va, 'es');
+
+                case 'codigo':
+                default:
+                    va = a.dataset.codigo || '';
+                    vb = b.dataset.codigo || '';
+                    return asc ? cmpAlfaNum(va, vb) : cmpAlfaNum(vb, va);
+            }
+        });
+
+        // Re-insertar en el nuevo orden (mantiene filas especiales al final)
+        filas.forEach(tr => tbody.appendChild(tr));
+
+        // Actualizar flechas en los headers
+        actualizarFlechasHeader(campo, asc);
+    }
+
+    /** Dibuja ↑ / ↓ en el th activo y limpia los demás. */
+    function actualizarFlechasHeader(campoActivo, asc) {
+        document.querySelectorAll('.th-sort-arrow').forEach(el => {
+            const col = el.dataset.col;
+            if (col === campoActivo) {
+                el.textContent = asc ? ' ↑' : ' ↓';
+                el.closest('th')?.classList.add('th-sorted');
+            } else {
+                el.textContent = '';
+                el.closest('th')?.classList.remove('th-sorted');
+            }
+        });
+    }
+
+    /** Guarda la preferencia y aplica el orden. */
+    function aplicarOrden(clave) {
+        try { localStorage.setItem(STORAGE_KEY_ORDEN, clave); } catch {}
+        ordenarTabla(clave);
+        if (selectOrden) selectOrden.value = clave;
+    }
+
+    // Inicialización: leer preferencia guardada (default: codigo_asc)
+    const ordenGuardado = (() => {
+        try { return localStorage.getItem(STORAGE_KEY_ORDEN) || 'codigo_asc'; } catch { return 'codigo_asc'; }
+    })();
+    aplicarOrden(ordenGuardado);
+
+    // Cambio desde el select desplegable
+    if (selectOrden) {
+        selectOrden.addEventListener('change', () => aplicarOrden(selectOrden.value));
+    }
+
+    // Clic en cabecera de columna → alterna asc/desc
+    document.querySelectorAll('.th-sortable').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => {
+            const col = th.dataset.col;
+            const [actualCampo, actualDir] = (selectOrden?.value || ordenGuardado).split('_');
+            // Si ya estamos ordenados por esta columna, invertir; sino asc
+            const nuevaDir = (col === actualCampo && actualDir === 'asc') ? 'desc' : 'asc';
+            aplicarOrden(`${col}_${nuevaDir}`);
+        });
+    });
+
     // ─── 1. BUSCADOR EN VIVO ────────────────────────────────────────────────
 
     const inputBusqueda     = document.getElementById('inputBusqueda');
     const btnLimpiarBusq    = document.getElementById('btnLimpiarBusqueda');
-    const tbody             = document.getElementById('tbodyServicios');
     const paginacion        = document.getElementById('paginacion');
     const tmplSinResultados = document.getElementById('tmplSinResultados');
     let rowLiveEmpty        = null;
@@ -391,7 +509,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // ─── Helper: agregar fila a la tabla sin recargar ────────────────────────
 
     function agregarFilaTabla(servicio) {
-        const tbody = document.getElementById('tbodyServicios');
         if (!tbody) return;
 
         // Quitar fila vacía si existe
@@ -439,11 +556,9 @@ document.addEventListener('DOMContentLoaded', function () {
             ${accionesHtml}
         `;
 
-        // Insertar en orden alfanumérico por código
-        const filas = [...tbody.querySelectorAll('tr[data-id]')];
-        const siguiente = filas.find(f => f.dataset.codigo.localeCompare(servicio.codigo, undefined, {numeric:true}) > 0);
-        if (siguiente) tbody.insertBefore(tr, siguiente);
-        else tbody.appendChild(tr);
+        // Agregar la nueva fila y re-aplicar el orden actual
+        tbody.appendChild(tr);
+        ordenarTabla(selectOrden?.value || ordenGuardado);
 
         // Reenlazar eventos de la nueva fila
         tr.querySelector('.btn-editar')?.addEventListener('click', () => {

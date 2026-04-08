@@ -87,9 +87,13 @@ class GestionServiciosView(LoginRequiredMixin, View):
         if activo in ('true', 'false'):
             qs = qs.filter(activo=(activo == 'true'))
 
-        # Orden alfanumérico: la DB ya ordena por 'codigo' (Meta.ordering),
-        # pero forzamos aquí para que ningún filtro lo rompa.
-        qs = qs.order_by('codigo')
+        # NOTA: el ordenamiento se dejó intencionalmente al cliente (JS).
+        # Esto evita inconsistencias entre motores de base de datos (SQLite vs
+        # PostgreSQL) y collations distintas en producción.
+        # El JS en gestion_servicios.js se encarga de ordenar la tabla.
+        # Solo aplicamos un orden base neutral por PK para que la paginación
+        # sea estable y no varíe entre páginas.
+        qs = qs.order_by('pk')
 
         paginator = Paginator(qs, 8)
         servicios = paginator.get_page(request.GET.get('page', 1))
