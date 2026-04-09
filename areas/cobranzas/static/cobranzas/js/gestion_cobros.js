@@ -1,21 +1,36 @@
 // ═══════════════════════════════════════════════════════════
-// GESTIÓN DE COBROS — gestion_cobros.js
+// GESTIÓN DE COBROS — gestion_cobros.js  (híbrido)
 //
-// LÓGICA DE MONTOS (importante):
-//   monto del servicio (modelo) = nuestro ADICIONAL, precio fijo
-//   importe que carga el usuario = monto de la FACTURA del cliente
-//   total por boleta = factura + adicional
+// LÓGICA DE MONTOS (crítico — no modificar sin revisar todo):
+//   Servicio.monto  = nuestro ADICIONAL (ganancia fija por cobro)
+//   importe         = monto de la FACTURA del cliente (lo ingresa el usuario)
+//   subtotal        = importe + adicional
+//
+// DOS MODOS DE BÚSQUEDA:
+//   Tab 1 — Inteligente: prefijo + importe → backend detecta servicio automáticamente
+//   Tab 2 — Texto:       búsqueda libre (código / descripción / proveedor) → selección manual
+//
+// Ambos modos usan el mismo endpoint /cobros/buscar-servicio/ pero con parámetros distintos:
+//   Inteligente: ?prefijo=EX&valor=1500
+//   Texto:       ?q=luz
 // ═══════════════════════════════════════════════════════════
 
-console.log("Módulo Gestión Cobros cargado.");
+console.log("Módulo Gestión Cobros (híbrido) cargado.");
 
-// ── Estado ──────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ════════════════════════════════════════════════════════════
 const estado = {
-    items: [],
-    pagos: [],
-    servicioSeleccionado: null,
-    pagoIdSeq: 0,
-    itemIdSeq: 0,
+    items:                    [],
+    pagos:                    [],
+    // Tab inteligente
+    smartServicio:            null,   // servicio detectado automáticamente
+    smartImporte:             0,      // importe confirmado para ese servicio
+    // Tab texto
+    textoServicioSeleccionado: null,
+    // Secuencias
+    pagoIdSeq:                0,
+    itemIdSeq:                0,
 };
 
 const CANALES = {
@@ -32,7 +47,9 @@ const METODOS_PAGO = {
     qr:            'QR',
 };
 
-// ── Helpers ─────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════
 function fmt(n) {
     return '$' + parseFloat(n || 0).toLocaleString('es-AR', {
         minimumFractionDigits: 2, maximumFractionDigits: 2
@@ -52,8 +69,182 @@ function esc(str) {
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+
 // ════════════════════════════════════════════════════════════
-// BÚSQUEDA
+// TABS
+// ════════════════════════════════════════════════════════════
+const panelInteligente = document.getElementById('panelTabInteligente');
+const panelTexto       = document.getElementById('panelTabTexto');
+
+document.querySelectorAll('.cobro-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.cobro-tab').forEach(b => b.classList.remove('cobro-tab-active'));
+        btn.classList.add('cobro-tab-active');
+
+        const tab = btn.dataset.tab;
+        panelInteligente.style.display = tab === 'inteligente' ? '' : 'none';
+        panelTexto.style.display       = tab === 'texto'       ? '' : 'none';
+
+        // Focus en el primer campo del tab activado
+        if (tab === 'inteligente') {
+            smartLimpiarResultado();
+            document.getElementById('smartPrefijo').focus();
+        } else {
+            cerrarPanelCarga();
+            document.getElementById('inputBuscarServicio').focus();
+        }
+    });
+});
+
+
+// ════════════════════════════════════════════════════════════
+// TAB 1 — BÚSQUEDA INTELIGENTE (prefijo + importe)
+// ════════════════════════════════════════════════════════════
+const elSmartPrefijo       = document.getElementById('smartPrefijo');
+const elSmartImporte       = document.getElementById('smartImporte');
+const elSmartBuscando      = document.getElementById('smartBuscando');
+const elSmartError         = document.getElementById('smartError');
+const elSmartResultado     = document.getElementById('smartResultado');
+const elSmartImporteConfirm = document.getElementById('smartImporteConfirm');
+
+function smartMostrarError(msg) {
+    elSmartError.textContent   = msg;
+    elSmartError.style.display = '';
+}
+function smartOcultarError() {
+    elSmartError.style.display = 'none';
+}
+
+function smartLimpiarResultado() {
+    elSmartResultado.style.display = 'none';
+    estado.smartServicio           = null;
+    estado.smartImporte            = 0;
+}
+
+// Enter en prefijo → foco a importe
+elSmartPrefijo.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); elSmartImporte.focus(); }
+});
+
+// Enter en importe → buscar
+elSmartImporte.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btnSmartBuscar').click(); }
+});
+
+// Limpiar resultado al editar los campos de búsqueda
+elSmartPrefijo.addEventListener('input', () => {
+    smartOcultarError();
+    smartLimpiarResultado();
+});
+elSmartImporte.addEventListener('input', () => {
+    smartOcultarError();
+    smartLimpiarResultado();
+});
+
+// Botón buscar
+document.getElementById('btnSmartBuscar').addEventListener('click', async () => {
+    smartOcultarError();
+    smartLimpiarResultado();
+
+    const prefijo = elSmartPrefijo.value.trim().toUpperCase();
+    const importe = parseFloat(elSmartImporte.value);
+
+    if (!prefijo) {
+        smartMostrarError('Ingresá el prefijo del servicio (ej: EX).');
+        elSmartPrefijo.focus();
+        return;
+    }
+    if (!importe || importe <= 0) {
+        smartMostrarError('Ingresá un importe de factura válido.');
+        elSmartImporte.focus();
+        return;
+    }
+
+    elSmartBuscando.style.display = '';
+    document.getElementById('btnSmartBuscar').disabled = true;
+
+    try {
+        const url  = `${window.cobroBuscarUrl}?prefijo=${encodeURIComponent(prefijo)}&valor=${encodeURIComponent(importe)}`;
+        const res  = await fetch(url);
+        const data = await res.json();
+
+        if (!data.encontrado) {
+            smartMostrarError(data.mensaje || 'No se encontró ningún servicio para ese prefijo e importe.');
+            return;
+        }
+
+        // ── Servicio encontrado ──
+        const s        = data.servicio;
+        const adicional = parseFloat(s.monto);
+
+        estado.smartServicio = s;
+        estado.smartImporte  = importe;
+
+        document.getElementById('smartSrvCodigo').textContent      = s.codigo;
+        document.getElementById('smartSrvDescripcion').textContent = s.descripcion;
+        document.getElementById('smartSrvProveedor').textContent   = s.proveedor || '';
+        document.getElementById('smartSrvAdicional').textContent   =
+            adicional.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        elSmartImporteConfirm.value = importe.toFixed(2);
+
+        // Subtotal
+        document.getElementById('smartSubtotalMonto').textContent = fmt(importe + adicional);
+
+        elSmartResultado.style.display = '';
+
+    } catch (err) {
+        smartMostrarError('Error de red. Intentá de nuevo.');
+        console.error(err);
+    } finally {
+        elSmartBuscando.style.display = 'none';
+        document.getElementById('btnSmartBuscar').disabled = false;
+    }
+});
+
+// Botón limpiar resultado
+document.getElementById('btnSmartLimpiar').addEventListener('click', () => {
+    smartLimpiarResultado();
+    elSmartPrefijo.value  = '';
+    elSmartImporte.value  = '';
+    smartOcultarError();
+    elSmartPrefijo.focus();
+});
+
+// Agregar boleta desde modo inteligente
+document.getElementById('btnSmartAgregar').addEventListener('click', () => {
+    const s       = estado.smartServicio;
+    const importe = estado.smartImporte;
+    if (!s || !importe || importe <= 0) return;
+
+    const canal     = document.getElementById('smartCanal').value;
+    const adicional = parseFloat(s.monto);
+
+    estado.itemIdSeq++;
+    estado.items.push({
+        _id:             estado.itemIdSeq,
+        servicio_id:     s.id,
+        codigo:          s.codigo,
+        descripcion:     s.descripcion,
+        proveedor:       s.proveedor || '',
+        monto_factura:   importe,
+        monto_adicional: adicional,
+        canal,
+        _modo:           'inteligente',   // solo para trazabilidad interna, no se envía
+    });
+
+    renderCarrito();
+
+    // Limpiar para la próxima boleta
+    smartLimpiarResultado();
+    elSmartPrefijo.value = '';
+    elSmartImporte.value = '';
+    elSmartPrefijo.focus();
+});
+
+
+// ════════════════════════════════════════════════════════════
+// TAB 2 — BÚSQUEDA POR TEXTO (código / descripción / proveedor)
 // ════════════════════════════════════════════════════════════
 const inputBuscar     = document.getElementById('inputBuscarServicio');
 const btnLimpiar      = document.getElementById('btnLimpiarBusqueda');
@@ -69,14 +260,14 @@ inputBuscar.addEventListener('input', () => {
     const q = inputBuscar.value.trim();
     btnLimpiar.style.display = q ? '' : 'none';
     clearTimeout(searchTimer);
-    if (!q) { mostrarEstado('placeholder'); return; }
+    if (!q) { mostrarEstadoBusqueda('placeholder'); return; }
     searchTimer = setTimeout(() => buscarServicios(q), 280);
 });
 
 btnLimpiar.addEventListener('click', () => {
     inputBuscar.value = '';
     btnLimpiar.style.display = 'none';
-    mostrarEstado('placeholder');
+    mostrarEstadoBusqueda('placeholder');
     cerrarPanelCarga();
 });
 
@@ -84,11 +275,11 @@ document.getElementById('btnDeseleccionar').addEventListener('click', () => {
     cerrarPanelCarga();
     inputBuscar.value = '';
     btnLimpiar.style.display = 'none';
-    mostrarEstado('placeholder');
+    mostrarEstadoBusqueda('placeholder');
     inputBuscar.focus();
 });
 
-function mostrarEstado(cual) {
+function mostrarEstadoBusqueda(cual) {
     elPlaceholder.style.display   = cual === 'placeholder' ? '' : 'none';
     elSinResultados.style.display = cual === 'vacio'       ? '' : 'none';
     elResultados.style.display    = cual === 'resultados'  ? '' : 'none';
@@ -99,12 +290,16 @@ async function buscarServicios(q) {
         const res  = await fetch(`${window.cobroBuscarUrl}?q=${encodeURIComponent(q)}`);
         const data = await res.json();
 
-        if (!data.servicios.length) { mostrarEstado('vacio'); return; }
+        if (!data.servicios || !data.servicios.length) {
+            mostrarEstadoBusqueda('vacio');
+            return;
+        }
 
-        // El "monto" del servicio = nuestro adicional fijo
+        // Nota: el "monto" del servicio es nuestro adicional
         listaResultados.innerHTML = data.servicios.map(s => `
             <div class="cobro-resultado-item" tabindex="0"
-                 data-id="${s.id}" data-codigo="${esc(s.codigo)}"
+                 data-id="${s.id}"
+                 data-codigo="${esc(s.codigo)}"
                  data-descripcion="${esc(s.descripcion)}"
                  data-adicional="${s.monto}"
                  data-proveedor="${esc(s.proveedor || '')}">
@@ -117,14 +312,14 @@ async function buscarServicios(q) {
             </div>
         `).join('');
 
-        mostrarEstado('resultados');
+        mostrarEstadoBusqueda('resultados');
 
         listaResultados.querySelectorAll('.cobro-resultado-item').forEach(el => {
             const abrir = () => seleccionarServicio({
                 id:          parseInt(el.dataset.id),
                 codigo:      el.dataset.codigo,
                 descripcion: el.dataset.descripcion,
-                adicional:   parseFloat(el.dataset.adicional),   // ← esto es el adicional
+                adicional:   parseFloat(el.dataset.adicional),
                 proveedor:   el.dataset.proveedor,
             });
             el.addEventListener('click', abrir);
@@ -136,18 +331,15 @@ async function buscarServicios(q) {
     }
 }
 
-// ════════════════════════════════════════════════════════════
-// PANEL DE CARGA
-// ════════════════════════════════════════════════════════════
+// ── Panel de carga manual ────────────────────────────────────
 const agrImporte = document.getElementById('agrImporte');
 
 function seleccionarServicio(s) {
-    estado.servicioSeleccionado = s;
+    estado.textoServicioSeleccionado = s;
 
     document.getElementById('agrCodigo').textContent      = s.codigo;
     document.getElementById('agrDescripcion').textContent = s.descripcion;
     document.getElementById('agrProveedor').textContent   = s.proveedor || '';
-    // Mostramos el adicional fijo del servicio
     document.getElementById('agrAdicional').textContent   =
         parseFloat(s.adicional).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -155,7 +347,7 @@ function seleccionarServicio(s) {
     document.getElementById('subtotalPreview').style.visibility = 'hidden';
     panelAgregar.style.display = '';
 
-    // Resalta ítem seleccionado
+    // Marca el ítem seleccionado en la lista
     listaResultados.querySelectorAll('.cobro-resultado-item').forEach(el => {
         el.classList.toggle('cobro-resultado-selected', parseInt(el.dataset.id) === s.id);
     });
@@ -165,12 +357,12 @@ function seleccionarServicio(s) {
 
 function cerrarPanelCarga() {
     panelAgregar.style.display = 'none';
-    estado.servicioSeleccionado = null;
+    estado.textoServicioSeleccionado = null;
 }
 
-// Subtotal en tiempo real mientras escribe el importe
+// Subtotal en tiempo real
 agrImporte.addEventListener('input', () => {
-    const s = estado.servicioSeleccionado;
+    const s = estado.textoServicioSeleccionado;
     if (!s) return;
     const importe  = parseFloat(agrImporte.value) || 0;
     const subtotal = importe + s.adicional;
@@ -184,13 +376,13 @@ agrImporte.addEventListener('input', () => {
     }
 });
 
-// Enter en el campo de importe = agregar
+// Enter en importe → agregar
 agrImporte.addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('btnAgregarItem').click();
 });
 
 document.getElementById('btnAgregarItem').addEventListener('click', () => {
-    const s = estado.servicioSeleccionado;
+    const s = estado.textoServicioSeleccionado;
     if (!s) return;
 
     const importe = parseFloat(agrImporte.value);
@@ -205,23 +397,26 @@ document.getElementById('btnAgregarItem').addEventListener('click', () => {
 
     estado.itemIdSeq++;
     estado.items.push({
-        _id:            estado.itemIdSeq,
-        servicio_id:    s.id,
-        codigo:         s.codigo,
-        descripcion:    s.descripcion,
-        proveedor:      s.proveedor,
-        monto_factura:  importe,      // lo que ingresó el usuario
-        monto_adicional: s.adicional, // fijo del servicio
+        _id:             estado.itemIdSeq,
+        servicio_id:     s.id,
+        codigo:          s.codigo,
+        descripcion:     s.descripcion,
+        proveedor:       s.proveedor || '',
+        monto_factura:   importe,
+        monto_adicional: s.adicional,
         canal,
+        _modo:           'texto',
     });
 
     renderCarrito();
+
     cerrarPanelCarga();
     inputBuscar.value = '';
     btnLimpiar.style.display = 'none';
-    mostrarEstado('placeholder');
+    mostrarEstadoBusqueda('placeholder');
     inputBuscar.focus();
 });
+
 
 // ════════════════════════════════════════════════════════════
 // CARRITO
@@ -233,7 +428,7 @@ const listaItems       = document.getElementById('listaItems');
 function renderCarrito() {
     const hay = estado.items.length > 0;
     carritoVacio.style.display     = hay ? 'none' : '';
-    carritoContenido.style.display = hay ? '' : 'none';
+    carritoContenido.style.display = hay ? ''     : 'none';
     if (!hay) return;
 
     document.getElementById('badgeCount').textContent = estado.items.length;
@@ -243,7 +438,7 @@ function renderCarrito() {
             <div class="cobro-item-header">
                 <span class="codigo-badge">${esc(item.codigo)}</span>
                 <span class="cobro-item-canal cobro-canal-${item.canal}">${CANALES[item.canal]}</span>
-                <button class="cobro-item-remove" data-iid="${item._id}" title="Quitar">×</button>
+                <button class="cobro-item-remove" data-iid="${item._id}" title="Quitar boleta">×</button>
             </div>
             <div class="cobro-item-desc">${esc(item.descripcion)}</div>
             <div class="cobro-item-montos">
@@ -278,19 +473,19 @@ function renderCarrito() {
 }
 
 function actualizarTotales() {
-    const totFacturas   = estado.items.reduce((s, i) => s + i.monto_factura, 0);
-    const totAdicional  = estado.items.reduce((s, i) => s + i.monto_adicional, 0);
-    const totGeneral    = totFacturas + totAdicional;
+    const totFacturas  = estado.items.reduce((s, i) => s + i.monto_factura, 0);
+    const totAdicional = estado.items.reduce((s, i) => s + i.monto_adicional, 0);
+    const totGeneral   = totFacturas + totAdicional;
 
-    document.getElementById('totalFacturas').textContent   = fmt(totFacturas);
+    document.getElementById('totalFacturas').textContent    = fmt(totFacturas);
     document.getElementById('totalAdicionales').textContent = fmt(totAdicional);
-    document.getElementById('totalGeneral').textContent    = fmt(totGeneral);
+    document.getElementById('totalGeneral').textContent     = fmt(totGeneral);
 
     actualizarBalance();
 }
 
-// Si hay un solo método de pago, le sugiere automáticamente el total
 function sincronizarPago() {
+    // Si hay exactamente un método de pago, le auto-asigna el total
     if (estado.pagos.length === 1) {
         const total = estado.items.reduce((s, i) => s + i.monto_factura + i.monto_adicional, 0);
         estado.pagos[0].monto = total;
@@ -299,6 +494,7 @@ function sincronizarPago() {
         actualizarBalance();
     }
 }
+
 
 // ════════════════════════════════════════════════════════════
 // PAGOS
@@ -385,8 +581,9 @@ function actualizarBalance() {
     }
 }
 
+
 // ════════════════════════════════════════════════════════════
-// CONFIRMAR
+// CONFIRMAR COBRO
 // ════════════════════════════════════════════════════════════
 document.getElementById('btnConfirmarCobro').addEventListener('click', async () => {
     document.getElementById('cobroError').style.display = 'none';
@@ -395,6 +592,7 @@ document.getElementById('btnConfirmarCobro').addEventListener('click', async () 
         mostrarError('No hay boletas cargadas.');
         return;
     }
+
     const total    = estado.items.reduce((s, i) => s + i.monto_factura + i.monto_adicional, 0);
     const asignado = estado.pagos.reduce((s, p) => s + p.monto, 0);
 
@@ -407,7 +605,7 @@ document.getElementById('btnConfirmarCobro').addEventListener('click', async () 
         return;
     }
 
-    // Enviamos: monto_servicio = factura, monto_adicional = adicional
+    // Payload — solo datos necesarios para el backend, sin campos internos (_id, _modo, etc.)
     const payload = {
         items: estado.items.map(i => ({
             servicio_id:     i.servicio_id,
@@ -428,9 +626,9 @@ document.getElementById('btnConfirmarCobro').addEventListener('click', async () 
 
     try {
         const res  = await fetch(window.cobroConfirmarUrl, {
-            method: 'POST',
+            method:  'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-            body: JSON.stringify(payload),
+            body:    JSON.stringify(payload),
         });
         const data = await res.json();
 
@@ -456,6 +654,7 @@ function mostrarError(msg) {
     el.style.display = '';
 }
 
+
 // ════════════════════════════════════════════════════════════
 // MODAL ÉXITO
 // ════════════════════════════════════════════════════════════
@@ -478,22 +677,44 @@ function mostrarExito(data) {
 document.getElementById('btnNuevoCobro').addEventListener('click', resetear);
 
 function resetear() {
-    estado.items = [];
-    estado.pagos = [];
-    estado.servicioSeleccionado = null;
-    estado.pagoIdSeq = 0;
-    estado.itemIdSeq = 0;
+    estado.items                     = [];
+    estado.pagos                     = [];
+    estado.smartServicio             = null;
+    estado.smartImporte              = 0;
+    estado.textoServicioSeleccionado = null;
+    estado.pagoIdSeq                 = 0;
+    estado.itemIdSeq                 = 0;
 
+    // Limpiar tab inteligente
+    elSmartPrefijo.value  = '';
+    elSmartImporte.value  = '';
+    smartOcultarError();
+    smartLimpiarResultado();
+
+    // Limpiar tab texto
+    inputBuscar.value = '';
+    btnLimpiar.style.display = 'none';
+    mostrarEstadoBusqueda('placeholder');
+    cerrarPanelCarga();
+
+    // Reiniciar carrito y pagos
     renderCarrito();
     renderPagos();
     agregarFilaPago('efectivo', 0);
     document.getElementById('cobroObservaciones').value = '';
     document.getElementById('cobroError').style.display = 'none';
-    inputBuscar.focus();
+
+    // Volver al tab inteligente y darle foco
+    document.querySelectorAll('.cobro-tab').forEach(b => b.classList.remove('cobro-tab-active'));
+    document.querySelector('[data-tab="inteligente"]').classList.add('cobro-tab-active');
+    panelInteligente.style.display = '';
+    panelTexto.style.display       = 'none';
+    elSmartPrefijo.focus();
 }
+
 
 // ════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════
 agregarFilaPago('efectivo', 0);
-inputBuscar.focus();
+elSmartPrefijo.focus();

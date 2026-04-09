@@ -183,3 +183,33 @@ main {
 .dropdown-divider {
     border-top: 1px solid #2a2a2a;
 }
+/* ════════════════════════════════════════════════════════════
+   SCROLLBAR — Estilo Kairos
+   Naranja sólida, sin bordes redondeados, integrada al diseño
+   como la barra decorativa del navbar
+   ════════════════════════════════════════════════════════════ */
+
+/* Webkit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #E85C0D;
+    border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #c94e0a;
+}
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #E85C0D transparent;
+}

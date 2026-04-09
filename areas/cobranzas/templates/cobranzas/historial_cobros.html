@@ -18,6 +18,23 @@
         </p>
     </div>
     <div class="page-header-actions">
+        {% if user.is_staff or user.is_superuser %}
+        <button type="button" class="btn-limpiezaauto" id="btnEliminarPorFiltros">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Eliminar registros
+        </button>
+        <button type="button" class="btn-limpiezaauto" id="btnLimpiezaAuto"
+                title="Elimina cobros del mes anterior. Disponible a partir del día 20.">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M8 2v3M8 11v3M2 8h3M11 8h3M4.2 4.2l2.1 2.1M9.7 9.7l2.1 2.1M4.2 11.8l2.1-2.1M9.7 6.3l2.1-2.1"
+                      stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            Limpieza automática
+        </button>
+        {% endif %}
         <a href="{% url 'cobranzas:gestion_cobros' %}" class="btn-nuevo">
             <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
                 <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -28,7 +45,7 @@
     </div>
 </div>
 
-{# ── FILTROS ── #}
+{# ── FILTROS DE BÚSQUEDA — simples, solo fechas ── #}
 <form method="get" class="filtros-bar" id="formFiltros">
     <div class="filtro-fecha-wrap">
         <label class="filtro-fecha-label">Desde</label>
@@ -46,7 +63,24 @@
 
 {% if cobros %}
 
-{# ── RESUMEN TOTALES DEL PERÍODO ── #}
+{# ── BARRA DE SELECCIÓN MASIVA ── #}
+{% if user.is_staff or user.is_superuser %}
+<div class="hist-acciones-masivas" id="barraAccionesMasivas" style="display:none;">
+    <span class="hist-sel-count" id="selCount">0 seleccionados</span>
+    <button type="button" class="btn-eliminar-sel" id="btnEliminarSeleccionados">
+        <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
+            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Eliminar seleccionados
+    </button>
+    <button type="button" class="btn-deseleccionar-todo" id="btnDeseleccionarTodo">
+        Deseleccionar todo
+    </button>
+</div>
+{% endif %}
+
+{# ── RESUMEN ── #}
 <div class="hist-resumen-grid">
     <div class="hist-resumen-card">
         <span class="hist-resumen-label">Total cobros</span>
@@ -71,6 +105,12 @@
     <table class="table" id="tablaHistorial">
         <thead>
             <tr>
+                {% if user.is_staff or user.is_superuser %}
+                <th style="width:32px;">
+                    <input type="checkbox" id="checkTodos" title="Seleccionar todos"
+                           style="accent-color:#E85C0D;cursor:pointer;">
+                </th>
+                {% endif %}
                 <th>#</th>
                 <th>Fecha y hora</th>
                 <th>Usuario</th>
@@ -85,9 +125,18 @@
         <tbody>
             {% for cobro in cobros %}
             <tr class="hist-fila"
+                data-id="{{ cobro.pk }}"
                 data-total-boletas="{{ cobro.total_boletas }}"
                 data-total-adicionales="{{ cobro.total_adicionales }}"
                 data-total-general="{{ cobro.total_general }}">
+
+                {% if user.is_staff or user.is_superuser %}
+                <td>
+                    <input type="checkbox" class="check-cobro" data-id="{{ cobro.pk }}"
+                           style="accent-color:#E85C0D;cursor:pointer;">
+                </td>
+                {% endif %}
+
                 <td><span class="hist-id">#{{ cobro.pk }}</span></td>
                 <td>
                     <span class="hist-fecha">{{ cobro.fecha_cierre|date:"d/m/Y" }}</span>
@@ -115,13 +164,24 @@
                     </div>
                 </td>
                 <td>
-                    <button class="btn-accion btn-editar hist-btn-detalle"
-                            data-id="{{ cobro.pk }}"
-                            data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}{% if not forloop.last %};;{% endif %}{% endfor %}"
-                            data-pagos="{% for pago in cobro.pagos.all %}{{ pago.get_metodo_display }}|{{ pago.monto }}{% if not forloop.last %};;{% endif %}{% endfor %}"
-                            data-obs="{{ cobro.observaciones }}">
-                        Ver detalle
-                    </button>
+                    <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:nowrap;">
+                        <button class="btn-accion btn-editar hist-btn-detalle"
+                                data-id="{{ cobro.pk }}"
+                                data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-pagos="{% for pago in cobro.pagos.all %}{{ pago.get_metodo_display }}|{{ pago.monto }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-obs="{{ cobro.observaciones }}">
+                            Ver detalle
+                        </button>
+                        {% if user.is_staff or user.is_superuser %}
+                        <button class="btn-eliminar-cobro" data-id="{{ cobro.pk }}" title="Eliminar este cobro">
+                            <svg viewBox="0 0 14 14" fill="none" width="12" height="12">
+                                <path d="M2 3.5h10M5 3.5V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4"
+                                      stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                                <rect x="2.5" y="3.5" width="9" height="8" rx="1" stroke="currentColor" stroke-width="1.3"/>
+                            </svg>
+                        </button>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% endfor %}
@@ -138,6 +198,7 @@
     <p>No hay cobros registrados{% if desde or hasta %} en ese período{% endif %}</p>
 </div>
 {% endif %}
+
 
 {# ════ MODAL DETALLE ════ #}
 <div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
@@ -167,91 +228,423 @@
     </div>
 </div>
 
+
+{# ════ MODAL CONFIRMAR ELIMINACIÓN (individual / selección masiva) ════ #}
+<div class="modal fade" id="modalEliminarCobros" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">Eliminar cobros</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="elimTexto" style="font-size:.88rem;color:#333;margin:0 0 .5rem;"></p>
+                <p class="eliminar-warning">Esta acción no se puede deshacer. Los ítems y pagos asociados también se eliminarán.</p>
+                <div id="elimError" class="alerta-inline alerta-error mt-2" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger btn-sm" id="btnConfirmarElimCobros">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% if user.is_staff or user.is_superuser %}
+
+{# ════ MODAL ELIMINAR POR FILTROS ════ #}
+<div class="modal fade" id="modalEliminarFiltros" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <div>
+                    <h5 class="modal-title">Eliminar registros por filtro</h5>
+                    <p class="modal-subtitle" style="color:#999;">
+                        Definí los criterios — se eliminarán todos los cobros que coincidan.
+                    </p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                <div class="elim-filtros-grid">
+                    <div class="elim-filtro-group">
+                        <label class="elim-filtro-label">Fecha desde</label>
+                        <input type="date" id="efDesde" class="filtro-fecha-input" style="width:100%;">
+                    </div>
+                    <div class="elim-filtro-group">
+                        <label class="elim-filtro-label">Fecha hasta</label>
+                        <input type="date" id="efHasta" class="filtro-fecha-input" style="width:100%;">
+                    </div>
+                    <div class="elim-filtro-group">
+                        <label class="elim-filtro-label">Usuario</label>
+                        <input type="text" id="efUsuario" placeholder="Nombre de usuario"
+                               class="filtro-fecha-input" style="width:100%;">
+                    </div>
+                    <div class="elim-filtro-group">
+                        <label class="elim-filtro-label">Método de pago</label>
+                        <select id="efMetodo" class="filtro-select" style="width:100%;">
+                            <option value="">Todos</option>
+                            {% for val, lbl in metodos_choices %}
+                            <option value="{{ val }}">{{ lbl }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="elim-filtro-group">
+                        <label class="elim-filtro-label">Código servicio</label>
+                        <input type="text" id="efCodigo" placeholder="Ej: EX1"
+                               class="filtro-fecha-input" style="width:100%;">
+                    </div>
+                    <div class="elim-filtro-group">
+                        <label class="elim-filtro-label">Factura mín. $</label>
+                        <input type="number" id="efMontoMin" placeholder="0"
+                               class="filtro-fecha-input" style="width:100%;" min="0" step="0.01">
+                    </div>
+                    <div class="elim-filtro-group">
+                        <label class="elim-filtro-label">Factura máx. $</label>
+                        <input type="number" id="efMontoMax" placeholder="Sin límite"
+                               class="filtro-fecha-input" style="width:100%;" min="0" step="0.01">
+                    </div>
+                </div>
+
+                {# Resultado de previsualización #}
+                <div class="elim-preview" id="elimFiltroPreview" style="display:none;">
+                    <svg viewBox="0 0 16 16" fill="none" width="14" height="14" style="flex-shrink:0;">
+                        <circle cx="8" cy="8" r="6.5" stroke="#E85C0D" stroke-width="1.4"/>
+                        <path d="M8 5v3.5M8 10.5v.5" stroke="#E85C0D" stroke-width="1.4" stroke-linecap="round"/>
+                    </svg>
+                    <span>Se eliminarán <strong id="elimFiltroCount">—</strong> cobros con los criterios ingresados.</span>
+                </div>
+
+                <div id="elimFiltroError" class="alerta-inline alerta-error" style="display:none;margin-top:.6rem;"></div>
+
+                <p class="eliminar-warning" style="margin-top:.75rem;">
+                    ⚠ Esta acción no se puede deshacer. Se borrarán los cobros que coincidan, incluyendo sus ítems y pagos.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnPrevisualizarElim"
+                        style="border-color:#E85C0D;color:#E85C0D;background:#fff8f4;">
+                    Previsualizar
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" id="btnConfirmarElimFiltro" disabled>
+                    Eliminar registros
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{# ════ MODAL LIMPIEZA AUTOMÁTICA ════ #}
+<div class="modal fade" id="modalLimpieza" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">Limpieza automática</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:.88rem;color:#333;margin:0 0 .5rem;">
+                    Elimina todos los cobros cerrados del <strong>mes anterior</strong>.
+                    Esta limpieza está disponible a partir del día 20 de cada mes.
+                </p>
+                <p class="eliminar-warning">Esta acción no se puede deshacer.</p>
+                <div id="limpiezaError" class="alerta-inline alerta-error" style="display:none;margin-top:.5rem;"></div>
+                <div id="limpiezaExito" class="alerta-inline" style="display:none;margin-top:.5rem;
+                     background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#15803d;font-weight:600;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger btn-sm" id="btnConfirmarLimpieza">Ejecutar limpieza</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}{# /is_staff #}
+
+
 {% endblock %}
 
 {% block extra_js %}
 {{ block.super }}
 <script>
-const CANALES_HIST = { pagofacil: 'Pago Fácil', rapipago: 'Rapipago', otro: 'Otro' };
+// ════════════════════════════════════════════════════════════
+// HISTORIAL DE COBROS — JS
+// ════════════════════════════════════════════════════════════
+
+const CANALES_HIST      = { pagofacil: 'Pago Fácil', rapipago: 'Rapipago', otro: 'Otro' };
+const ELIMINAR_URL      = "{% url 'cobranzas:cobros_eliminar' %}";
+const LIMPIEZA_URL      = "{% url 'cobranzas:cobros_limpieza_automatica' %}";
+const PREVISUALIZAR_URL = "{% url 'cobranzas:cobros_previsualizar_filtro' %}";
 
 function fmt(n) {
     return '$' + parseFloat(n || 0).toLocaleString('es-AR', {
         minimumFractionDigits: 2, maximumFractionDigits: 2
     });
 }
+function getCsrf() {
+    return document.cookie.split(';').map(c => c.trim())
+        .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+async function postJSON(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify(body),
+    });
+}
+const el = id => document.getElementById(id);
 
-// ── Calcular resumen desde las filas ──
 document.addEventListener('DOMContentLoaded', () => {
-    const filas = document.querySelectorAll('.hist-fila');
+
+    // ── Resumen totales ──────────────────────────────────────
     let sumBoletas = 0, sumAdicionales = 0, sumGeneral = 0;
-    filas.forEach(f => {
+    document.querySelectorAll('.hist-fila').forEach(f => {
         sumBoletas     += parseFloat(f.dataset.totalBoletas     || 0);
         sumAdicionales += parseFloat(f.dataset.totalAdicionales || 0);
         sumGeneral     += parseFloat(f.dataset.totalGeneral     || 0);
     });
-    const el = id => document.getElementById(id);
     if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(sumBoletas);
     if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(sumAdicionales);
     if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(sumGeneral);
 
-    // ── Botones de detalle ──
+    // ── Modal detalle ────────────────────────────────────────
     document.querySelectorAll('.hist-btn-detalle').forEach(btn => {
         btn.addEventListener('click', () => {
-            const id    = btn.dataset.id;
             const items = btn.dataset.items ? btn.dataset.items.split(';;') : [];
-            const pagos = btn.dataset.pagos  ? btn.dataset.pagos.split(';;')  : [];
-            const obs   = btn.dataset.obs || '';
-
-            document.getElementById('detalleTitle').textContent    = `Cobro #${id}`;
-            document.getElementById('detalleSubtitle').textContent = `${items.length} boleta${items.length !== 1 ? 's' : ''}`;
-
-            document.getElementById('detalleItems').innerHTML = items.map(raw => {
+            const pagos = btn.dataset.pagos ? btn.dataset.pagos.split(';;') : [];
+            el('detalleTitle').textContent    = `Cobro #${btn.dataset.id}`;
+            el('detalleSubtitle').textContent = `${items.length} boleta${items.length !== 1 ? 's' : ''}`;
+            el('detalleItems').innerHTML = items.map(raw => {
                 const [cod, desc, factura, adicional, canal] = raw.split('|');
-                return `
-                    <div class="cobro-item-row">
-                        <div class="cobro-item-header">
-                            <span class="codigo-badge">${cod}</span>
-                            <span class="cobro-item-canal cobro-canal-${canal}">${CANALES_HIST[canal] || canal}</span>
-                        </div>
-                        <div class="cobro-item-desc">${desc}</div>
-                        <div class="cobro-item-montos">
-                            <div class="cobro-item-monto-col">
-                                <span class="cobro-monto-label">Factura</span>
-                                <span class="cobro-monto-val">${fmt(factura)}</span>
-                            </div>
-                            <span class="cobro-monto-mas">+</span>
-                            <div class="cobro-item-monto-col">
-                                <span class="cobro-monto-label">Adicional</span>
-                                <span class="cobro-monto-val cobro-monto-adicional">${fmt(adicional)}</span>
-                            </div>
-                            <span class="cobro-monto-mas">=</span>
-                            <div class="cobro-item-monto-col cobro-item-subtotal">
-                                <span class="cobro-monto-label">Subtotal</span>
-                                <span class="cobro-monto-val cobro-monto-total">${fmt(parseFloat(factura)+parseFloat(adicional))}</span>
-                            </div>
-                        </div>
-                    </div>`;
+                return `<div class="cobro-item-row">
+                    <div class="cobro-item-header">
+                        <span class="codigo-badge">${cod}</span>
+                        <span class="cobro-item-canal cobro-canal-${canal}">${CANALES_HIST[canal] || canal}</span>
+                    </div>
+                    <div class="cobro-item-desc">${desc}</div>
+                    <div class="cobro-item-montos">
+                        <div class="cobro-item-monto-col"><span class="cobro-monto-label">Factura</span><span class="cobro-monto-val">${fmt(factura)}</span></div>
+                        <span class="cobro-monto-mas">+</span>
+                        <div class="cobro-item-monto-col"><span class="cobro-monto-label">Adicional</span><span class="cobro-monto-val cobro-monto-adicional">${fmt(adicional)}</span></div>
+                        <span class="cobro-monto-mas">=</span>
+                        <div class="cobro-item-monto-col cobro-item-subtotal"><span class="cobro-monto-label">Subtotal</span><span class="cobro-monto-val cobro-monto-total">${fmt(parseFloat(factura)+parseFloat(adicional))}</span></div>
+                    </div>
+                </div>`;
             }).join('');
-
-            document.getElementById('detallePagos').innerHTML = pagos.map(raw => {
+            el('detallePagos').innerHTML = pagos.map(raw => {
                 const [metodo, monto] = raw.split('|');
                 return `<div class="cobro-pago-row" style="background:#f8f9fb;border-radius:6px;padding:.4rem .7rem;">
                     <span style="font-size:.83rem;font-weight:600;">${metodo}</span>
                     <span style="font-size:.83rem;font-weight:700;margin-left:auto;">${fmt(monto)}</span>
                 </div>`;
             }).join('');
-
-            const obsDiv = document.getElementById('detalleObs');
-            if (obs) {
-                document.getElementById('detalleObsTexto').textContent = obs;
-                obsDiv.style.display = '';
-            } else {
-                obsDiv.style.display = 'none';
-            }
-
-            new bootstrap.Modal(document.getElementById('modalDetalle')).show();
+            const obs = btn.dataset.obs || '';
+            el('detalleObs').style.display = obs ? '' : 'none';
+            if (obs) el('detalleObsTexto').textContent = obs;
+            new bootstrap.Modal(el('modalDetalle')).show();
         });
     });
+
+    // ════════════════════════════════════════════════════════
+    // SELECCIÓN MASIVA
+    // ════════════════════════════════════════════════════════
+    const checkTodos = el('checkTodos');
+
+    function getIdsSeleccionados() {
+        return [...document.querySelectorAll('.check-cobro:checked')].map(c => parseInt(c.dataset.id));
+    }
+
+    function actualizarBarra() {
+        const ids   = getIdsSeleccionados();
+        const barra = el('barraAccionesMasivas');
+        if (!barra) return;
+        barra.style.display = ids.length > 0 ? 'flex' : 'none';
+        el('selCount').textContent = `${ids.length} seleccionado${ids.length !== 1 ? 's' : ''}`;
+        if (checkTodos) {
+            const total = document.querySelectorAll('.check-cobro').length;
+            checkTodos.indeterminate = ids.length > 0 && ids.length < total;
+            checkTodos.checked = ids.length === total && total > 0;
+        }
+    }
+
+    checkTodos?.addEventListener('change', () => {
+        document.querySelectorAll('.check-cobro').forEach(c => c.checked = checkTodos.checked);
+        actualizarBarra();
+    });
+    document.querySelectorAll('.check-cobro').forEach(c => c.addEventListener('change', actualizarBarra));
+    el('btnDeseleccionarTodo')?.addEventListener('click', () => {
+        document.querySelectorAll('.check-cobro').forEach(c => c.checked = false);
+        if (checkTodos) checkTodos.checked = false;
+        actualizarBarra();
+    });
+
+    // ════════════════════════════════════════════════════════
+    // ELIMINACIÓN INDIVIDUAL + POR CHECKBOX
+    // ════════════════════════════════════════════════════════
+    let idsAEliminar = [];
+    const modalElim = new bootstrap.Modal(el('modalEliminarCobros'));
+
+    function abrirEliminar(ids) {
+        idsAEliminar = ids;
+        el('elimTexto').textContent = ids.length === 1
+            ? `¿Eliminás el cobro #${ids[0]}?`
+            : `¿Eliminás los ${ids.length} cobros seleccionados?`;
+        el('elimError').style.display = 'none';
+        el('btnConfirmarElimCobros').disabled    = false;
+        el('btnConfirmarElimCobros').textContent = 'Eliminar';
+        modalElim.show();
+    }
+
+    document.querySelectorAll('.btn-eliminar-cobro').forEach(btn => {
+        btn.addEventListener('click', () => abrirEliminar([parseInt(btn.dataset.id)]));
+    });
+    el('btnEliminarSeleccionados')?.addEventListener('click', () => {
+        const ids = getIdsSeleccionados();
+        if (ids.length) abrirEliminar(ids);
+    });
+
+    el('btnConfirmarElimCobros')?.addEventListener('click', async () => {
+        const btn = el('btnConfirmarElimCobros');
+        btn.disabled = true; btn.textContent = 'Eliminando…';
+        el('elimError').style.display = 'none';
+        try {
+            const res  = await postJSON(ELIMINAR_URL, { ids: idsAEliminar });
+            const data = await res.json();
+            if (data.success) {
+                idsAEliminar.forEach(id => document.querySelector(`.hist-fila[data-id="${id}"]`)?.remove());
+                modalElim.hide();
+                actualizarBarra();
+                const n = document.querySelectorAll('.hist-fila').length;
+                const sub = el('subtituloHistorial');
+                if (sub) sub.textContent = `${n} cobro${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''}`;
+            } else {
+                el('elimError').textContent = data.error || 'No se pudo eliminar.';
+                el('elimError').style.display = '';
+                btn.disabled = false; btn.textContent = 'Eliminar';
+            }
+        } catch {
+            el('elimError').textContent = 'Error de conexión.';
+            el('elimError').style.display = '';
+            btn.disabled = false; btn.textContent = 'Eliminar';
+        }
+    });
+
+    // ════════════════════════════════════════════════════════
+    // MODAL ELIMINAR POR FILTROS
+    // ════════════════════════════════════════════════════════
+    const modalFiltros = el('modalEliminarFiltros')
+        ? new bootstrap.Modal(el('modalEliminarFiltros')) : null;
+
+    el('btnEliminarPorFiltros')?.addEventListener('click', () => {
+        el('elimFiltroPreview').style.display = 'none';
+        el('elimFiltroError').style.display   = 'none';
+        el('btnConfirmarElimFiltro').disabled  = true;
+        ['efDesde','efHasta','efUsuario','efCodigo','efMontoMin','efMontoMax']
+            .forEach(id => { if (el(id)) el(id).value = ''; });
+        if (el('efMetodo')) el('efMetodo').value = '';
+        modalFiltros?.show();
+    });
+
+    function getFiltros() {
+        return {
+            desde:     el('efDesde')?.value    || '',
+            hasta:     el('efHasta')?.value    || '',
+            usuario:   el('efUsuario')?.value.trim()  || '',
+            metodo:    el('efMetodo')?.value   || '',
+            codigo:    el('efCodigo')?.value.trim()   || '',
+            monto_min: el('efMontoMin')?.value || '',
+            monto_max: el('efMontoMax')?.value || '',
+        };
+    }
+
+    el('btnPrevisualizarElim')?.addEventListener('click', async () => {
+        const btn = el('btnPrevisualizarElim');
+        btn.disabled = true; btn.textContent = 'Consultando…';
+        el('elimFiltroError').style.display  = 'none';
+        el('elimFiltroPreview').style.display = 'none';
+        el('btnConfirmarElimFiltro').disabled = true;
+        try {
+            const res  = await postJSON(PREVISUALIZAR_URL, getFiltros());
+            const data = await res.json();
+            if (data.error) {
+                el('elimFiltroError').textContent = data.error;
+                el('elimFiltroError').style.display = '';
+            } else {
+                el('elimFiltroCount').textContent = data.count;
+                el('elimFiltroPreview').style.display = '';
+                el('btnConfirmarElimFiltro').disabled = data.count === 0;
+            }
+        } catch {
+            el('elimFiltroError').textContent = 'Error de conexión.';
+            el('elimFiltroError').style.display = '';
+        } finally {
+            btn.disabled = false; btn.textContent = 'Previsualizar';
+        }
+    });
+
+    el('btnConfirmarElimFiltro')?.addEventListener('click', async () => {
+        const btn = el('btnConfirmarElimFiltro');
+        btn.disabled = true; btn.textContent = 'Eliminando…';
+        el('elimFiltroError').style.display = 'none';
+        try {
+            const res  = await postJSON(ELIMINAR_URL, { filtros: getFiltros() });
+            const data = await res.json();
+            if (data.success) {
+                modalFiltros?.hide();
+                setTimeout(() => location.reload(), 300);
+            } else {
+                el('elimFiltroError').textContent = data.error || 'No se pudo eliminar.';
+                el('elimFiltroError').style.display = '';
+                btn.disabled = false; btn.textContent = 'Eliminar registros';
+            }
+        } catch {
+            el('elimFiltroError').textContent = 'Error de conexión.';
+            el('elimFiltroError').style.display = '';
+            btn.disabled = false; btn.textContent = 'Eliminar registros';
+        }
+    });
+
+    // ════════════════════════════════════════════════════════
+    // LIMPIEZA AUTOMÁTICA
+    // ════════════════════════════════════════════════════════
+    el('btnLimpiezaAuto')?.addEventListener('click', () => {
+        el('limpiezaError').style.display = 'none';
+        el('limpiezaExito').style.display = 'none';
+        el('btnConfirmarLimpieza').disabled    = false;
+        el('btnConfirmarLimpieza').textContent = 'Ejecutar limpieza';
+        new bootstrap.Modal(el('modalLimpieza')).show();
+    });
+
+    el('btnConfirmarLimpieza')?.addEventListener('click', async () => {
+        const btn = el('btnConfirmarLimpieza');
+        btn.disabled = true; btn.textContent = 'Procesando…';
+        el('limpiezaError').style.display = 'none';
+        el('limpiezaExito').style.display = 'none';
+        try {
+            const res  = await postJSON(LIMPIEZA_URL, {});
+            const data = await res.json();
+            if (data.success) {
+                el('limpiezaExito').textContent = `✓ Se eliminaron ${data.eliminados} cobro(s) de ${data.periodo}.`;
+                el('limpiezaExito').style.display = '';
+                btn.textContent = 'Hecho';
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                el('limpiezaError').textContent = data.error || 'No se pudo ejecutar.';
+                el('limpiezaError').style.display = '';
+                btn.disabled = false; btn.textContent = 'Ejecutar limpieza';
+            }
+        } catch {
+            el('limpiezaError').textContent = 'Error de conexión.';
+            el('limpiezaError').style.display = '';
+            btn.disabled = false; btn.textContent = 'Ejecutar limpieza';
+        }
+    });
+
 });
 </script>
 {% endblock %}

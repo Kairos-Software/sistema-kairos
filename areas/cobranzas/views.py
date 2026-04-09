@@ -3,7 +3,7 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, ProtectedError
 import re
 
 from core.permisos import chequear_permiso
@@ -148,8 +148,17 @@ class ServicioEliminarAjax(LoginRequiredMixin, View):
             return JsonResponse({'error': 'Sin permiso'}, status=403)
         pk = request.POST.get('pk')
         servicio = get_object_or_404(Servicio, pk=pk)
-        servicio.delete()
-        return JsonResponse({'success': True})
+        try:
+            servicio.delete()
+            return JsonResponse({'success': True})
+        except ProtectedError:
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    f'No se puede eliminar "{servicio.codigo}" porque tiene cobros registrados. '
+                    f'Podés desactivarlo en su lugar para que no aparezca en nuevos cobros.'
+                )
+            }, status=400)
 
 
 class ServicioActivarAjax(LoginRequiredMixin, View):

@@ -5,6 +5,7 @@
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'cobranzas/css/cobranzas.css' %}">
 <link rel="stylesheet" href="{% static 'cobranzas/css/contador_billetes.css' %}">
+<link rel="stylesheet" href="{% static 'cobranzas/css/vuelto.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -82,6 +83,19 @@
                     </button>
                 </li>
 
+                {# ── CALCULADORA DE VUELTO ── #}
+                <li>
+                    <button class="btn-vuelto-sidebar" id="btnVuelto" title="Calculadora de vuelto (Alt+V)">
+                        <span class="nav-icon">
+                            <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+                                <path d="M4 10h12M10 4l-6 6 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                        <span>Vuelto</span>
+                        <span class="kbd-hint">Alt + V</span>
+                    </button>
+                </li>
+
                 <li class="disabled">
                     <a href="#" class="disabled-link">
                         <span class="nav-icon">
@@ -132,4 +146,5 @@
 {{ block.super }}
 <script src="{% static 'cobranzas/js/cobranzas.js' %}"></script>
 <script src="{% static 'cobranzas/js/contador_billetes.js' %}"></script>
+<script src="{% static 'cobranzas/js/vuelto.js' %}"></script>
 {% endblock %}

@@ -42,106 +42,239 @@
             Buscar servicio
         </div>
 
-        <div class="cobro-search-wrap">
-            <svg class="cobro-search-icon" viewBox="0 0 20 20" fill="none">
-                <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
-                <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <input type="text" id="inputBuscarServicio"
-                   placeholder="Código, descripción, proveedor..."
-                   class="cobro-search-input" autocomplete="off">
-            <button type="button" class="cobro-search-clear" id="btnLimpiarBusqueda" style="display:none;">×</button>
+        {# ── TABS ── #}
+        <div class="cobro-tabs">
+            <button class="cobro-tab cobro-tab-active" data-tab="inteligente">
+                <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
+                    <path d="M2 7l3 3 7-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Prefijo + importe
+            </button>
+            <button class="cobro-tab" data-tab="texto">
+                <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
+                    <circle cx="6" cy="6" r="4.2" stroke="currentColor" stroke-width="1.4"/>
+                    <path d="M9.5 9.5L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Buscar por texto
+            </button>
         </div>
 
-        {# Placeholder inicial #}
-        <div id="buscarPlaceholder" class="cobro-estado-vacio">
-            <svg viewBox="0 0 48 48" fill="none" width="36" height="36">
-                <circle cx="22" cy="22" r="13" stroke="#ddd" stroke-width="2"/>
-                <path d="M32 32L42 42" stroke="#ddd" stroke-width="2.5" stroke-linecap="round"/>
-            </svg>
-            <p>Escribí para buscar un servicio</p>
-        </div>
 
-        {# Sin resultados #}
-        <div id="sinResultados" class="cobro-estado-vacio" style="display:none;">
-            <svg viewBox="0 0 48 48" fill="none" width="36" height="36">
-                <circle cx="24" cy="24" r="18" stroke="#ddd" stroke-width="2"/>
-                <path d="M16 16L32 32M32 16L16 32" stroke="#ddd" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <p>No se encontraron servicios activos</p>
-        </div>
+        <div id="panelTabInteligente" class="cobro-tab-panel">
 
-        {# Lista de resultados #}
-        <div id="resultadosBusqueda" style="display:none;">
-            <p class="cobro-resultados-label">Seleccioná para cargar</p>
-            <div id="listaResultados" class="cobro-lista-resultados"></div>
-        </div>
-
-        {# ══ PANEL DE CARGA ══ #}
-        <div id="panelAgregar" class="cobro-panel-carga" style="display:none;">
-
-            <div class="cobro-servicio-seleccionado">
-                <span class="codigo-badge" id="agrCodigo"></span>
-                <div class="cobro-servicio-info">
-                    <strong id="agrDescripcion"></strong>
-                    <span id="agrProveedor" class="cobro-servicio-proveedor"></span>
+            <div class="cobro-smart-fields">
+                <div class="cobro-smart-field">
+                    <label class="cobro-label-secundario">Prefijo del servicio</label>
+                    <input type="text" id="smartPrefijo"
+                           placeholder="Ej: EX"
+                           class="cobro-input-prefijo"
+                           maxlength="10"
+                           autocomplete="off"
+                           style="text-transform:uppercase">
                 </div>
-                <button type="button" class="cobro-deseleccionar" id="btnDeseleccionar">✕</button>
-            </div>
-
-            <div class="cobro-carga-fields">
-
-                {# IMPORTE — campo principal, el usuario siempre lo carga #}
-                <div class="cobro-field-full">
-                    <label class="cobro-label-principal">
-                        Importe de la factura
-                        <span class="cobro-requerido">*</span>
-                    </label>
+                <div class="cobro-smart-field cobro-smart-field-importe">
+                    <label class="cobro-label-secundario">Importe de la factura</label>
                     <div class="cobro-input-grande-wrap">
                         <span class="cobro-signo-grande">$</span>
-                        <input type="number" id="agrImporte" min="0" step="0.01"
-                               placeholder="0,00" class="cobro-input-grande">
+                        <input type="number" id="smartImporte"
+                               min="0" step="0.01"
+                               placeholder="0,00"
+                               class="cobro-input-grande">
+                    </div>
+                </div>
+            </div>
+
+            <p class="cobro-hint-texto">
+                Escribí el prefijo del servicio (ej: <strong>EX</strong> para el código "EX1")
+                y el monto de la boleta. El sistema detecta el servicio y el adicional automáticamente.
+            </p>
+
+            <div id="smartBuscando" class="cobro-buscando" style="display:none;">
+                <span class="cobro-spinner"></span> Buscando servicio...
+            </div>
+            <div id="smartError" class="alerta-inline alerta-error" style="display:none; margin-bottom:.6rem;"></div>
+
+            <button type="button" class="btn-cobro-agregar" id="btnSmartBuscar">
+                <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                    <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M11 11l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+                Buscar servicio
+            </button>
+
+            {# Resultado de detección automática #}
+            <div id="smartResultado" class="cobro-panel-carga" style="display:none;">
+
+                <div class="cobro-smart-detectado">
+                    <div class="cobro-detectado-tag">
+                        <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
+                            <path d="M2 7l3 3 7-6" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Servicio detectado automáticamente
+                    </div>
+                    <div class="cobro-servicio-seleccionado">
+                        <span class="codigo-badge" id="smartSrvCodigo"></span>
+                        <div class="cobro-servicio-info">
+                            <strong id="smartSrvDescripcion"></strong>
+                            <span id="smartSrvProveedor" class="cobro-servicio-proveedor"></span>
+                        </div>
+                        <button type="button" class="cobro-deseleccionar" id="btnSmartLimpiar" title="Limpiar">✕</button>
                     </div>
                 </div>
 
-                <div class="cobro-fields-row">
-                    {# ADICIONAL — viene del modelo, solo se muestra #}
-                    <div class="cobro-field-half">
-                        <label class="cobro-label-secundario">Adicional (nuestro)</label>
-                        <div class="cobro-adicional-pill">
-                            <span>$</span>
-                            <strong id="agrAdicional"></strong>
+                <div class="cobro-carga-fields">
+                    <div class="cobro-field-full">
+                        <label class="cobro-label-principal">
+                            Importe de la factura
+                            <span class="cobro-requerido">*</span>
+                        </label>
+                        <div class="cobro-input-grande-wrap">
+                            <span class="cobro-signo-grande">$</span>
+                            <input type="number" id="smartImporteConfirm"
+                                   min="0" step="0.01"
+                                   placeholder="0,00"
+                                   class="cobro-input-grande"
+                                   readonly>
+                        </div>
+                        <p class="cobro-hint-texto" style="margin-top:.2rem;">
+                            Este es el importe que ingresaste. Si es incorrecto, usá el botón ✕ para volver a buscar.
+                        </p>
+                    </div>
+
+                    <div class="cobro-fields-row">
+                        <div class="cobro-field-half">
+                            <label class="cobro-label-secundario">Adicional (nuestro)</label>
+                            <div class="cobro-adicional-pill">
+                                <span>$</span>
+                                <strong id="smartSrvAdicional"></strong>
+                            </div>
+                        </div>
+                        <div class="cobro-field-half">
+                            <label class="cobro-label-secundario">Canal de cobro</label>
+                            <select id="smartCanal" class="cobro-select">
+                                <option value="pagofacil">Pago Fácil</option>
+                                <option value="rapipago">Rapipago</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cobro-subtotal-preview" id="smartSubtotalPreview">
+                    <span>Subtotal esta boleta:</span>
+                    <strong id="smartSubtotalMonto">$0,00</strong>
+                </div>
+
+                <button type="button" class="btn-cobro-agregar" id="btnSmartAgregar">
+                    <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                        <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Agregar boleta al cobro
+                </button>
+
+            </div>
+
+        </div>
+
+        <div id="panelTabTexto" class="cobro-tab-panel" style="display:none;">
+
+            <div class="cobro-search-wrap">
+                <svg class="cobro-search-icon" viewBox="0 0 20 20" fill="none">
+                    <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
+                    <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <input type="text" id="inputBuscarServicio"
+                       placeholder="Código, descripción, proveedor..."
+                       class="cobro-search-input" autocomplete="off">
+                <button type="button" class="cobro-search-clear" id="btnLimpiarBusqueda" style="display:none;">×</button>
+            </div>
+
+            <div id="buscarPlaceholder" class="cobro-estado-vacio">
+                <svg viewBox="0 0 48 48" fill="none" width="36" height="36">
+                    <circle cx="22" cy="22" r="13" stroke="#ddd" stroke-width="2"/>
+                    <path d="M32 32L42 42" stroke="#ddd" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+                <p>Escribí para buscar un servicio</p>
+                <span>Por código, descripción o proveedor</span>
+            </div>
+
+            <div id="sinResultados" class="cobro-estado-vacio" style="display:none;">
+                <svg viewBox="0 0 48 48" fill="none" width="36" height="36">
+                    <circle cx="24" cy="24" r="18" stroke="#ddd" stroke-width="2"/>
+                    <path d="M16 16L32 32M32 16L16 32" stroke="#ddd" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <p>No se encontraron servicios activos</p>
+            </div>
+
+            <div id="resultadosBusqueda" style="display:none;">
+                <p class="cobro-resultados-label">Seleccioná para cargar</p>
+                <div id="listaResultados" class="cobro-lista-resultados"></div>
+            </div>
+
+            {# Panel de carga manual (igual al original) #}
+            <div id="panelAgregar" class="cobro-panel-carga" style="display:none;">
+
+                <div class="cobro-servicio-seleccionado">
+                    <span class="codigo-badge" id="agrCodigo"></span>
+                    <div class="cobro-servicio-info">
+                        <strong id="agrDescripcion"></strong>
+                        <span id="agrProveedor" class="cobro-servicio-proveedor"></span>
+                    </div>
+                    <button type="button" class="cobro-deseleccionar" id="btnDeseleccionar">✕</button>
+                </div>
+
+                <div class="cobro-carga-fields">
+
+                    <div class="cobro-field-full">
+                        <label class="cobro-label-principal">
+                            Importe de la factura
+                            <span class="cobro-requerido">*</span>
+                        </label>
+                        <div class="cobro-input-grande-wrap">
+                            <span class="cobro-signo-grande">$</span>
+                            <input type="number" id="agrImporte" min="0" step="0.01"
+                                   placeholder="0,00" class="cobro-input-grande">
                         </div>
                     </div>
 
-                    {# CANAL #}
-                    <div class="cobro-field-half">
-                        <label class="cobro-label-secundario">Canal de cobro</label>
-                        <select id="agrCanal" class="cobro-select">
-                            <option value="pagofacil">Pago Fácil</option>
-                            <option value="rapipago">Rapipago</option>
-                            <option value="otro">Otro</option>
-                        </select>
+                    <div class="cobro-fields-row">
+                        <div class="cobro-field-half">
+                            <label class="cobro-label-secundario">Adicional (nuestro)</label>
+                            <div class="cobro-adicional-pill">
+                                <span>$</span>
+                                <strong id="agrAdicional"></strong>
+                            </div>
+                        </div>
+                        <div class="cobro-field-half">
+                            <label class="cobro-label-secundario">Canal de cobro</label>
+                            <select id="agrCanal" class="cobro-select">
+                                <option value="pagofacil">Pago Fácil</option>
+                                <option value="rapipago">Rapipago</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
                     </div>
+
                 </div>
 
+                <div class="cobro-subtotal-preview" id="subtotalPreview" style="visibility:hidden;">
+                    <span>Subtotal esta boleta:</span>
+                    <strong id="subtotalPreviewMonto">$0,00</strong>
+                </div>
+
+                <button type="button" class="btn-cobro-agregar" id="btnAgregarItem">
+                    <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                        <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Agregar boleta al cobro
+                </button>
+
             </div>
 
-            {# Subtotal en tiempo real #}
-            <div class="cobro-subtotal-preview" id="subtotalPreview" style="visibility:hidden;">
-                <span>Subtotal esta boleta:</span>
-                <strong id="subtotalPreviewMonto">$0,00</strong>
-            </div>
+        </div>{# /panelTabTexto #}
 
-            <button type="button" class="btn-cobro-agregar" id="btnAgregarItem">
-                <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
-                    <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                Agregar boleta al cobro
-            </button>
+    </div>{# /cobro-panel-buscar #}
 
-        </div>
-    </div>
 
     {# ══ COLUMNA DERECHA: carrito + pagos ══ #}
     <div class="cobro-panel cobro-panel-carrito">
@@ -170,7 +303,6 @@
 
             <div id="listaItems" class="cobro-items-lista"></div>
 
-            {# Totales #}
             <div class="cobro-totales-bloque">
                 <div class="cobro-total-row">
                     <span>Total facturas</span>
@@ -235,7 +367,9 @@
             </div>
         </div>
     </div>
+
 </div>
+
 
 {# ════ MODAL ÉXITO ════ #}
 <div class="modal fade" id="modalExito" tabindex="-1" aria-hidden="true">

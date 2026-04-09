@@ -62,6 +62,11 @@
     top: 50%;
     transform: translateY(-50%);
     pointer-events: none;
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px;
+    min-height: 16px;
+    flex-shrink: 0;
 }
 .cobro-search-input {
     width: 100%;
@@ -748,20 +753,374 @@
 .hist-metodo-debito        { background: #ede9fe; color: #6d28d9; }
 .hist-metodo-credito       { background: #fce7f3; color: #9d174d; }
 .hist-metodo-qr            { background: #fef3c7; color: #92400e; }
-/* ── Fix botón "Ver detalle" nunca cortado ── */
-.hist-btn-detalle {
+/* ── Historial: tabla compacta sin scroll horizontal ── */
+
+/* La tabla del historial tiene 8 columnas — reducir padding y font para que entren */
+#tablaHistorial th,
+#tablaHistorial td {
+    padding: 0.65rem 0.6rem;
+    font-size: 0.81rem;
+    text-align: left;
+    vertical-align: middle;
+}
+#tablaHistorial th {
+    font-size: 0.6rem;
+    padding: 0.6rem 0.6rem;
+}
+
+/* Columna métodos: más compacta */
+.hist-metodos {
+    max-width: 160px;
+}
+.hist-metodo-pill {
+    font-size: 0.62rem;
+    padding: 2px 6px;
     white-space: nowrap;
 }
 
-/* Columna de métodos de pago: limitar ancho para no aplastar acciones */
-.hist-metodos {
-    max-width: 200px;
-}
-
-/* Columna acciones del historial: pegada a la derecha, sin comprimir */
+/* Columna acciones: nunca se comprime, siempre visible completa */
 #tablaHistorial td:last-child,
 #tablaHistorial th:last-child {
     white-space: nowrap;
     width: 1%;
-    text-align: right;
+    padding-left: 0.4rem;
+    padding-right: 0.9rem;
+}
+
+/* Fix botón "Ver detalle" nunca cortado */
+.hist-btn-detalle {
+    white-space: nowrap;
+    font-size: 0.71rem;
+    padding: 0.25rem 0.6rem;
+}
+
+/* Tabla del historial: sin min-width forzado — se adapta al contenedor */
+#tablaHistorial {
+    min-width: unset;
+    width: 100%;
+    table-layout: auto;
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIVE — MOBILE & TABLET
+   ════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+    .hist-resumen-grid { grid-template-columns: repeat(2, 1fr); }
+    .filtros-bar { flex-wrap: wrap; gap: .5rem; }
+    .filtro-fecha-wrap { flex: 1 1 140px; }
+    #tablaHistorial th, #tablaHistorial td { padding: 0.55rem 0.45rem; font-size: 0.78rem; }
+}
+
+@media (max-width: 600px) {
+    .page-header { flex-direction: column; align-items: flex-start; gap: .75rem; }
+    .page-header-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .cobro-layout { grid-template-columns: 1fr; }
+    .hist-resumen-grid { grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .hist-resumen-valor { font-size: .95rem; }
+    .filtros-bar { flex-direction: column; gap: .5rem; }
+    .filtro-fecha-wrap { width: 100%; }
+    .filtro-fecha-input { width: 100%; }
+    .cobro-fields-row { flex-direction: column; gap: .5rem; }
+    .cobro-field-half { flex: 1 1 100%; }
+    .cobro-pago-row .cobro-select { min-width: 100px; font-size: .77rem; }
+    .btn-historial, .btn-volver, .btn-nuevo { font-size: .74rem; padding: .35rem .65rem; }
+    .hist-resumen-card { padding: .55rem .75rem; }
+}
+
+@media (max-width: 400px) {
+    .hist-resumen-grid { grid-template-columns: 1fr; }
+    .cobro-input-grande { font-size: .92rem; }
+}
+/* ═══════════════════════════════════════════════════════════
+   ADICIONES A gestion_cobros.css
+   Pegar al final del archivo existente.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Filtros del historial en grilla ── */
+.hist-filtros-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+    align-items: flex-end;
+}
+
+/* ── Barra de acciones masivas ── */
+.hist-acciones-masivas {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    background: #fff8f0;
+    border: 1px solid rgba(232,92,13,.3);
+    border-radius: 9px;
+    padding: .5rem 1rem;
+    margin-bottom: .85rem;
+    flex-wrap: wrap;
+}
+
+.hist-sel-count {
+    font-size: .78rem;
+    font-weight: 700;
+    color: #E85C0D;
+    min-width: 100px;
+}
+
+.btn-eliminar-sel {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    background: #c0392b;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: .35rem .85rem;
+    font-size: .77rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+}
+.btn-eliminar-sel:hover { background: #a93226; }
+
+.btn-deseleccionar-todo {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 7px;
+    padding: .32rem .75rem;
+    font-size: .75rem;
+    font-weight: 600;
+    color: #888;
+    cursor: pointer;
+    transition: all .12s;
+}
+.btn-deseleccionar-todo:hover { border-color: #bbb; color: #555; }
+
+/* ── Botón de limpieza automática ── */
+.btn-limpiezaauto {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    border: 1px solid rgba(192,57,43,.35);
+    border-radius: 7px;
+    padding: .4rem .85rem;
+    font-size: .78rem;
+    font-weight: 600;
+    color: #c0392b;
+    background: rgba(192,57,43,.05);
+    cursor: pointer;
+    transition: all .15s;
+}
+.btn-limpiezaauto:hover {
+    background: rgba(192,57,43,.12);
+    border-color: rgba(192,57,43,.55);
+    color: #a93226;
+}
+
+/* ── Botón eliminar individual (🗑) ── */
+.btn-eliminar-cobro {
+    background: none;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: .2rem .45rem;
+    font-size: .78rem;
+    color: #bbb;
+    cursor: pointer;
+    transition: all .12s;
+    line-height: 1;
+}
+.btn-eliminar-cobro:hover {
+    background: rgba(192,57,43,.08);
+    border-color: rgba(192,57,43,.3);
+    color: #c0392b;
+}
+
+/* ── Fila seleccionada ── */
+.hist-fila.fila-seleccionada {
+    background: #fff8f4;
+}
+
+/* ── Grilla de filtros del modal eliminar ── */
+.elim-filtros-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .65rem;
+    margin-bottom: .75rem;
+}
+@media (max-width: 500px) {
+    .elim-filtros-grid { grid-template-columns: 1fr; }
+}
+
+.elim-filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+
+.elim-filtro-label {
+    font-size: .67rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: #999;
+}
+
+/* ── Previsualización del conteo ── */
+.elim-preview {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    background: #fff8f4;
+    border: 1px solid rgba(232,92,13,.3);
+    border-radius: 8px;
+    padding: .55rem .85rem;
+    font-size: .83rem;
+    color: #444;
+    margin-top: .4rem;
+}
+.elim-preview strong {
+    color: #E85C0D;
+    font-size: 1rem;
+}
+/* ═══════════════════════════════════════════════════════════
+   AGREGAR AL FINAL DE gestion_cobros.css
+   Clases nuevas para el sistema de tabs y búsqueda inteligente.
+   No reemplaza nada — solo pegar al final del archivo existente.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Tabs de modo de búsqueda ── */
+.cobro-tabs {
+    display: flex;
+    border-bottom: 1px solid #e8e9ef;
+    background: #fafbfc;
+}
+
+.cobro-tab {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .35rem;
+    padding: .55rem .5rem;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: #aaa;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+    white-space: nowrap;
+    margin-bottom: -1px;
+}
+.cobro-tab:hover {
+    color: #666;
+}
+.cobro-tab-active {
+    color: #E85C0D;
+    border-bottom-color: #E85C0D;
+    background: #fff;
+}
+
+/* ── Panel de cada tab ── */
+.cobro-tab-panel {
+    padding: .85rem .85rem .1rem;
+}
+
+/* ── Campos lado a lado en búsqueda inteligente ── */
+.cobro-smart-fields {
+    display: flex;
+    gap: .65rem;
+    align-items: flex-end;
+    margin-bottom: .5rem;
+}
+.cobro-smart-field {
+    display: flex;
+    flex-direction: column;
+    gap: .28rem;
+    flex: 0 0 auto;
+}
+.cobro-smart-field-importe {
+    flex: 1 1 auto;
+}
+
+/* ── Input prefijo ── */
+.cobro-input-prefijo {
+    border: 2px solid #d0d1da;
+    border-radius: 8px;
+    padding: .42rem .65rem;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 3px;
+    width: 78px;
+    outline: none;
+    color: #111;
+    background: #fff;
+    text-align: center;
+    transition: border-color .15s;
+}
+.cobro-input-prefijo:focus {
+    border-color: #E85C0D;
+}
+.cobro-input-prefijo::placeholder {
+    font-weight: 400;
+    letter-spacing: 1px;
+    color: #ccc;
+}
+
+/* ── Texto de ayuda / hint ── */
+.cobro-hint-texto {
+    font-size: .71rem;
+    color: #bbb;
+    margin: 0 0 .6rem;
+    line-height: 1.45;
+}
+.cobro-hint-texto strong { color: #888; }
+
+/* ── Spinner / indicador de búsqueda ── */
+.cobro-buscando {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    font-size: .79rem;
+    color: #888;
+    margin-bottom: .55rem;
+}
+.cobro-spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid #e0e0e0;
+    border-top-color: #E85C0D;
+    border-radius: 50%;
+    animation: cobro-spin .65s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes cobro-spin { to { transform: rotate(360deg); } }
+
+/* ── Bloque "servicio detectado" ── */
+.cobro-smart-detectado {
+    margin-bottom: .7rem;
+}
+.cobro-detectado-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #16a34a;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 20px;
+    padding: 2px 9px;
+    margin-bottom: .5rem;
+}
+
+/* Reusar .cobro-panel-carga con borde verde en modo inteligente */
+#smartResultado.cobro-panel-carga {
+    border-top-color: #22c55e;
+    background: #fafffe;
+    margin-top: .75rem;
 }

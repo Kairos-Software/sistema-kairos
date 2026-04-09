@@ -341,18 +341,19 @@
     letter-spacing: 1.5px; text-transform: uppercase; color: #aaa;
     padding: 0.8rem 1.1rem; background: #fafafa;
     border-bottom: 1px solid #f0f0f5; white-space: nowrap;
+    text-align: left;
+    vertical-align: middle;
 }
-/* Última columna (acciones) nunca se comprime */
+/* Última columna: nunca se comprime, padding derecho consistente */
 .table thead th:last-child,
 .table tbody td:last-child {
     white-space: nowrap;
-    width: 1%;
     padding-right: 1.1rem;
 }
 .table tbody tr { border-bottom: 1px solid #f5f5f8; transition: background 0.12s; }
 .table tbody tr:last-child { border-bottom: none; }
 .table tbody tr:hover { background: #fafbff; }
-.table tbody td { padding: 0.85rem 1.1rem; font-size: 0.87rem; color: #333; vertical-align: middle; }
+.table tbody td { padding: 0.85rem 1.1rem; font-size: 0.87rem; color: #333; vertical-align: middle; text-align: left; }
 
 .codigo-badge {
     display: inline-block;
@@ -381,7 +382,7 @@
 /* ══════════════════════════════════════
    ACCIONES
    ══════════════════════════════════════ */
-.acciones-cell { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.acciones-cell { display: flex; align-items: center; gap: 0.4rem; flex-wrap: nowrap; white-space: nowrap; }
 .btn-accion {
     padding: 0.28rem 0.7rem; border: 1px solid #e8e8ee; border-radius: 6px;
     font-size: 0.72rem; font-weight: 700; cursor: pointer;

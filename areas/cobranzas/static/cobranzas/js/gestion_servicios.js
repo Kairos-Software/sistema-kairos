@@ -711,10 +711,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ─── 9. ELIMINAR ─────────────────────────────────────────────────────────
 
+    // Crea (una sola vez) el div de error dentro del modal eliminar
+    let elimErrorDiv = document.getElementById('eliminarModalError');
+    if (!elimErrorDiv && elimModalEl) {
+        elimErrorDiv = document.createElement('div');
+        elimErrorDiv.id = 'eliminarModalError';
+        elimErrorDiv.className = 'alerta-inline alerta-error mt-2';
+        elimErrorDiv.style.display = 'none';
+        elimErrorDiv.style.fontSize = '.82rem';
+        // Insertarlo después del párrafo de advertencia dentro del modal-body
+        const modalBody = elimModalEl.querySelector('.modal-body');
+        if (modalBody) modalBody.appendChild(elimErrorDiv);
+    }
+
+    function mostrarErrorEliminar(msg) {
+        if (!elimErrorDiv) return;
+        elimErrorDiv.textContent = msg;
+        elimErrorDiv.style.display = 'block';
+    }
+
+    function ocultarErrorEliminar() {
+        if (!elimErrorDiv) return;
+        elimErrorDiv.style.display = 'none';
+        elimErrorDiv.textContent = '';
+    }
+
+    // Limpiar el error cada vez que se abre el modal
+    if (elimModalEl) {
+        elimModalEl.addEventListener('show.bs.modal', () => ocultarErrorEliminar());
+    }
+
     document.querySelectorAll('.btn-eliminar').forEach(btn => {
         btn.addEventListener('click', () => {
             pkEliminar = btn.dataset.id;
             document.getElementById('nombreEliminar').textContent = btn.dataset.codigo;
+            ocultarErrorEliminar();
             elimModal?.show();
         });
     });
@@ -723,12 +754,26 @@ document.addEventListener('DOMContentLoaded', function () {
     if (confirmarElim) {
         confirmarElim.addEventListener('click', async () => {
             if (!pkEliminar) return;
-            const fd = new FormData();
-            fd.append('pk', pkEliminar);
-            const resp = await postForm(window.servicioEliminarUrl, fd);
-            const data = await resp.json();
-            if (data.success) location.reload();
-            else alert('Error al eliminar.');
+            ocultarErrorEliminar();
+            confirmarElim.disabled = true;
+            confirmarElim.textContent = 'Eliminando…';
+            try {
+                const fd = new FormData();
+                fd.append('pk', pkEliminar);
+                const resp = await postForm(window.servicioEliminarUrl, fd);
+                const data = await resp.json();
+                if (data.success) {
+                    location.reload();
+                } else {
+                    mostrarErrorEliminar(data.error || 'No se pudo eliminar el servicio.');
+                    confirmarElim.disabled = false;
+                    confirmarElim.textContent = 'Eliminar';
+                }
+            } catch {
+                mostrarErrorEliminar('Error de conexión. Intentá de nuevo.');
+                confirmarElim.disabled = false;
+                confirmarElim.textContent = 'Eliminar';
+            }
         });
     }
 

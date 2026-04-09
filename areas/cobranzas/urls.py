@@ -5,7 +5,7 @@ from . import views_cobros
 app_name = 'cobranzas'
 
 urlpatterns = [
-    # ── Existentes ──────────────────────────────────────────
+    # ── Servicios ───────────────────────────────────────────
     path('', views.InicioCobranzasView.as_view(), name='index'),
     path('servicios/', views.GestionServiciosView.as_view(), name='gestion_servicios'),
     path('servicios/acciones/', views.ServicioCrearEditarAjax.as_view(), name='servicio_acciones'),
@@ -19,4 +19,9 @@ urlpatterns = [
     path('cobros/buscar-servicio/', views_cobros.BuscarServicioAjax.as_view(), name='cobro_buscar_servicio'),
     path('cobros/confirmar/', views_cobros.ConfirmarCobroAjax.as_view(), name='cobro_confirmar'),
     path('cobros/historial/', views_cobros.HistorialCobrosView.as_view(), name='historial_cobros'),
+
+    # ── Gestión / eliminación de cobros ─────────────────────
+    path('cobros/eliminar/', views_cobros.EliminarCobrosAjax.as_view(), name='cobros_eliminar'),
+    path('cobros/previsualizar-filtro/', views_cobros.PrevisualizarElimFiltroAjax.as_view(), name='cobros_previsualizar_filtro'),
+    path('cobros/limpieza-automatica/', views_cobros.LimpiezaAutomaticaAjax.as_view(), name='cobros_limpieza_automatica'),
 ]
