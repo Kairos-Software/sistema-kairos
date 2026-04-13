@@ -1,0 +1,309 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Caja — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Gestión de <span>Caja</span></h1>
+        <p class="page-subtitle" id="cajaSubtitulo">Cargando estado...</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'cobranzas:historial_turnos' %}" class="btn-historial">Ver turnos</a>
+        <a href="{% url 'cobranzas:historial_cierres' %}" class="btn-historial">Ver cierres</a>
+        <a href="{% url 'cobranzas:index' %}" class="btn-volver">← Volver</a>
+    </div>
+</div>
+
+<div id="panelCajaCerrada" style="display:none;">
+
+    <div class="caja-estado-badge caja-cerrada">
+        <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
+            <rect x="3" y="9" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        CAJA CERRADA
+    </div>
+
+    <div class="caja-card">
+        <h2 class="caja-card-titulo">Abrir caja</h2>
+        <p class="caja-card-desc">
+            Ingresá el efectivo inicial disponible para dar vuelto.
+            Al abrir la caja se crea un turno automáticamente.
+        </p>
+
+        <div class="caja-field">
+            <label class="caja-label">Monto inicial en caja <span class="caja-hint">(para vueltos)</span></label>
+            <div class="caja-input-wrap">
+                <span class="caja-signo">$</span>
+                <input type="number" id="inputMontoInicial" class="caja-input"
+                       min="0" step="0.01" placeholder="0,00" value="0">
+            </div>
+        </div>
+
+        <div id="abrirError" class="alerta-inline alerta-error" style="display:none;"></div>
+
+        <button type="button" class="btn-caja-principal" id="btnAbrirCaja">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Abrir caja
+        </button>
+    </div>
+
+</div>
+
+<div id="panelCajaAbierta" style="display:none;">
+
+    <div class="caja-estado-badge caja-abierta">
+        <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
+            <rect x="3" y="9" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 9V6a3 3 0 016 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        CAJA ABIERTA — Turno <span id="badgeTurnoNumero">#—</span>
+    </div>
+
+    <div class="caja-grid">
+
+        {# ── Resumen del turno ── #}
+        <div class="caja-card caja-card-resumen">
+            <h2 class="caja-card-titulo">Resumen del turno</h2>
+
+            <div class="caja-resumen-grid">
+                <div class="caja-resumen-item">
+                    <span class="caja-resumen-label">Cajero</span>
+                    <strong id="turnoNombreCajero">—</strong>
+                </div>
+                <div class="caja-resumen-item">
+                    <span class="caja-resumen-label">Apertura</span>
+                    <strong id="turnoFechaApertura">—</strong>
+                </div>
+                <div class="caja-resumen-item">
+                    <span class="caja-resumen-label">Fondo inicial</span>
+                    <strong id="turnoMontoInicial">$ 0,00</strong>
+                </div>
+                <div class="caja-resumen-item">
+                    <span class="caja-resumen-label">Cobros registrados</span>
+                    <strong id="turnoCantCobros">0</strong>
+                </div>
+            </div>
+
+            <div class="caja-totales">
+                <div class="caja-total-row">
+                    <span>Efectivo cobrado</span>
+                    <strong id="turnoTotEfectivo">$ 0,00</strong>
+                </div>
+                <div class="caja-total-row">
+                    <span>Transferencia</span>
+                    <strong id="turnoTotTransferencia">$ 0,00</strong>
+                </div>
+                <div class="caja-total-row">
+                    <span>Débito</span>
+                    <strong id="turnoTotDebito">$ 0,00</strong>
+                </div>
+                <div class="caja-total-row">
+                    <span>Crédito</span>
+                    <strong id="turnoTotCredito">$ 0,00</strong>
+                </div>
+                <div class="caja-total-row">
+                    <span>QR</span>
+                    <strong id="turnoTotQR">$ 0,00</strong>
+                </div>
+                <div class="caja-total-row caja-total-retiros">
+                    <span>Retiros de caja</span>
+                    <strong id="turnoTotRetiros">$ 0,00</strong>
+                </div>
+                <div class="caja-total-row caja-total-gral">
+                    <span>Total general</span>
+                    <strong id="turnoTotGeneral">$ 0,00</strong>
+                </div>
+                <div class="caja-total-row caja-total-adicionales">
+                    <span>Nuestros adicionales</span>
+                    <strong id="turnoTotAdicionales">$ 0,00</strong>
+                </div>
+                <div class="caja-total-row caja-total-efectivo-esperado">
+                    <span>Efectivo esperado en caja</span>
+                    <strong id="turnoEfEsperado">$ 0,00</strong>
+                </div>
+            </div>
+        </div>
+
+        {# ── Retiros de caja ── #}
+        <div class="caja-card">
+            <h2 class="caja-card-titulo">Retiros de caja</h2>
+            <p class="caja-card-desc">
+                Registrá salidas de efectivo durante el turno (depósitos, gastos, etc.).
+                Reducen el efectivo esperado al cierre.
+            </p>
+
+            <div class="caja-field">
+                <label class="caja-label">Motivo</label>
+                <input type="text" id="retiroMotivo" class="caja-input-text"
+                       placeholder="Ej: Depósito banco, gasto limpieza..." maxlength="200">
+            </div>
+            <div class="caja-field">
+                <label class="caja-label">Monto</label>
+                <div class="caja-input-wrap">
+                    <span class="caja-signo">$</span>
+                    <input type="number" id="retiroMonto" class="caja-input"
+                           min="0.01" step="0.01" placeholder="0,00">
+                </div>
+            </div>
+
+            <div id="retiroError" class="alerta-inline alerta-error" style="display:none;"></div>
+
+            <button type="button" class="btn-caja-secundario" id="btnRegistrarRetiro">
+                + Registrar retiro
+            </button>
+
+            <div id="listaRetiros" class="caja-retiros-lista" style="margin-top:1rem;"></div>
+        </div>
+
+        {# ── Cierre de turno ── #}
+        <div class="caja-card caja-card-cierre">
+            <h2 class="caja-card-titulo">Cerrar turno</h2>
+            <p class="caja-card-desc">
+                Contá el efectivo físico en caja y declaralo.
+                El sistema calculará si hay diferencia.
+            </p>
+
+            <div class="caja-field">
+                <label class="caja-label">
+                    Efectivo físico contado
+                    <span class="caja-hint">(fondo + cobros - retiros)</span>
+                </label>
+                <div class="caja-input-wrap">
+                    <span class="caja-signo">$</span>
+                    <input type="number" id="inputEfectivoDeclarado" class="caja-input"
+                           min="0" step="0.01" placeholder="0,00">
+                </div>
+            </div>
+
+            <div class="caja-diferencia-preview" id="diferenciaPrev" style="display:none;">
+                <div class="caja-dif-row">
+                    <span>Esperado por sistema</span>
+                    <strong id="difEsperado">$ 0,00</strong>
+                </div>
+                <div class="caja-dif-row">
+                    <span>Declarado</span>
+                    <strong id="difDeclarado">$ 0,00</strong>
+                </div>
+                <div class="caja-dif-resultado" id="difResultado">
+                    <span id="difLabel">Sin diferencia</span>
+                    <strong id="difMonto">$ 0,00</strong>
+                </div>
+            </div>
+
+            <div id="cerrarError" class="alerta-inline alerta-error" style="display:none;"></div>
+
+            <button type="button" class="btn-caja-peligro" id="btnCerrarTurno">
+                <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                    <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M6 11l1.5 1.5L10 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Cerrar turno
+            </button>
+        </div>
+
+    </div>{# /caja-grid #}
+
+</div>{# /panelCajaAbierta #}
+
+<div class="caja-card caja-card-cierre-diario" style="margin-top:1.5rem;">
+    <h2 class="caja-card-titulo">Cierre diario</h2>
+    <p class="caja-card-desc">
+        Agrupa todos los turnos cerrados de un rango de fechas y hace el balance final del día.
+        Solo puede ejecutarse cuando no hay turno abierto.
+    </p>
+
+    <div class="caja-fecha-rango">
+        <div class="caja-field">
+            <label class="caja-label">Desde</label>
+            <input type="date" id="cierreDesde" class="caja-input-date">
+        </div>
+        <div class="caja-field">
+            <label class="caja-label">Hasta</label>
+            <input type="date" id="cierreHasta" class="caja-input-date">
+        </div>
+        <button type="button" class="btn-caja-secundario" id="btnPrevisualizarCierre">
+            Previsualizar
+        </button>
+    </div>
+
+    <div id="cierrePreviewPanel" style="display:none; margin-top:1rem;">
+
+        <div class="caja-cierre-resumen" id="cierreResumen"></div>
+
+        <div class="caja-field" style="margin-top:1rem;">
+            <label class="caja-label">Efectivo físico en caja al cierre</label>
+            <div class="caja-input-wrap">
+                <span class="caja-signo">$</span>
+                <input type="number" id="cierreEfectivoFisico" class="caja-input"
+                       min="0" step="0.01" placeholder="0,00">
+            </div>
+        </div>
+
+        <div id="cierreError" class="alerta-inline alerta-error" style="display:none;"></div>
+
+        <button type="button" class="btn-caja-principal" id="btnEjecutarCierre">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <path d="M3 8.5l3.5 3.5L13 4" stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Ejecutar cierre diario
+        </button>
+    </div>
+
+    <div id="cierreExitoPanel" style="display:none;"></div>
+</div>
+
+
+{# ══ MODAL ÉXITO CIERRE TURNO ══ #}
+<div class="modal fade" id="modalCierreTurno" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content caja-modal">
+            <div class="modal-body p-4">
+                <div class="caja-modal-icono">✅</div>
+                <h5 class="caja-modal-titulo">Turno cerrado</h5>
+                <div id="cierreTurnoDetalle" class="caja-modal-detalle"></div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="button" class="btn-caja-principal flex-fill"
+                            id="btnAbrirNuevoTurno" data-bs-dismiss="modal">
+                        Abrir nuevo turno
+                    </button>
+                    <button type="button" class="btn-caja-secundario flex-fill"
+                            data-bs-dismiss="modal">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'cobranzas/js/caja.js' %}"></script>
+<script>
+    window.cajaUrls = {
+        estado:              "{% url 'cobranzas:caja_estado' %}",
+        abrir:               "{% url 'cobranzas:caja_abrir' %}",
+        cerrarTurno:         "{% url 'cobranzas:caja_cerrar_turno' %}",
+        retiro:              "{% url 'cobranzas:caja_retiro' %}",
+        cierrePrevisualizar: "{% url 'cobranzas:cierre_previsualizar' %}",
+        cierreEjecutar:      "{% url 'cobranzas:cierre_ejecutar' %}",
+        historialCierres:    "{% url 'cobranzas:historial_cierres' %}",
+    };
+</script>
+{% endblock %}

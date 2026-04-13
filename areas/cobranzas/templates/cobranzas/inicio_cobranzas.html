@@ -11,16 +11,34 @@
     <p>Gestión de servicios, deudas y pagos — Grupo Kairos.</p>
 </div>
 
-{# ── MÓDULOS PRÓXIMAMENTE ── #}
-<p class="page-subtitle" style="margin-bottom:.9rem;">Funciones disponibles próximamente</p>
+{# ── ACCESOS RÁPIDOS ── #}
+<p class="page-subtitle" style="margin-bottom:.9rem;">Accesos rápidos</p>
 <div class="cobr-pronto-grid">
-    <div class="cobr-pronto-card">
+
+    <a href="{% url 'cobranzas:caja' %}" class="cobr-acceso-card">
         <div class="cobr-pronto-icon">💰</div>
         <div class="cobr-pronto-info">
-            <strong>Abrir caja</strong>
-            <span>Próximamente</span>
+            <strong>Caja</strong>
+            <span>Abrir / cerrar turno</span>
         </div>
-    </div>
+    </a>
+
+    <a href="{% url 'cobranzas:gestion_cobros' %}" class="cobr-acceso-card">
+        <div class="cobr-pronto-icon">🧾</div>
+        <div class="cobr-pronto-info">
+            <strong>Nuevo cobro</strong>
+            <span>Registrar boletas</span>
+        </div>
+    </a>
+
+    <a href="{% url 'cobranzas:gestion_servicios' %}" class="cobr-acceso-card">
+        <div class="cobr-pronto-icon">⚙️</div>
+        <div class="cobr-pronto-info">
+            <strong>Servicios</strong>
+            <span>ABM de servicios</span>
+        </div>
+    </a>
+
     <div class="cobr-pronto-card">
         <div class="cobr-pronto-icon">📊</div>
         <div class="cobr-pronto-info">
@@ -28,13 +46,7 @@
             <span>Próximamente</span>
         </div>
     </div>
-    <div class="cobr-pronto-card">
-        <div class="cobr-pronto-icon">📁</div>
-        <div class="cobr-pronto-info">
-            <strong>Historial</strong>
-            <span>Próximamente</span>
-        </div>
-    </div>
+
 </div>
 
 {% endblock %}

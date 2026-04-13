@@ -1,3 +1,9 @@
+"""
+views_cobros.py
+Vistas del módulo de cobros.
+CAMBIO: ConfirmarCobroAjax ahora requiere un turno abierto y
+        asocia el cobro al turno activo.
+"""
 import re
 import json
 from datetime import date
@@ -9,7 +15,8 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Q, Sum
 
-from .models import Servicio, Cobro, ItemCobro, PagoCobro
+from .models import Servicio, Cobro, ItemCobro, PagoCobro, Turno
+from .views_caja import get_turno_abierto
 
 
 # ═══════════════════════════════════════════════════════════
@@ -58,23 +65,17 @@ def resolver_adicional(prefijo: str, valor_boleta: float):
 
 
 # ═══════════════════════════════════════════════════════════
-# HELPER: armar queryset de cobros desde un dict de filtros
-# Usado tanto para previsualizar como para eliminar por filtros.
+# HELPER FILTROS
 # ═══════════════════════════════════════════════════════════
 
 def _qs_por_filtros(filtros: dict):
-    """
-    Recibe un dict con claves opcionales:
-      desde, hasta, usuario, metodo, codigo, monto_min, monto_max
-    Retorna un QuerySet de Cobro filtrado.
-    """
     qs = Cobro.objects.filter(estado=Cobro.ESTADO_CERRADO)
 
-    desde = (filtros.get('desde') or '').strip()
-    hasta = (filtros.get('hasta') or '').strip()
-    usuario  = (filtros.get('usuario')  or '').strip()
-    metodo   = (filtros.get('metodo')   or '').strip()
-    codigo   = (filtros.get('codigo')   or '').strip()
+    desde     = (filtros.get('desde')     or '').strip()
+    hasta     = (filtros.get('hasta')     or '').strip()
+    usuario   = (filtros.get('usuario')   or '').strip()
+    metodo    = (filtros.get('metodo')    or '').strip()
+    codigo    = (filtros.get('codigo')    or '').strip()
     monto_min = (filtros.get('monto_min') or '').strip()
     monto_max = (filtros.get('monto_max') or '').strip()
 
@@ -108,7 +109,10 @@ def _qs_por_filtros(filtros: dict):
 
 class GestionCobrosView(LoginRequiredMixin, View):
     def get(self, request):
-        return render(request, 'cobranzas/gestion_cobros.html')
+        turno = get_turno_abierto()
+        return render(request, 'cobranzas/gestion_cobros.html', {
+            'turno_abierto': turno,
+        })
 
 
 class BuscarServicioAjax(LoginRequiredMixin, View):
@@ -171,6 +175,14 @@ class BuscarServicioAjax(LoginRequiredMixin, View):
 
 class ConfirmarCobroAjax(LoginRequiredMixin, View):
     def post(self, request):
+        # ── Verificar turno abierto ──────────────────────────
+        turno = get_turno_abierto()
+        if not turno:
+            return JsonResponse({
+                'error': 'No hay caja abierta. Abrí la caja antes de registrar cobros.',
+                'sin_turno': True,
+            }, status=400)
+
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
@@ -198,6 +210,7 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
 
         with transaction.atomic():
             cobro = Cobro.objects.create(
+                turno=turno,
                 estado=Cobro.ESTADO_CERRADO,
                 fecha_cierre=timezone.now(),
                 creado_por=request.user,
@@ -231,16 +244,16 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
             'total_adicionales': float(cobro.total_adicionales()),
             'pagos':             totales_por_metodo,
             'fecha':             cobro.fecha_cierre.strftime('%d/%m/%Y %H:%M'),
+            'turno_numero':      turno.numero,
         })
 
 
 class HistorialCobrosView(LoginRequiredMixin, View):
-    """Lista de cobros cerrados. Filtro de búsqueda solo por fecha."""
     def get(self, request):
         cobros = (
             Cobro.objects
             .filter(estado=Cobro.ESTADO_CERRADO)
-            .select_related('creado_por')
+            .select_related('creado_por', 'turno')
             .prefetch_related('items__servicio', 'pagos')
         )
 
@@ -252,10 +265,10 @@ class HistorialCobrosView(LoginRequiredMixin, View):
             cobros = cobros.filter(fecha_cierre__date__lte=hasta)
 
         return render(request, 'cobranzas/historial_cobros.html', {
-            'cobros':           cobros[:500],
-            'desde':            desde,
-            'hasta':            hasta,
-            'metodos_choices':  PagoCobro.METODOS,
+            'cobros':          cobros[:500],
+            'desde':           desde,
+            'hasta':           hasta,
+            'metodos_choices': PagoCobro.METODOS,
         })
 
 
@@ -264,18 +277,6 @@ class HistorialCobrosView(LoginRequiredMixin, View):
 # ═══════════════════════════════════════════════════════════
 
 class EliminarCobrosAjax(LoginRequiredMixin, View):
-    """
-    Elimina cobros. Acepta dos modos en el body JSON:
-
-    Modo 1 — por IDs directos:
-        { "ids": [1, 2, 3] }
-
-    Modo 2 — por filtros (viene del modal "Eliminar registros"):
-        { "filtros": { "desde": "2025-01-01", "hasta": "2025-01-31", ... } }
-
-    Al eliminar un Cobro en cascade se eliminan sus ItemCobro y PagoCobro,
-    liberando las FK protegidas en Servicio.
-    """
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
             return JsonResponse({'error': 'Solo administradores pueden eliminar cobros.'}, status=403)
@@ -285,7 +286,6 @@ class EliminarCobrosAjax(LoginRequiredMixin, View):
         except json.JSONDecodeError:
             return JsonResponse({'error': 'JSON inválido'}, status=400)
 
-        # ── Modo 1: por IDs ──────────────────────────────────
         if 'ids' in data:
             ids = data['ids']
             if not ids:
@@ -299,7 +299,6 @@ class EliminarCobrosAjax(LoginRequiredMixin, View):
                 eliminados, _ = Cobro.objects.filter(pk__in=ids).delete()
             return JsonResponse({'success': True, 'eliminados': eliminados})
 
-        # ── Modo 2: por filtros ──────────────────────────────
         if 'filtros' in data:
             filtros = data['filtros']
             if not isinstance(filtros, dict):
@@ -319,13 +318,6 @@ class EliminarCobrosAjax(LoginRequiredMixin, View):
 
 
 class PrevisualizarElimFiltroAjax(LoginRequiredMixin, View):
-    """
-    Cuenta cuántos cobros serían eliminados con los filtros dados.
-    No borra nada — solo informa el total para que el usuario confirme.
-
-    POST body JSON: mismo dict de filtros que EliminarCobrosAjax (modo filtros).
-    Respuesta: { "count": N }
-    """
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
             return JsonResponse({'error': 'Sin permiso.'}, status=403)
@@ -343,11 +335,6 @@ class PrevisualizarElimFiltroAjax(LoginRequiredMixin, View):
 
 
 class LimpiezaAutomaticaAjax(LoginRequiredMixin, View):
-    """
-    Elimina todos los cobros cerrados del mes anterior al de ejecución.
-    Solo disponible a partir del día 20 del mes.
-    Solo staff/superuser.
-    """
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
             return JsonResponse({'error': 'Sin permiso.'}, status=403)

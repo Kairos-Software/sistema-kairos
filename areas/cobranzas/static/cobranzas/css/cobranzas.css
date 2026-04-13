@@ -702,4 +702,39 @@
     opacity: .7;
     display: inline-block;
     min-width: 1ch; /* reserva espacio para evitar saltos de layout */
+}/* ── Accesos rápidos en inicio (cards con link) ── */
+.cobr-acceso-card {
+    background: #fff;
+    border: 1px solid #e8e8ee;
+    border-radius: 14px;
+    padding: 1.2rem 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    text-decoration: none;
+    transition: all .18s;
+    cursor: pointer;
+}
+
+.cobr-acceso-card:hover {
+    border-color: #E85C0D;
+    box-shadow: 0 4px 14px rgba(232,92,13,.12);
+    transform: translateY(-1px);
+}
+
+.cobr-acceso-card .cobr-pronto-info strong {
+    color: #222;
+}
+
+.cobr-acceso-card:hover .cobr-pronto-info strong {
+    color: #E85C0D;
+}
+
+.cobr-acceso-card .cobr-pronto-info span {
+    color: #888;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
 }

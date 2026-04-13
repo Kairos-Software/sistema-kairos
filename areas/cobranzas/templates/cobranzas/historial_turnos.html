@@ -1,0 +1,99 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Historial de Turnos — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Historial de <span>Turnos</span></h1>
+        <p class="page-subtitle">{{ turnos|length }} turno{{ turnos|length|pluralize }} encontrado{{ turnos|length|pluralize }}</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'cobranzas:caja' %}" class="btn-volver">← Volver a Caja</a>
+    </div>
+</div>
+
+<form method="get" class="filtros-bar">
+    <div class="filtro-fecha-wrap">
+        <label>Desde</label>
+        <input type="date" name="desde" value="{{ desde }}" class="filtro-input">
+    </div>
+    <div class="filtro-fecha-wrap">
+        <label>Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta }}" class="filtro-input">
+    </div>
+    <button type="submit" class="btn-filtrar">Filtrar</button>
+    <a href="{% url 'cobranzas:historial_turnos' %}" class="btn-volver">Limpiar</a>
+</form>
+
+{% if turnos %}
+<div class="tabla-scroll">
+    <table class="tabla-base">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Cajero</th>
+                <th>Apertura</th>
+                <th>Cierre</th>
+                <th>Estado</th>
+                <th>Fondo inicial</th>
+                <th>Total efectivo</th>
+                <th>Total general</th>
+                <th>Ef. Declarado</th>
+                <th>Diferencia</th>
+                <th>Cierre diario</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in turnos %}
+            <tr>
+                <td><strong>#{{ t.numero }}</strong></td>
+                <td>{{ t.cajero }}</td>
+                <td>{{ t.fecha_apertura|date:"d/m/Y H:i" }}</td>
+                <td>{{ t.fecha_cierre|date:"d/m/Y H:i"|default:"—" }}</td>
+                <td>
+                    <span class="badge-estado {% if t.estado == 'abierto' %}badge-abierto{% else %}badge-cerrado{% endif %}">
+                        {{ t.get_estado_display }}
+                    </span>
+                </td>
+                <td>${{ t.monto_inicial|floatformat:2 }}</td>
+                <td>${{ t.total_efectivo_sistema|floatformat:2|default:"—" }}</td>
+                <td>
+                    {% with total=t.total_general %}
+                    ${{ total|floatformat:2 }}
+                    {% endwith %}
+                </td>
+                <td>${{ t.efectivo_declarado|floatformat:2|default:"—" }}</td>
+                <td>
+                    {% if t.diferencia is not None %}
+                        <span class="{% if t.tipo_diferencia == 'sobrante' %}texto-sobrante{% elif t.tipo_diferencia == 'faltante' %}texto-faltante{% else %}texto-ok{% endif %}">
+                            {% if t.diferencia > 0 %}+{% endif %}${{ t.diferencia|floatformat:2 }}
+                        </span>
+                    {% else %}—{% endif %}
+                </td>
+                <td>
+                    {% if t.cierre_diario %}
+                        <a href="{% url 'cobranzas:historial_cierres' %}">Cierre #{{ t.cierre_diario.pk }}</a>
+                    {% else %}
+                        <span class="texto-pendiente">Pendiente</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="estado-vacio">
+    <p>No se encontraron turnos con esos filtros.</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Historial de Cierres — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Historial de <span>Cierres Diarios</span></h1>
+        <p class="page-subtitle">{{ cierres|length }} cierre{{ cierres|length|pluralize }} encontrado{{ cierres|length|pluralize }}</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'cobranzas:caja' %}" class="btn-volver">← Volver a Caja</a>
+    </div>
+</div>
+
+<form method="get" class="filtros-bar">
+    <div class="filtro-fecha-wrap">
+        <label>Desde</label>
+        <input type="date" name="desde" value="{{ desde }}" class="filtro-input">
+    </div>
+    <div class="filtro-fecha-wrap">
+        <label>Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta }}" class="filtro-input">
+    </div>
+    <button type="submit" class="btn-filtrar">Filtrar</button>
+    <a href="{% url 'cobranzas:historial_cierres' %}" class="btn-volver">Limpiar</a>
+</form>
+
+{% if cierres %}
+<div class="tabla-scroll">
+    <table class="tabla-base">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Fecha</th>
+                <th>Rango</th>
+                <th>Turnos</th>
+                <th>Efectivo</th>
+                <th>Transferencia</th>
+                <th>Débito</th>
+                <th>Crédito</th>
+                <th>QR</th>
+                <th>Retiros</th>
+                <th>Total general</th>
+                <th>Adicionales</th>
+                <th>Ef. Físico</th>
+                <th>Diferencia</th>
+                <th>Realizado por</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cierres %}
+            <tr>
+                <td><strong>#{{ c.pk }}</strong></td>
+                <td>{{ c.fecha|date:"d/m/Y H:i" }}</td>
+                <td>{{ c.fecha_desde|date:"d/m/Y" }} → {{ c.fecha_hasta|date:"d/m/Y" }}</td>
+                <td>{{ c.cant_turnos }}</td>
+                <td>${{ c.total_efectivo|floatformat:2 }}</td>
+                <td>${{ c.total_transferencia|floatformat:2 }}</td>
+                <td>${{ c.total_debito|floatformat:2 }}</td>
+                <td>${{ c.total_credito|floatformat:2 }}</td>
+                <td>${{ c.total_qr|floatformat:2 }}</td>
+                <td>${{ c.total_retiros|floatformat:2 }}</td>
+                <td><strong>${{ c.total_general|floatformat:2 }}</strong></td>
+                <td class="texto-adicionales"><strong>${{ c.total_adicionales|floatformat:2 }}</strong></td>
+                <td>${{ c.efectivo_fisico|floatformat:2 }}</td>
+                <td>
+                    <span class="{% if c.diferencia_caja > 0 %}texto-sobrante{% elif c.diferencia_caja < 0 %}texto-faltante{% else %}texto-ok{% endif %}">
+                        {% if c.diferencia_caja > 0 %}+{% endif %}${{ c.diferencia_caja|floatformat:2 }}
+                    </span>
+                </td>
+                <td>{{ c.realizado_por }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="estado-vacio">
+    <p>No se encontraron cierres diarios con esos filtros.</p>
+</div>
+{% endif %}
+
+{% endblock %}
