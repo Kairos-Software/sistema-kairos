@@ -1,0 +1,488 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Depósitos Bancarios — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Depósitos <span>Bancarios</span></h1>
+        <p class="page-subtitle">Registrá el depósito bancario por entidad</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'cobranzas:depositos_historial' %}" class="btn-historial">
+            📋 Ver historial completo
+        </a>
+    </div>
+</div>
+
+{# ── SELECTOR DE ENTIDAD ── #}
+<div class="caja-card" style="margin-bottom:1.2rem;">
+    <h2 class="caja-card-titulo" style="margin-bottom:.9rem;">Seleccionar entidad</h2>
+    <div class="dep-entidad-selector">
+
+        <button class="dep-entidad-btn {% if entidad == ENTIDAD_PF %}dep-entidad-activa{% endif %}"
+                data-entidad="{{ ENTIDAD_PF }}" data-label="PagoFácil">
+            <span class="dep-entidad-icono">💳</span>
+            <span class="dep-entidad-nombre">PagoFácil</span>
+            <span class="dep-entidad-total">${{ total_pf|floatformat:2 }}</span>
+            <span class="dep-entidad-cant">{{ cant_pf }} depósito{{ cant_pf|pluralize }}</span>
+        </button>
+
+        <button class="dep-entidad-btn {% if entidad == ENTIDAD_RP %}dep-entidad-activa{% endif %}"
+                data-entidad="{{ ENTIDAD_RP }}" data-label="RapiPago">
+            <span class="dep-entidad-icono">🏦</span>
+            <span class="dep-entidad-nombre">RapiPago</span>
+            <span class="dep-entidad-total">${{ total_rp|floatformat:2 }}</span>
+            <span class="dep-entidad-cant">{{ cant_rp }} depósito{{ cant_rp|pluralize }}</span>
+        </button>
+
+    </div>
+</div>
+
+{# ── FORMULARIO ── #}
+<div class="caja-card" style="margin-bottom:1.2rem;">
+    <h2 class="caja-card-titulo">
+        Registrar depósito —
+        <span id="labelEntidadForm" class="dep-entidad-label-activa">{{ entidad_label }}</span>
+    </h2>
+    <p class="caja-card-desc">
+        Completá los datos del depósito realizado en el banco para la entidad seleccionada.
+    </p>
+
+    <div class="dep-form-grid">
+        <div class="caja-field">
+            <label class="caja-label">Fecha del depósito</label>
+            <input type="date" id="inputFecha" class="dep-input" value="{{ hoy|date:'Y-m-d' }}">
+        </div>
+        <div class="caja-field">
+            <label class="caja-label">Monto depositado</label>
+            <div class="dep-input-money">
+                <span class="dep-signo">$</span>
+                <input type="number" id="inputMonto" class="dep-input dep-input-num"
+                       min="0.01" step="0.01" placeholder="0,00">
+            </div>
+        </div>
+        <div class="caja-field">
+            <label class="caja-label">
+                N° de comprobante <span class="caja-hint">(opcional)</span>
+            </label>
+            <input type="text" id="inputComprobante" class="dep-input" placeholder="Ej: 00123456">
+        </div>
+    </div>
+
+    <div class="caja-field" style="margin-top:.6rem;">
+        <label class="caja-label">
+            Observaciones <span class="caja-hint">(opcional)</span>
+        </label>
+        <textarea id="inputObservaciones" class="dep-input dep-textarea"
+                  placeholder="Ej: Depósito banco Galicia sucursal centro..."></textarea>
+    </div>
+
+    <div id="depositoError" class="alerta-inline alerta-error" style="display:none;"></div>
+    <div id="depositoExito" class="alerta-inline alerta-exito" style="display:none;"></div>
+
+    <div style="margin-top:1rem;">
+        <button type="button" class="btn-caja-principal" id="btnRegistrar">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Registrar depósito
+        </button>
+    </div>
+</div>
+
+{# ── ÚLTIMOS DEPÓSITOS ── #}
+<div class="caja-card" id="panelUltimos">
+    <div class="dep-table-header">
+        <h2 class="caja-card-titulo" style="margin-bottom:0;">
+            Últimos depósitos — <span id="labelEntidadTabla">{{ entidad_label }}</span>
+        </h2>
+        <a href="{% url 'cobranzas:depositos_historial' %}?entidad={{ entidad }}"
+           id="linkHistorialEntidad" class="btn-historial" style="font-size:.82rem;">
+            Ver todos →
+        </a>
+    </div>
+
+    <div class="tabla-scroll" style="margin-top:.9rem;">
+        <table class="tabla-base">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Monto</th>
+                    <th>Comprobante</th>
+                    <th>Observaciones</th>
+                    <th>Registrado por</th>
+                </tr>
+            </thead>
+            <tbody id="tbodyDepositos">
+                {% for d in ultimos %}
+                <tr>
+                    <td><strong>#{{ d.pk }}</strong></td>
+                    <td>{{ d.fecha|date:"d/m/Y" }}</td>
+                    <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
+                    <td>{{ d.numero_comprobante|default:"—" }}</td>
+                    <td>{{ d.observaciones|default:"—" }}</td>
+                    <td>{{ d.realizado_por }}</td>
+                </tr>
+                {% empty %}
+                <tr id="trVacio">
+                    <td colspan="6" class="dep-vacio">
+                        No hay depósitos registrados para esta entidad.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# ── Modal confirmación ── #}
+<div class="modal fade" id="modalConfirmar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content caja-modal">
+            <div class="modal-body p-4">
+                <div class="caja-modal-icono">🏦</div>
+                <h5 class="caja-modal-titulo">Confirmar depósito</h5>
+
+                <div class="caja-modal-fila mt-3">
+                    <span>Entidad</span>
+                    <strong id="modalEntidad">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span>Fecha</span>
+                    <strong id="modalFecha">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span>Monto</span>
+                    <strong id="modalMonto">—</strong>
+                </div>
+                <div class="caja-modal-fila" id="modalFilaComprobante" style="display:none;">
+                    <span>Comprobante</span>
+                    <strong id="modalComprobante">—</strong>
+                </div>
+                <div class="caja-modal-fila" id="modalFilaObs" style="display:none;">
+                    <span>Observaciones</span>
+                    <strong id="modalObs">—</strong>
+                </div>
+
+                <div class="d-flex gap-2 mt-4 justify-content-end">
+                    <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn-caja-principal" id="btnConfirmar">
+                        Confirmar
+                    </button>
+                </div>
+                <div id="modalError" class="caja-error-msg mt-2" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ── Layout ── */
+.dep-entidad-selector { display: flex; gap: 1rem; }
+.dep-entidad-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .25rem;
+    padding: 1rem;
+    background: var(--surface-raised, #f4f4f5);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+.dep-entidad-btn:hover        { border-color: var(--accent, #E85C0D); background: var(--surface, #fff); }
+.dep-entidad-activa           { border-color: var(--accent, #E85C0D) !important; background: var(--surface, #fff) !important; }
+.dep-entidad-icono            { font-size: 1.6rem; }
+.dep-entidad-nombre           { font-weight: 700; font-size: .95rem; color: var(--text-primary, #111); }
+.dep-entidad-total            { font-size: 1.05rem; font-weight: 600; color: var(--accent, #E85C0D); }
+.dep-entidad-cant             { font-size: .78rem; color: var(--text-muted, #888); }
+.dep-entidad-label-activa     { color: var(--accent, #E85C0D); }
+
+/* ── Form grid ── */
+.dep-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: .8rem 1.2rem;
+}
+
+/* ── Inputs con borde visible ── */
+.dep-input {
+    width: 100%;
+    padding: .5rem .75rem;
+    border: 1.5px solid var(--border, #d1d5db);
+    border-radius: 7px;
+    background: var(--surface, #fff);
+    color: var(--text-primary, #111);
+    font-size: .9rem;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+.dep-input:focus {
+    border-color: var(--accent, #E85C0D);
+    box-shadow: 0 0 0 3px rgba(232,92,13,.12);
+}
+.dep-textarea  { resize: vertical; min-height: 72px; }
+.dep-input-money { display: flex; align-items: center; border: 1.5px solid var(--border, #d1d5db); border-radius: 7px; background: var(--surface, #fff); overflow: hidden; transition: border-color .15s, box-shadow .15s; }
+.dep-input-money:focus-within { border-color: var(--accent, #E85C0D); box-shadow: 0 0 0 3px rgba(232,92,13,.12); }
+.dep-signo { padding: 0 .5rem 0 .75rem; color: var(--text-muted, #6b7280); font-weight: 600; }
+.dep-input-num { border: none !important; box-shadow: none !important; padding-left: 0; }
+.dep-input-num:focus { border: none !important; box-shadow: none !important; }
+
+/* ── Tabla header ── */
+.dep-table-header { display: flex; align-items: center; justify-content: space-between; }
+.dep-vacio { text-align: center; color: var(--text-muted, #888); padding: 1.5rem 0; }
+
+@media (max-width: 640px) {
+    .dep-entidad-selector { flex-direction: column; }
+    .dep-form-grid        { grid-template-columns: 1fr; }
+}
+</style>
+
+<script>
+(function () {
+    'use strict';
+
+    const urlRegistrar = "{% url 'cobranzas:depositos_registrar' %}";
+    const urlHistorial = "{% url 'cobranzas:depositos_historial' %}";
+    const urlDepositos = "{% url 'cobranzas:depositos' %}";
+    let entidadActual  = "{{ entidad }}";
+    let modalInstance  = null;
+
+    function getCsrf() {
+        return document.cookie.split(';')
+            .map(c => c.trim())
+            .find(c => c.startsWith('csrftoken='))
+            ?.split('=')[1] || '';
+    }
+
+    function fmt(n) {
+        return '$' + parseFloat(n).toLocaleString('es-AR', {
+            minimumFractionDigits: 2, maximumFractionDigits: 2,
+        });
+    }
+
+    // Fecha de hoy por defecto
+    const inputFecha = document.getElementById('inputFecha');
+    if (!inputFecha.value) {
+        inputFecha.value = new Date().toISOString().split('T')[0];
+    }
+
+    // ── Selector de entidad ───────────────────────────────
+    document.querySelectorAll('.dep-entidad-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const nueva = this.dataset.entidad;
+            const label = this.dataset.label;
+
+            document.querySelectorAll('.dep-entidad-btn')
+                .forEach(b => b.classList.remove('dep-entidad-activa'));
+            this.classList.add('dep-entidad-activa');
+
+            entidadActual = nueva;
+            document.getElementById('labelEntidadForm').textContent  = label;
+            document.getElementById('labelEntidadTabla').textContent = label;
+            document.getElementById('linkHistorialEntidad').href =
+                urlHistorial + '?entidad=' + nueva;
+
+            document.getElementById('depositoError').style.display = 'none';
+            document.getElementById('depositoExito').style.display = 'none';
+
+            // Recargar página con la entidad seleccionada para actualizar la tabla
+            window.location.search = '?entidad=' + nueva;
+        });
+    });
+
+    // ── Abrir modal ───────────────────────────────────────
+    document.getElementById('btnRegistrar').addEventListener('click', function () {
+        const fecha  = document.getElementById('inputFecha').value;
+        const monto  = parseFloat(document.getElementById('inputMonto').value);
+        const comp   = document.getElementById('inputComprobante').value.trim();
+        const obs    = document.getElementById('inputObservaciones').value.trim();
+        const errEl  = document.getElementById('depositoError');
+        const okEl   = document.getElementById('depositoExito');
+
+        errEl.style.display = 'none';
+        okEl.style.display  = 'none';
+
+        if (!fecha) {
+            errEl.textContent = 'La fecha es obligatoria.';
+            errEl.style.display = '';
+            return;
+        }
+        if (!monto || monto <= 0) {
+            errEl.textContent = 'El monto debe ser mayor a cero.';
+            errEl.style.display = '';
+            return;
+        }
+
+        // Poblar modal
+        const labelMap = {
+            '{{ ENTIDAD_PF }}': 'PagoFácil',
+            '{{ ENTIDAD_RP }}': 'RapiPago',
+        };
+        document.getElementById('modalEntidad').textContent = labelMap[entidadActual] || entidadActual;
+
+        const [y, m, d] = fecha.split('-');
+        document.getElementById('modalFecha').textContent = `${d}/${m}/${y}`;
+        document.getElementById('modalMonto').textContent = fmt(monto);
+
+        const filaCom = document.getElementById('modalFilaComprobante');
+        if (comp) {
+            document.getElementById('modalComprobante').textContent = comp;
+            filaCom.style.display = '';
+        } else {
+            filaCom.style.display = 'none';
+        }
+
+        const filaObs = document.getElementById('modalFilaObs');
+        if (obs) {
+            document.getElementById('modalObs').textContent = obs;
+            filaObs.style.display = '';
+        } else {
+            filaObs.style.display = 'none';
+        }
+
+        document.getElementById('modalError').style.display = 'none';
+        const btnConf = document.getElementById('btnConfirmar');
+        btnConf.disabled    = false;
+        btnConf.textContent = 'Confirmar';
+
+        modalInstance = new bootstrap.Modal(document.getElementById('modalConfirmar'));
+        modalInstance.show();
+    });
+
+    // ── Confirmar ─────────────────────────────────────────
+    document.getElementById('btnConfirmar').addEventListener('click', async function () {
+        const fecha = document.getElementById('inputFecha').value;
+        const monto = parseFloat(document.getElementById('inputMonto').value);
+        const comp  = document.getElementById('inputComprobante').value.trim();
+        const obs   = document.getElementById('inputObservaciones').value.trim();
+        const errEl = document.getElementById('modalError');
+        const btn   = this;
+
+        btn.disabled    = true;
+        btn.textContent = 'Registrando...';
+        errEl.style.display = 'none';
+
+        // ── Fetch ─────────────────────────────────────────
+        let resp;
+        try {
+            resp = await fetch(urlRegistrar, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrf(),
+                },
+                body: JSON.stringify({
+                    entidad:            entidadActual,
+                    fecha,
+                    monto,
+                    numero_comprobante: comp,
+                    observaciones:      obs,
+                }),
+            });
+        } catch (e) {
+            errEl.textContent = 'Error de red. Verificá tu conexión e intentá de nuevo.';
+            errEl.style.display = '';
+            btn.disabled    = false;
+            btn.textContent = 'Confirmar';
+            return;
+        }
+
+        // Verificar content-type antes de parsear
+        const ct = resp.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+            errEl.textContent =
+                `Respuesta inesperada del servidor (HTTP ${resp.status}). ` +
+                `Recargá la página para verificar si el depósito se guardó.`;
+            errEl.style.display = '';
+            btn.disabled    = false;
+            btn.textContent = 'Confirmar';
+            return;
+        }
+
+        let data;
+        try {
+            data = await resp.json();
+        } catch (e) {
+            errEl.textContent = 'No se pudo leer la respuesta. Recargá la página.';
+            errEl.style.display = '';
+            btn.disabled    = false;
+            btn.textContent = 'Confirmar';
+            return;
+        }
+
+        // ── Éxito ─────────────────────────────────────────
+        if (data.success) {
+            // Cerrar modal de forma segura
+            if (modalInstance) {
+                try { modalInstance.hide(); } catch (_) {}
+                modalInstance = null;
+            }
+
+            // Actualizar contador y total en el botón de entidad
+            const btnActivo = document.querySelector(
+                `.dep-entidad-btn[data-entidad="${entidadActual}"]`
+            );
+            if (btnActivo) {
+                btnActivo.querySelector('.dep-entidad-total').textContent = fmt(data.nuevo_total);
+                const cantEl = btnActivo.querySelector('.dep-entidad-cant');
+                const n = (parseInt(cantEl.textContent) || 0) + 1;
+                cantEl.textContent = `${n} depósito${n !== 1 ? 's' : ''}`;
+            }
+
+            // Agregar fila en tabla
+            const tbody   = document.getElementById('tbodyDepositos');
+            const trVacio = document.getElementById('trVacio');
+            if (trVacio) trVacio.remove();
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>#${data.deposito_id}</strong></td>
+                <td>${data.fecha}</td>
+                <td><strong>${fmt(data.monto)}</strong></td>
+                <td>${data.numero_comprobante || '—'}</td>
+                <td>${data.observaciones || '—'}</td>
+                <td>${data.realizado_por}</td>
+            `;
+            tbody.prepend(tr);
+
+            // Mensaje de éxito
+            const okEl = document.getElementById('depositoExito');
+            okEl.textContent =
+                `Depósito de ${fmt(data.monto)} registrado para ${data.entidad_label}. ` +
+                `Total acumulado: ${fmt(data.nuevo_total)}.`;
+            okEl.style.display = '';
+
+            // Limpiar campos
+            document.getElementById('inputMonto').value         = '';
+            document.getElementById('inputComprobante').value   = '';
+            document.getElementById('inputObservaciones').value = '';
+
+        } else {
+            errEl.textContent = data.error || 'Error al registrar el depósito.';
+            errEl.style.display = '';
+            btn.disabled    = false;
+            btn.textContent = 'Confirmar';
+        }
+    });
+
+})();
+</script>
+
+{% endblock %}

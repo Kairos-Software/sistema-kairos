@@ -1,7 +1,7 @@
 {% extends 'cobranzas/base_cobranzas.html' %}
 {% load static %}
 
-{% block title %}Historial de Cierres — Cobranzas{% endblock %}
+{% block title %}Historial de Depósitos — Cobranzas{% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
@@ -12,8 +12,8 @@
 
 <div class="page-header">
     <div>
-        <h1>Historial de <span>Cierres Diarios</span></h1>
-        <p class="page-subtitle" id="subtituloHistorial">{{ cierres|length }} cierre{{ cierres|length|pluralize }} encontrado{{ cierres|length|pluralize }}</p>
+        <h1>Historial de <span>Depósitos</span></h1>
+        <p class="page-subtitle" id="subtituloHistorial">{{ depositos|length }} depósito{{ depositos|length|pluralize }} encontrado{{ depositos|length|pluralize }}</p>
     </div>
     <div class="page-header-actions">
         {% if user.is_staff or user.is_superuser %}
@@ -25,7 +25,7 @@
             Eliminar seleccionados (<span id="selCount">0</span>)
         </button>
         {% endif %}
-        <a href="{% url 'cobranzas:caja' %}" class="btn-volver">← Volver a Caja</a>
+        <a href="{% url 'cobranzas:depositos' %}" class="btn-volver">← Volver a Depósitos</a>
     </div>
 </div>
 
@@ -38,11 +38,36 @@
         <label>Hasta</label>
         <input type="date" name="hasta" value="{{ hasta }}" class="filtro-input">
     </div>
+    <div class="filtro-fecha-wrap">
+        <label>Entidad</label>
+        <select name="entidad" class="filtro-input">
+            <option value="">Todas</option>
+            <option value="{{ ENTIDAD_PF }}" {% if entidad == ENTIDAD_PF %}selected{% endif %}>PagoFácil</option>
+            <option value="{{ ENTIDAD_RP }}" {% if entidad == ENTIDAD_RP %}selected{% endif %}>RapiPago</option>
+        </select>
+    </div>
     <button type="submit" class="btn-filtrar">Filtrar</button>
-    <a href="{% url 'cobranzas:historial_cierres' %}" class="btn-volver">Limpiar</a>
+    <a href="{% url 'cobranzas:depositos_historial' %}" class="btn-volver">Limpiar</a>
 </form>
 
-{% if cierres %}
+{% if depositos %}
+<div class="caja-card" style="margin-bottom:1rem; padding:.8rem 1.2rem;">
+    <div class="caja-resumen-grid">
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">Total período</span>
+            <strong>${{ total_filtrado|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">PagoFácil</span>
+            <strong>${{ total_pf_filtrado|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">RapiPago</span>
+            <strong>${{ total_rp_filtrado|floatformat:2 }}</strong>
+        </div>
+    </div>
+</div>
+
 <div class="tabla-scroll">
     <table class="tabla-base">
         <thead>
@@ -53,54 +78,40 @@
                 </th>
                 {% endif %}
                 <th>#</th>
-                <th>Fecha</th>
-                <th>Rango</th>
-                <th>Turnos</th>
-                <th>Efectivo</th>
-                <th>Transferencia</th>
-                <th>Débito</th>
-                <th>Crédito</th>
-                <th>QR</th>
-                <th>Retiros</th>
-                <th>Total general</th>
-                <th>Adicionales</th>
-                <th>Ef. Físico</th>
-                <th>Diferencia</th>
-                <th>Realizado por</th>
+                <th>Entidad</th>
+                <th>Fecha depósito</th>
+                <th>Monto</th>
+                <th>Comprobante</th>
+                <th>Observaciones</th>
+                <th>Registrado por</th>
+                <th>Registrado el</th>
                 {% if user.is_staff or user.is_superuser %}<th></th>{% endif %}
             </tr>
         </thead>
         <tbody>
-            {% for c in cierres %}
-            <tr class="hist-fila" data-id="{{ c.pk }}">
+            {% for d in depositos %}
+            <tr class="hist-fila" data-id="{{ d.pk }}">
                 {% if user.is_staff or user.is_superuser %}
                 <td>
-                    <input type="checkbox" class="check-item" data-id="{{ c.pk }}"
+                    <input type="checkbox" class="check-item" data-id="{{ d.pk }}"
                            style="accent-color:#E85C0D;cursor:pointer;">
                 </td>
                 {% endif %}
-                <td><strong>#{{ c.pk }}</strong></td>
-                <td>{{ c.fecha|date:"d/m/Y H:i" }}</td>
-                <td>{{ c.fecha_desde|date:"d/m/Y" }} → {{ c.fecha_hasta|date:"d/m/Y" }}</td>
-                <td>{{ c.cant_turnos }}</td>
-                <td>${{ c.total_efectivo|floatformat:2 }}</td>
-                <td>${{ c.total_transferencia|floatformat:2 }}</td>
-                <td>${{ c.total_debito|floatformat:2 }}</td>
-                <td>${{ c.total_credito|floatformat:2 }}</td>
-                <td>${{ c.total_qr|floatformat:2 }}</td>
-                <td>${{ c.total_retiros|floatformat:2 }}</td>
-                <td><strong>${{ c.total_general|floatformat:2 }}</strong></td>
-                <td class="texto-adicionales"><strong>${{ c.total_adicionales|floatformat:2 }}</strong></td>
-                <td>${{ c.efectivo_fisico|floatformat:2 }}</td>
+                <td><strong>#{{ d.pk }}</strong></td>
                 <td>
-                    <span class="{% if c.diferencia_caja > 0 %}texto-sobrante{% elif c.diferencia_caja < 0 %}texto-faltante{% else %}texto-ok{% endif %}">
-                        {% if c.diferencia_caja > 0 %}+{% endif %}${{ c.diferencia_caja|floatformat:2 }}
+                    <span class="badge-entidad badge-entidad-{{ d.entidad }}">
+                        {{ d.get_entidad_display }}
                     </span>
                 </td>
-                <td>{{ c.realizado_por }}</td>
+                <td>{{ d.fecha|date:"d/m/Y" }}</td>
+                <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
+                <td>{{ d.numero_comprobante|default:"—" }}</td>
+                <td>{{ d.observaciones|default:"—" }}</td>
+                <td>{{ d.realizado_por }}</td>
+                <td>{{ d.fecha_registro|date:"d/m/Y H:i" }}</td>
                 {% if user.is_staff or user.is_superuser %}
                 <td>
-                    <button class="btn-eliminar-item" data-id="{{ c.pk }}" title="Eliminar cierre #{{ c.pk }}"
+                    <button class="btn-eliminar-item" data-id="{{ d.pk }}" title="Eliminar depósito #{{ d.pk }}"
                             style="background:none;border:none;cursor:pointer;color:#dc3545;padding:.2rem .4rem;font-size:.85rem;">
                         🗑
                     </button>
@@ -113,21 +124,21 @@
 </div>
 {% else %}
 <div class="estado-vacio">
-    <p>No se encontraron cierres diarios con esos filtros.</p>
+    <p>No se encontraron depósitos con esos filtros.</p>
 </div>
 {% endif %}
 
 {# ── Modal eliminación ── #}
 {% if user.is_staff or user.is_superuser %}
-<div class="modal fade" id="modalEliminarCierres" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalEliminarDepositos" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content caja-modal">
             <div class="modal-body p-4 text-center">
                 <div class="caja-modal-icono">🗑️</div>
-                <h5 class="caja-modal-titulo">Eliminar cierre(s)</h5>
+                <h5 class="caja-modal-titulo">Eliminar depósito(s)</h5>
                 <p id="elimTexto" style="margin:.8rem 0 0;color:var(--text-secondary);font-size:.9rem;"></p>
                 <p style="font-size:.8rem;color:#dc3545;margin-top:.4rem;">
-                    ⚠ Esta acción es irreversible. Los turnos asociados quedarán sin cierre asignado.
+                    ⚠ Esta acción es irreversible.
                 </p>
                 <div id="elimError" class="caja-error-msg mt-2" style="display:none"></div>
                 <div class="d-flex gap-2 mt-4 justify-content-center">
@@ -143,11 +154,23 @@
 </div>
 {% endif %}
 
+<style>
+.badge-entidad {
+    display: inline-block;
+    padding: .2rem .55rem;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 600;
+}
+.badge-entidad-pagofacil { background: #fff3e0; color: #e65100; }
+.badge-entidad-rapipago  { background: #e8f5e9; color: #2e7d32; }
+</style>
+
 <script>
 (function () {
     'use strict';
 
-    const ELIMINAR_URL = "{% url 'cobranzas:cierres_eliminar' %}";
+    const ELIMINAR_URL = "{% url 'cobranzas:depositos_eliminar' %}";
 
     function getCsrf() {
         return document.cookie.split(';').map(c => c.trim())
@@ -183,14 +206,14 @@
 
     // ── Modal ──
     let idsAEliminar = [];
-    const modalElim = document.getElementById('modalEliminarCierres')
-        ? new bootstrap.Modal(document.getElementById('modalEliminarCierres')) : null;
+    const modalElim = document.getElementById('modalEliminarDepositos')
+        ? new bootstrap.Modal(document.getElementById('modalEliminarDepositos')) : null;
 
     function abrirEliminar(ids) {
         idsAEliminar = ids;
         document.getElementById('elimTexto').textContent = ids.length === 1
-            ? `¿Eliminás el cierre #${ids[0]}?`
-            : `¿Eliminás los ${ids.length} cierres seleccionados?`;
+            ? `¿Eliminás el depósito #${ids[0]}?`
+            : `¿Eliminás los ${ids.length} depósitos seleccionados?`;
         document.getElementById('elimError').style.display = 'none';
         document.getElementById('btnConfirmarElim').disabled    = false;
         document.getElementById('btnConfirmarElim').textContent = 'Eliminar';
@@ -218,7 +241,7 @@
                 actualizarBarra();
                 const n   = document.querySelectorAll('.hist-fila').length;
                 const sub = document.getElementById('subtituloHistorial');
-                if (sub) sub.textContent = `${n} cierre${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}`;
+                if (sub) sub.textContent = `${n} depósito${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}`;
             } else {
                 document.getElementById('elimError').textContent = data.error || 'No se pudo eliminar.';
                 document.getElementById('elimError').style.display = '';

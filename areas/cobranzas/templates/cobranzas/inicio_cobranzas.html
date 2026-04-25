@@ -5,13 +5,50 @@
 
 {% block cobranzas_content %}
 
-{# ── HERO ── #}
+<div id="deposito-reminder" class="deposito-reminder" style="display:none;" role="alert" aria-live="polite">
+
+    <div class="deposito-reminder__icon">
+        <svg viewBox="0 0 24 24" fill="none" width="26" height="26">
+            <rect x="3" y="5" width="18" height="15" rx="2.5" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 10v4M10 12l2 2 2-2" stroke="currentColor" stroke-width="1.7"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 5V4a1 1 0 011-1h6a1 1 0 011 1v1"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+    </div>
+
+    <div class="deposito-reminder__body">
+        <strong class="deposito-reminder__titulo">Hoy es día de depósito</strong>
+        <span class="deposito-reminder__sub">Recordá depositar los fondos de PagoFácil y RapiPago antes de cerrar el turno.</span>
+    </div>
+
+    <div class="deposito-reminder__actions">
+        <a href="{% url 'cobranzas:depositos' %}" class="deposito-reminder__btn-ir">
+            Ir a Depósitos
+        </a>
+        <button type="button" class="deposito-reminder__btn-ok" id="depositoReminderDismiss"
+                title="Marcar como realizado por hoy">
+            ✓ Ya deposité
+        </button>
+    </div>
+
+    {# Botón X para cerrar sin marcar como hecho (vuelve a aparecer al recargar) #}
+    <button type="button" class="deposito-reminder__close" id="depositoReminderClose"
+            title="Cerrar (volverá a aparecer al recargar)">
+        <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
+            <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round"/>
+        </svg>
+    </button>
+
+</div>
+
+{# ─── Hero ─── #}
 <div class="cobr-hero">
     <h1>Panel de <span>Cobranzas</span></h1>
     <p>Gestión de servicios, deudas y pagos — Grupo Kairos.</p>
 </div>
 
-{# ── ACCESOS RÁPIDOS ── #}
 <p class="page-subtitle" style="margin-bottom:.9rem;">Accesos rápidos</p>
 <div class="cobr-pronto-grid">
 
@@ -39,6 +76,22 @@
         </div>
     </a>
 
+    <a href="{% url 'cobranzas:caja_grande' %}" class="cobr-acceso-card">
+        <div class="cobr-pronto-icon">🏦</div>
+        <div class="cobr-pronto-info">
+            <strong>Caja Grande</strong>
+            <span>Acumulado global</span>
+        </div>
+    </a>
+
+    <a href="{% url 'cobranzas:depositos' %}" class="cobr-acceso-card">
+        <div class="cobr-pronto-icon">💳</div>
+        <div class="cobr-pronto-info">
+            <strong>Depósitos</strong>
+            <span>PagoFácil / RapiPago</span>
+        </div>
+    </a>
+
     <div class="cobr-pronto-card">
         <div class="cobr-pronto-icon">📊</div>
         <div class="cobr-pronto-info">
@@ -48,5 +101,83 @@
     </div>
 
 </div>
+
+<script>
+(function () {
+    'use strict';
+
+    // ────────────────────────────────────────────────────────
+    // ★ CONFIGURACIÓN — editá esto para probar o ajustar ★
+    // ────────────────────────────────────────────────────────
+
+    // Días en que debe aparecer el recordatorio.
+    // 0 = domingo, 1 = lunes, 2 = martes, 3 = miércoles,
+    // 4 = jueves,  5 = viernes, 6 = sábado
+    const DIAS_DEPOSITO = [1, 3, 5]; // lunes, miércoles, viernes
+
+    // ── MODO PRUEBA ──────────────────────────────────────────
+    // Para simular un día diferente al real, poné el número
+    // del día que querés probar (0-6) en DIA_PRUEBA.
+    // Dejalo en null para usar el día real del sistema.
+    //
+    // Ejemplos:
+    //   const DIA_PRUEBA = 6;  → simula sábado (no debería mostrar)
+    //   const DIA_PRUEBA = 1;  → simula lunes   (sí debería mostrar)
+    //   const DIA_PRUEBA = null; → día real
+    const DIA_PRUEBA = null;
+
+    // ────────────────────────────────────────────────────────
+    // Lógica (no hace falta tocar nada de acá para abajo)
+    // ────────────────────────────────────────────────────────
+
+    const STORAGE_KEY = 'deposito_reminder_dismissed'; // sessionStorage
+
+    const hoy = new Date();
+    const diaHoy = DIA_PRUEBA !== null ? DIA_PRUEBA : hoy.getDay();
+
+    // ¿Corresponde mostrar el recordatorio hoy?
+    if (!DIAS_DEPOSITO.includes(diaHoy)) return;
+
+    // ¿El usuario ya lo cerró con "Ya deposité" en esta sesión?
+    if (sessionStorage.getItem(STORAGE_KEY) === 'true') return;
+
+    // ── Mostrar banner ──
+    const banner = document.getElementById('deposito-reminder');
+    if (!banner) return;
+    banner.style.display = '';
+
+    // Pequeña animación de entrada (CSS lo maneja, solo añadimos la clase)
+    requestAnimationFrame(() => banner.classList.add('deposito-reminder--visible'));
+
+    // ── Botón "Ya deposité" → cierra y NO vuelve hasta nueva sesión ──
+    document.getElementById('depositoReminderDismiss').addEventListener('click', function () {
+        sessionStorage.setItem(STORAGE_KEY, 'true');
+        cerrarBanner(banner);
+    });
+
+    // ── Botón X → cierra solo por ahora, vuelve al recargar ──
+    document.getElementById('depositoReminderClose').addEventListener('click', function () {
+        cerrarBanner(banner);
+    });
+
+    // ── Cierre automático a medianoche ──
+    const ahora = new Date();
+    const mañana = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1);
+    const msPastaMedianoche = mañana - ahora;
+    setTimeout(function () {
+        cerrarBanner(banner);
+    }, msPastaMedianoche);
+
+    function cerrarBanner(el) {
+        el.classList.remove('deposito-reminder--visible');
+        el.classList.add('deposito-reminder--saliendo');
+        el.addEventListener('transitionend', () => {
+            el.style.display = 'none';
+            el.classList.remove('deposito-reminder--saliendo');
+        }, { once: true });
+    }
+
+})();
+</script>
 
 {% endblock %}

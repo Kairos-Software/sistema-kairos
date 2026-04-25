@@ -716,3 +716,429 @@
     .caja-fecha-rango { flex-direction: column; align-items: stretch; }
     .caja-input-wrap { max-width: 100%; }
 }
+/* ═══════════════════════════════════════════════════════════
+   TABS DE CAJA
+   ═══════════════════════════════════════════════════════════ */
+
+.caja-tabs-nav {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: #fff;
+    border: 1px solid #e8e8ee;
+    border-radius: 12px;
+    padding: .35rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+
+.caja-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .55rem 1.2rem;
+    background: transparent;
+    color: #888;
+    border: none;
+    border-radius: 8px;
+    font-size: .84rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+    position: relative;
+    white-space: nowrap;
+}
+
+.caja-tab-btn:hover {
+    background: #f5f5f8;
+    color: #444;
+}
+
+.caja-tab-btn.caja-tab-activo {
+    background: #E85C0D;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(232,92,13,.25);
+}
+
+/* Tab "Cerrar turno": rojo cuando activo */
+.caja-tab-btn.caja-tab-cierre.caja-tab-activo {
+    background: #dc2626;
+    box-shadow: 0 2px 8px rgba(220,38,38,.25);
+}
+.caja-tab-btn.caja-tab-cierre:not(.caja-tab-activo):hover {
+    color: #dc2626;
+    background: rgba(220,38,38,.05);
+}
+
+/* Tab "Cierre diario": índigo cuando activo */
+.caja-tab-btn.caja-tab-cierre-diario.caja-tab-activo {
+    background: #6366f1;
+    box-shadow: 0 2px 8px rgba(99,102,241,.25);
+}
+.caja-tab-btn.caja-tab-cierre-diario:not(.caja-tab-activo):hover {
+    color: #6366f1;
+    background: rgba(99,102,241,.05);
+}
+
+/* Badge contador retiros */
+.caja-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    background: rgba(220,38,38,.12);
+    color: #dc2626;
+    border-radius: 9px;
+    font-size: .7rem;
+    font-weight: 800;
+}
+.caja-tab-activo .caja-tab-badge {
+    background: rgba(255,255,255,.25);
+    color: #fff;
+}
+
+/* Animación de entrada de panel */
+.caja-tab-panel {
+    animation: tabFadeIn .18s ease;
+}
+@keyframes tabFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Acciones al pie del resumen ─────────────────────────── */
+.caja-resumen-acciones {
+    display: flex;
+    gap: .7rem;
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f0f0f5;
+    flex-wrap: wrap;
+}
+
+/* ── Formulario retiros inline ───────────────────────────── */
+.caja-retiros-form {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: .8rem;
+    align-items: end;
+    margin-bottom: 1.2rem;
+}
+.caja-retiros-form .caja-field { margin-bottom: 0; }
+
+.caja-retiros-divider {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    margin: .4rem 0 .8rem;
+    color: #bbb;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+}
+.caja-retiros-divider::before,
+.caja-retiros-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #f0f0f5;
+}
+
+/* ── Formulario cierre diario en fila ────────────────────── */
+.caja-cierre-form {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 1rem;
+    align-items: end;
+    margin-top: 1rem;
+}
+.caja-cierre-form .caja-field { margin-bottom: 0; }
+.caja-cierre-form-btn {
+    display: flex;
+    align-items: flex-end;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .caja-tabs-nav { flex-direction: column; }
+    .caja-tab-btn { justify-content: flex-start; }
+    .caja-retiros-form { grid-template-columns: 1fr; }
+    .caja-cierre-form { grid-template-columns: 1fr; }
+}
+/* ── Botón reabrir turno (historial) ────────────────────────── */
+.btn-reabrir-turno {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .28rem .75rem;
+    background: #fff;
+    color: #d97706;
+    border: 1.5px solid #d97706;
+    border-radius: 6px;
+    font-size: .75rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background .15s, color .15s, box-shadow .15s;
+    white-space: nowrap;
+    letter-spacing: .2px;
+}
+
+.btn-reabrir-turno:hover {
+    background: #d97706;
+    color: #fff;
+    box-shadow: 0 3px 8px rgba(217,119,6,.3);
+}
+
+/* Variante bloqueada: turno ya consolidado en cierre diario */
+.btn-reabrir-turno.btn-reabrir-bloqueado {
+    color: #aaa;
+    border-color: #ddd;
+    cursor: not-allowed;
+}
+
+.btn-reabrir-turno.btn-reabrir-bloqueado:hover {
+    background: #fff;
+    color: #aaa;
+    box-shadow: none;
+}
+
+/* ── Botón advertencia (modal confirmar reabrir) ────────────── */
+.btn-caja-advertencia {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem 1.2rem;
+    background: #d97706;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: .85rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+}
+
+.btn-caja-advertencia:hover {
+    background: #b45309;
+    box-shadow: 0 4px 12px rgba(217,119,6,.35);
+}
+
+.btn-caja-advertencia:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* ── Avisos dentro del modal reabrir ────────────────────────── */
+.reabrir-aviso {
+    margin: .9rem 0 0;
+    padding: .7rem .9rem;
+    border-radius: 8px;
+    font-size: .83rem;
+    line-height: 1.5;
+}
+
+.reabrir-aviso-ok {
+    background: rgba(22,163,74,.07);
+    border: 1px solid rgba(22,163,74,.2);
+    color: #15803d;
+}
+
+.reabrir-aviso-warn {
+    background: rgba(217,119,6,.07);
+    border: 1px solid rgba(217,119,6,.25);
+    color: #92400e;
+}
+
+.reabrir-aviso-bloqueado {
+    background: rgba(100,116,139,.07);
+    border: 1px solid rgba(100,116,139,.2);
+    color: #475569;
+}
+
+/* ── Alerta de error en modal ───────────────────────────────── */
+.reabrir-alerta {
+    padding: .55rem .8rem;
+    background: rgba(220,38,38,.07);
+    border: 1px solid rgba(220,38,38,.2);
+    border-radius: 8px;
+    color: #b91c1c;
+    font-size: .83rem;
+    margin-bottom: .5rem;
+}
+
+/* ── Link de cierre diario en tabla ─────────────────────────── */
+.badge-cierre-link {
+    display: inline-flex;
+    align-items: center;
+    padding: .2rem .6rem;
+    background: rgba(99,102,241,.08);
+    color: #4f46e5;
+    border: 1px solid rgba(99,102,241,.2);
+    border-radius: 1rem;
+    font-size: .75rem;
+    font-weight: 700;
+    text-decoration: none;
+    letter-spacing: .03em;
+    transition: background .15s, color .15s;
+    white-space: nowrap;
+}
+
+.badge-cierre-link:hover {
+    background: rgba(99,102,241,.15);
+    color: #3730a3;
+}
+
+/* ── Banner pendientes cierre diario ────────────────────────── */
+.cierre-pendientes-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: .6rem;
+    padding: .7rem .9rem;
+    background: rgba(232,92,13,.06);
+    border: 1px solid rgba(232,92,13,.25);
+    border-radius: 8px;
+    font-size: .84rem;
+    color: #7c3009;
+    line-height: 1.5;
+}
+
+.cierre-pendientes-banner strong { color: #c2410c; }
+
+.cierre-sin-pendientes {
+    padding: .55rem .9rem;
+    background: rgba(22,163,74,.06);
+    border: 1px solid rgba(22,163,74,.2);
+    border-radius: 8px;
+    font-size: .83rem;
+    color: #15803d;
+    font-weight: 600;
+}
+
+/* ── Botón reabrir turno (historial) ────────────────────────── */
+.btn-reabrir-turno {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .28rem .75rem;
+    background: #fff;
+    color: #d97706;
+    border: 1.5px solid #d97706;
+    border-radius: 6px;
+    font-size: .75rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background .15s, color .15s, box-shadow .15s;
+    white-space: nowrap;
+    letter-spacing: .2px;
+}
+
+.btn-reabrir-turno:hover {
+    background: #d97706;
+    color: #fff;
+    box-shadow: 0 3px 8px rgba(217,119,6,.3);
+}
+
+.btn-reabrir-turno.btn-reabrir-bloqueado {
+    color: #aaa;
+    border-color: #ddd;
+    cursor: not-allowed;
+}
+
+.btn-reabrir-turno.btn-reabrir-bloqueado:hover {
+    background: #fff;
+    color: #aaa;
+    box-shadow: none;
+}
+
+/* ── Botón advertencia (modal confirmar reabrir) ────────────── */
+.btn-caja-advertencia {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem 1.2rem;
+    background: #d97706;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: .85rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+}
+
+.btn-caja-advertencia:hover {
+    background: #b45309;
+    box-shadow: 0 4px 12px rgba(217,119,6,.35);
+}
+
+.btn-caja-advertencia:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.reabrir-aviso {
+    margin: .9rem 0 0;
+    padding: .7rem .9rem;
+    border-radius: 8px;
+    font-size: .83rem;
+    line-height: 1.5;
+}
+
+.reabrir-aviso-ok {
+    background: rgba(22,163,74,.07);
+    border: 1px solid rgba(22,163,74,.2);
+    color: #15803d;
+}
+
+.reabrir-aviso-warn {
+    background: rgba(217,119,6,.07);
+    border: 1px solid rgba(217,119,6,.25);
+    color: #92400e;
+}
+
+.reabrir-aviso-bloqueado {
+    background: rgba(100,116,139,.07);
+    border: 1px solid rgba(100,116,139,.2);
+    color: #475569;
+}
+
+.reabrir-alerta {
+    padding: .55rem .8rem;
+    background: rgba(220,38,38,.07);
+    border: 1px solid rgba(220,38,38,.2);
+    border-radius: 8px;
+    color: #b91c1c;
+    font-size: .83rem;
+    margin-bottom: .5rem;
+}
+
+.badge-cierre-link {
+    display: inline-flex;
+    align-items: center;
+    padding: .2rem .6rem;
+    background: rgba(99,102,241,.08);
+    color: #4f46e5;
+    border: 1px solid rgba(99,102,241,.2);
+    border-radius: 1rem;
+    font-size: .75rem;
+    font-weight: 700;
+    text-decoration: none;
+    letter-spacing: .03em;
+    transition: background .15s, color .15s;
+    white-space: nowrap;
+}
+
+.badge-cierre-link:hover {
+    background: rgba(99,102,241,.15);
+    color: #3730a3;
+}

@@ -309,3 +309,53 @@ class CierreDiario(models.Model):
 
     def __str__(self):
         return f"Cierre #{self.pk} — {self.fecha:%d/%m/%Y %H:%M} — {self.cant_turnos} turno(s)"
+
+
+# ─────────────────────────────────────────────────────────────
+# DEPÓSITO BANCARIO
+#
+# Registra cada depósito bancario realizado, separado por
+# entidad (PagoFácil / RapiPago).
+#
+# El acumulado por entidad se calcula en tiempo real:
+#   SUM(CierreDiario.total_general) no aplica aquí —
+#   el monto a depositar lo ingresa el usuario manualmente.
+#   El historial de depósitos permite ver lo ya depositado.
+# ─────────────────────────────────────────────────────────────
+
+class DepositoBancario(models.Model):
+    ENTIDAD_PAGOFACIL = 'pagofacil'
+    ENTIDAD_RAPIPAGO  = 'rapipago'
+    ENTIDADES = [
+        (ENTIDAD_PAGOFACIL, 'PagoFácil'),
+        (ENTIDAD_RAPIPAGO,  'RapiPago'),
+    ]
+
+    entidad            = models.CharField(max_length=20, choices=ENTIDADES)
+    fecha              = models.DateField(help_text="Fecha en que se realizó el depósito")
+    monto              = models.DecimalField(
+                             max_digits=12, decimal_places=2,
+                             help_text="Monto depositado en el banco")
+    numero_comprobante = models.CharField(
+                             max_length=100, blank=True,
+                             help_text="Número de boleta o comprobante bancario")
+    observaciones      = models.TextField(blank=True)
+    realizado_por      = models.ForeignKey(
+                             Usuario, on_delete=models.SET_NULL,
+                             null=True, related_name='depositos_bancarios')
+    fecha_registro     = models.DateTimeField(auto_now_add=True,
+                             help_text="Momento en que se cargó en el sistema")
+
+    class Meta:
+        ordering = ['-fecha', '-fecha_registro']
+        verbose_name        = 'Depósito bancario'
+        verbose_name_plural = 'Depósitos bancarios'
+
+    def get_entidad_display_label(self):
+        return dict(self.ENTIDADES).get(self.entidad, self.entidad)
+
+    def __str__(self):
+        return (
+            f"Depósito {self.get_entidad_display()} "
+            f"${self.monto} — {self.fecha:%d/%m/%Y}"
+        )

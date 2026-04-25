@@ -1,0 +1,116 @@
+/*
+ * cobranzas_estados.css
+ * Clases de color semántico para estados numéricos y diferencias.
+ * Ubicación: static/cobranzas/css/cobranzas_estados.css
+ *
+ * VERDE  → ok / sobrante / cubierto / positivo
+ * ROJO   → faltante / negativo / pendiente de atención
+ * AZUL   → excedente en cobro (el cliente pagó de más — no es error)
+ * ÁMBAR  → pendiente sin procesar
+ */
+
+/* ═══════════════════════════════════════════
+   TEXTO SIMPLE
+   ═══════════════════════════════════════════ */
+.texto-ok        { color: #16a34a; font-weight: 600; }
+.texto-sobrante  { color: #16a34a; font-weight: 600; }
+.texto-faltante  { color: #dc2626; font-weight: 600; }
+.texto-pendiente { color: #d97706; font-weight: 600; }
+.texto-negativo  { color: #dc2626; font-weight: 600; }
+
+/* ═══════════════════════════════════════════
+   BALANCE DE COBROS  (gestion_cobros.js)
+   ═══════════════════════════════════════════ */
+.cobro-balance-ok {
+    color: #16a34a;
+    font-weight: 700;
+}
+.cobro-balance-pendiente {
+    color: #dc2626;
+    font-weight: 700;
+}
+.cobro-balance-exceso {
+    color: #2563eb;
+    font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════
+   CHIPS / BADGES  (diferencias en tablas)
+   ═══════════════════════════════════════════ */
+.chip-ok,
+.chip-sobrante {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .18rem .55rem;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 600;
+    background: #dcfce7;
+    color: #15803d;
+}
+.chip-faltante,
+.chip-negativo {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .18rem .55rem;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 600;
+    background: #fee2e2;
+    color: #b91c1c;
+}
+.chip-pendiente {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .18rem .55rem;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 600;
+    background: #fef9c3;
+    color: #92400e;
+}
+
+/* ═══════════════════════════════════════════
+   TARJETAS MÉTRICAS  (caja grande)
+   ═══════════════════════════════════════════ */
+.caja-metricas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.metrica-card {
+    border-radius: 12px;
+    padding: 1.1rem 1.3rem;
+    border: 1.5px solid transparent;
+    background: var(--surface-raised, #f4f4f5);
+}
+.metrica-card-ok     { border-color: #bbf7d0; background: #f0fdf4; }
+.metrica-card-alerta { border-color: #fca5a5; background: #fff5f5; }
+.metrica-card-neutro { border-color: var(--border, #e5e7eb); }
+
+.metrica-label {
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--text-muted, #6b7280);
+    margin-bottom: .45rem;
+}
+.metrica-valor {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--text-primary, #111);
+}
+.metrica-valor-ok     { color: #15803d; }
+.metrica-valor-alerta { color: #b91c1c; }
+
+.metrica-sub {
+    font-size: .78rem;
+    color: var(--text-muted, #6b7280);
+    margin-top: .3rem;
+}

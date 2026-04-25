@@ -164,6 +164,68 @@ class CerrarTurnoAjax(LoginRequiredMixin, View):
 
 
 # ─────────────────────────────────────────────────────────────
+# AJAX: reabrir un turno cerrado
+# ─────────────────────────────────────────────────────────────
+
+class ReabrirTurnoAjax(LoginRequiredMixin, View):
+    """
+    Reabre un turno cerrado siempre que:
+      - No tenga cierre diario asignado (ya consolidado = intocable).
+      - No haya otro turno abierto en este momento.
+
+    Al reabrir se limpian los campos de cierre (fecha_cierre,
+    efectivo_declarado, total_efectivo_sistema, diferencia,
+    tipo_diferencia) y el estado vuelve a ABIERTO.
+    Los cobros y retiros del turno quedan intactos.
+    """
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+        turno_id = data.get('turno_id')
+        if not turno_id:
+            return JsonResponse({'error': 'turno_id requerido'}, status=400)
+
+        turno = get_object_or_404(Turno, pk=turno_id)
+
+        # Validaciones de negocio
+        if turno.estado == Turno.ESTADO_ABIERTO:
+            return JsonResponse({'error': 'El turno ya está abierto.'}, status=400)
+
+        if turno.cierre_diario_id:
+            return JsonResponse(
+                {'error': (
+                    f'El turno #{turno.numero} ya fue incluido en el Cierre #{turno.cierre_diario_id} '
+                    f'y no puede reabrirse. El cierre diario consolida los datos de forma definitiva.'
+                )},
+                status=400
+            )
+
+        if get_turno_abierto():
+            return JsonResponse(
+                {'error': 'Ya hay un turno abierto. Cerralo antes de reabrir otro.'},
+                status=400
+            )
+
+        with transaction.atomic():
+            turno.estado                 = Turno.ESTADO_ABIERTO
+            turno.fecha_cierre           = None
+            turno.efectivo_declarado     = None
+            turno.total_efectivo_sistema = None
+            turno.diferencia             = None
+            turno.tipo_diferencia        = None
+            turno.save()
+
+        return JsonResponse({
+            'success': True,
+            'turno_id': turno.pk,
+            'numero': turno.numero,
+        })
+
+
+# ─────────────────────────────────────────────────────────────
 # AJAX: registrar retiro de caja
 # ─────────────────────────────────────────────────────────────
 
@@ -456,6 +518,30 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
 # HISTORIAL DE TURNOS
 # ─────────────────────────────────────────────────────────────
 
+
+
+# ─────────────────────────────────────────────────────────────
+# AJAX: turnos pendientes de cierre diario
+# ─────────────────────────────────────────────────────────────
+
+class TurnosPendientesAjax(LoginRequiredMixin, View):
+    def get(self, request):
+        from django.db.models import Min, Max
+        pendientes = Turno.objects.filter(
+            estado=Turno.ESTADO_CERRADO,
+            cierre_diario__isnull=True,
+        )
+        count = pendientes.count()
+        if count == 0:
+            return JsonResponse({'count': 0, 'desde': None, 'hasta': None})
+        agg = pendientes.aggregate(
+            desde=Min('fecha_apertura'),
+            hasta=Max('fecha_apertura'),
+        )
+        desde_str = agg['desde'].date().isoformat() if agg['desde'] else None
+        hasta_str  = agg['hasta'].date().isoformat()  if agg['hasta']  else None
+        return JsonResponse({'count': count, 'desde': desde_str, 'hasta': hasta_str})
+
 class HistorialTurnosView(LoginRequiredMixin, View):
     def get(self, request):
         desde = request.GET.get('desde', '').strip()
@@ -496,3 +582,62 @@ class HistorialCierresDiariosView(LoginRequiredMixin, View):
             'desde':   desde,
             'hasta':   hasta,
         })
+    
+
+# ─────────────────────────────────────────────────────────────
+# AJAX: eliminar turnos (solo staff/superuser — modo desarrollo)
+# ─────────────────────────────────────────────────────────────
+
+class EliminarTurnosAjax(LoginRequiredMixin, View):
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return JsonResponse({'error': 'Solo administradores pueden eliminar turnos.'}, status=403)
+
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+        ids = data.get('ids', [])
+        if not ids:
+            return JsonResponse({'error': 'No se recibieron IDs.'}, status=400)
+        try:
+            ids = [int(i) for i in ids]
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'IDs inválidos.'}, status=400)
+
+        with transaction.atomic():
+            eliminados, _ = Turno.objects.filter(pk__in=ids).delete()
+
+        return JsonResponse({'success': True, 'eliminados': eliminados})
+
+
+# ─────────────────────────────────────────────────────────────
+# AJAX: eliminar cierres diarios (solo staff/superuser)
+# ─────────────────────────────────────────────────────────────
+
+class EliminarCierresAjax(LoginRequiredMixin, View):
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return JsonResponse({'error': 'Solo administradores pueden eliminar cierres.'}, status=403)
+
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+        ids = data.get('ids', [])
+        if not ids:
+            return JsonResponse({'error': 'No se recibieron IDs.'}, status=400)
+        try:
+            ids = [int(i) for i in ids]
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'IDs inválidos.'}, status=400)
+
+        with transaction.atomic():
+            # Al eliminar el cierre, los turnos asociados quedan sin cierre_diario
+            # para que puedan volver a usarse o eliminarse por separado
+            Turno.objects.filter(cierre_diario_id__in=ids).update(cierre_diario=None)
+            eliminados, _ = CierreDiario.objects.filter(pk__in=ids).delete()
+
+        return JsonResponse({'success': True, 'eliminados': eliminados})

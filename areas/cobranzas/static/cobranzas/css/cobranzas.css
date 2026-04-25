@@ -738,3 +738,164 @@
     text-transform: uppercase;
     letter-spacing: .06em;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   RECORDATORIO DE DEPÓSITO — reemplaza el bloque anterior en cobranzas.css
+   ═══════════════════════════════════════════════════════════ */
+
+.deposito-reminder {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem 1rem 1.5rem;
+    margin-bottom: 1.25rem;
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-left: 4px solid #E85C0D;
+    border-radius: 12px;
+    position: relative;
+
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.deposito-reminder--visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.deposito-reminder--saliendo {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+/* ── Ícono ── */
+.deposito-reminder__icon {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    background: rgba(232, 92, 13, 0.15);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #E85C0D;
+}
+
+/* ── Texto ── */
+.deposito-reminder__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.deposito-reminder__titulo {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+.deposito-reminder__sub {
+    font-size: 0.76rem;
+    color: #666;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+/* ── Botones ── */
+.deposito-reminder__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.deposito-reminder__btn-ir {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.38rem 0.9rem;
+    background: #E85C0D;
+    color: #fff;
+    border-radius: 8px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.deposito-reminder__btn-ir:hover {
+    background: #c94e0a;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232, 92, 13, 0.4);
+}
+
+.deposito-reminder__btn-ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.38rem 0.9rem;
+    background: transparent;
+    border: 1px solid #333;
+    color: #888;
+    border-radius: 8px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: 'Nunito', sans-serif;
+}
+
+.deposito-reminder__btn-ok:hover {
+    border-color: #555;
+    color: #ccc;
+    background: rgba(255,255,255,0.04);
+}
+
+/* ── Botón cerrar (×) ── */
+.deposito-reminder__close {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.6rem;
+    width: 22px;
+    height: 22px;
+    background: none;
+    border: none;
+    color: #444;
+    cursor: pointer;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 0.15s, background 0.15s;
+}
+
+.deposito-reminder__close:hover {
+    background: rgba(255,255,255,0.07);
+    color: #aaa;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+    .deposito-reminder {
+        flex-wrap: wrap;
+        padding-right: 2.5rem;
+    }
+    .deposito-reminder__actions {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+    .deposito-reminder__btn-ir,
+    .deposito-reminder__btn-ok {
+        flex: 1;
+        justify-content: center;
+    }
+}

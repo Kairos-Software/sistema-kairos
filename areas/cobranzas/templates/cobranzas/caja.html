@@ -22,6 +22,7 @@
     </div>
 </div>
 
+
 <div id="panelCajaCerrada" style="display:none;">
 
     <div class="caja-estado-badge caja-cerrada">
@@ -32,34 +33,102 @@
         CAJA CERRADA
     </div>
 
-    <div class="caja-card">
-        <h2 class="caja-card-titulo">Abrir caja</h2>
-        <p class="caja-card-desc">
-            Ingresá el efectivo inicial disponible para dar vuelto.
-            Al abrir la caja se crea un turno automáticamente.
-        </p>
-
-        <div class="caja-field">
-            <label class="caja-label">Monto inicial en caja <span class="caja-hint">(para vueltos)</span></label>
-            <div class="caja-input-wrap">
-                <span class="caja-signo">$</span>
-                <input type="number" id="inputMontoInicial" class="caja-input"
-                       min="0" step="0.01" placeholder="0,00" value="0">
-            </div>
-        </div>
-
-        <div id="abrirError" class="alerta-inline alerta-error" style="display:none;"></div>
-
-        <button type="button" class="btn-caja-principal" id="btnAbrirCaja">
+    <div class="caja-tabs-nav">
+        <button class="caja-tab-btn caja-tab-activo" data-tab="abrir" data-scope="cerrada">
             <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
                 <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/>
                 <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
             Abrir caja
         </button>
+        <button class="caja-tab-btn caja-tab-cierre-diario" data-tab="cierre-diario" data-scope="cerrada">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Cierre diario
+        </button>
     </div>
 
-</div>
+    <div class="caja-tab-panel" id="tabAbrir">
+        <div class="caja-card" style="margin-bottom:0;">
+            <h2 class="caja-card-titulo">Abrir caja</h2>
+            <p class="caja-card-desc">
+                Ingresá el efectivo inicial disponible para dar vuelto.
+                Al abrir la caja se crea un turno automáticamente.
+            </p>
+            <div class="caja-field">
+                <label class="caja-label">Monto inicial en caja <span class="caja-hint">(para vueltos)</span></label>
+                <div class="caja-input-wrap">
+                    <span class="caja-signo">$</span>
+                    <input type="number" id="inputMontoInicial" class="caja-input"
+                           min="0" step="0.01" placeholder="0,00" value="0">
+                </div>
+            </div>
+            <div id="abrirError" class="alerta-inline alerta-error" style="display:none;"></div>
+            <button type="button" class="btn-caja-principal" id="btnAbrirCaja">
+                <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                    <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Abrir caja
+            </button>
+        </div>
+    </div>
+
+    <div class="caja-tab-panel" id="tabCierreDiario" style="display:none;">
+        <div class="caja-card caja-card-cierre-diario" style="margin-bottom:0;">
+            <h2 class="caja-card-titulo">Cierre diario</h2>
+            <p class="caja-card-desc">
+                Agrupa todos los turnos cerrados de un rango de fechas y hace el balance final del día.
+            </p>
+            <div id="cierrePendientesBanner" style="display:none; margin-bottom:1rem;"></div>
+            <div class="caja-cierre-form">
+                <div class="caja-field">
+                    <label class="caja-label">Desde</label>
+                    <input type="date" id="cierreDesde" class="caja-input-date">
+                </div>
+                <div class="caja-field">
+                    <label class="caja-label">Hasta</label>
+                    <input type="date" id="cierreHasta" class="caja-input-date">
+                </div>
+                <div class="caja-cierre-form-btn">
+                    <button type="button" class="btn-caja-secundario" id="btnPrevisualizarCierre">
+                        <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                            <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+                            <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                        </svg>
+                        Previsualizar
+                    </button>
+                </div>
+            </div>
+
+            <div id="cierrePreviewPanel" style="display:none; margin-top:1.2rem;">
+                <div class="caja-cierre-resumen" id="cierreResumen"></div>
+                <div class="caja-field" style="margin-top:1rem;">
+                    <label class="caja-label">Efectivo físico en caja al cierre</label>
+                    <div class="caja-input-wrap">
+                        <span class="caja-signo">$</span>
+                        <input type="number" id="cierreEfectivoFisico" class="caja-input"
+                               min="0" step="0.01" placeholder="0,00">
+                    </div>
+                </div>
+                <div id="cierreError" class="alerta-inline alerta-error" style="display:none;"></div>
+                <button type="button" class="btn-caja-principal" id="btnEjecutarCierre">
+                    <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                        <path d="M3 8.5l3.5 3.5L13 4" stroke="currentColor" stroke-width="2"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Ejecutar cierre diario
+                </button>
+            </div>
+
+            <div id="cierreExitoPanel" style="display:none;"></div>
+        </div>
+    </div>
+
+</div>{# /panelCajaCerrada #}
+
+
 
 <div id="panelCajaAbierta" style="display:none;">
 
@@ -71,12 +140,37 @@
         CAJA ABIERTA — Turno <span id="badgeTurnoNumero">#—</span>
     </div>
 
-    <div class="caja-grid">
+    <div class="caja-tabs-nav">
+        <button class="caja-tab-btn caja-tab-activo" data-tab="resumen" data-scope="abierta">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.4"/>
+                <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.4"/>
+                <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.4"/>
+                <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.4"/>
+            </svg>
+            Resumen
+        </button>
+        <button class="caja-tab-btn" data-tab="retiros" data-scope="abierta">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retiros
+            <span class="caja-tab-badge" id="tabBadgeRetiros" style="display:none;">0</span>
+        </button>
+        <button class="caja-tab-btn caja-tab-cierre" data-tab="cierre" data-scope="abierta">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M6 11l1.5 1.5L10 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Cerrar turno
+        </button>
+    </div>
 
-        {# ── Resumen del turno ── #}
-        <div class="caja-card caja-card-resumen">
+    {# ── Tab: Resumen ── #}
+    <div class="caja-tab-panel" id="tabResumen">
+        <div class="caja-card caja-card-resumen" style="margin-bottom:0;">
             <h2 class="caja-card-titulo">Resumen del turno</h2>
-
             <div class="caja-resumen-grid">
                 <div class="caja-resumen-item">
                     <span class="caja-resumen-label">Cajero</span>
@@ -95,7 +189,6 @@
                     <strong id="turnoCantCobros">0</strong>
                 </div>
             </div>
-
             <div class="caja-totales">
                 <div class="caja-total-row">
                     <span>Efectivo cobrado</span>
@@ -134,47 +227,67 @@
                     <strong id="turnoEfEsperado">$ 0,00</strong>
                 </div>
             </div>
+            <div class="caja-resumen-acciones">
+                <button type="button" class="btn-caja-secundario" onclick="cajaSwitchTab('retiros','abierta')">
+                    <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                        <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Registrar retiro
+                </button>
+                <button type="button" class="btn-caja-peligro" style="margin-top:0;" onclick="cajaSwitchTab('cierre','abierta')">
+                    <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                        <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        <path d="M6 11l1.5 1.5L10 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Cerrar turno
+                </button>
+            </div>
         </div>
+    </div>
 
-        {# ── Retiros de caja ── #}
-        <div class="caja-card">
+    {# ── Tab: Retiros ── #}
+    <div class="caja-tab-panel" id="tabRetiros" style="display:none;">
+        <div class="caja-card" style="margin-bottom:0;">
             <h2 class="caja-card-titulo">Retiros de caja</h2>
             <p class="caja-card-desc">
                 Registrá salidas de efectivo durante el turno (depósitos, gastos, etc.).
                 Reducen el efectivo esperado al cierre.
             </p>
-
-            <div class="caja-field">
-                <label class="caja-label">Motivo</label>
-                <input type="text" id="retiroMotivo" class="caja-input-text"
-                       placeholder="Ej: Depósito banco, gasto limpieza..." maxlength="200">
-            </div>
-            <div class="caja-field">
-                <label class="caja-label">Monto</label>
-                <div class="caja-input-wrap">
-                    <span class="caja-signo">$</span>
-                    <input type="number" id="retiroMonto" class="caja-input"
-                           min="0.01" step="0.01" placeholder="0,00">
+            <div class="caja-retiros-form">
+                <div class="caja-field">
+                    <label class="caja-label">Motivo</label>
+                    <input type="text" id="retiroMotivo" class="caja-input-text"
+                           placeholder="Ej: Depósito banco, gasto limpieza..." maxlength="200">
+                </div>
+                <div class="caja-field">
+                    <label class="caja-label">Monto</label>
+                    <div class="caja-input-wrap">
+                        <span class="caja-signo">$</span>
+                        <input type="number" id="retiroMonto" class="caja-input"
+                               min="0.01" step="0.01" placeholder="0,00">
+                    </div>
+                </div>
+                <div>
+                    <div id="retiroError" class="alerta-inline alerta-error" style="display:none;"></div>
+                    <button type="button" class="btn-caja-principal" id="btnRegistrarRetiro">
+                        + Registrar retiro
+                    </button>
                 </div>
             </div>
-
-            <div id="retiroError" class="alerta-inline alerta-error" style="display:none;"></div>
-
-            <button type="button" class="btn-caja-secundario" id="btnRegistrarRetiro">
-                + Registrar retiro
-            </button>
-
-            <div id="listaRetiros" class="caja-retiros-lista" style="margin-top:1rem;"></div>
+            <div class="caja-retiros-divider"><span>Retiros del turno</span></div>
+            <div id="listaRetiros" class="caja-retiros-lista"></div>
         </div>
+    </div>
 
-        {# ── Cierre de turno ── #}
-        <div class="caja-card caja-card-cierre">
+    {# ── Tab: Cerrar turno ── #}
+    <div class="caja-tab-panel" id="tabCierre" style="display:none;">
+        <div class="caja-card caja-card-cierre" style="margin-bottom:0; max-width: 520px;">
             <h2 class="caja-card-titulo">Cerrar turno</h2>
             <p class="caja-card-desc">
                 Contá el efectivo físico en caja y declaralo.
                 El sistema calculará si hay diferencia.
             </p>
-
             <div class="caja-field">
                 <label class="caja-label">
                     Efectivo físico contado
@@ -186,7 +299,6 @@
                            min="0" step="0.01" placeholder="0,00">
                 </div>
             </div>
-
             <div class="caja-diferencia-preview" id="diferenciaPrev" style="display:none;">
                 <div class="caja-dif-row">
                     <span>Esperado por sistema</span>
@@ -201,70 +313,19 @@
                     <strong id="difMonto">$ 0,00</strong>
                 </div>
             </div>
-
             <div id="cerrarError" class="alerta-inline alerta-error" style="display:none;"></div>
-
             <button type="button" class="btn-caja-peligro" id="btnCerrarTurno">
                 <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
                     <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/>
                     <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                     <path d="M6 11l1.5 1.5L10 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Cerrar turno
+                Confirmar cierre de turno
             </button>
         </div>
-
-    </div>{# /caja-grid #}
+    </div>
 
 </div>{# /panelCajaAbierta #}
-
-<div class="caja-card caja-card-cierre-diario" style="margin-top:1.5rem;">
-    <h2 class="caja-card-titulo">Cierre diario</h2>
-    <p class="caja-card-desc">
-        Agrupa todos los turnos cerrados de un rango de fechas y hace el balance final del día.
-        Solo puede ejecutarse cuando no hay turno abierto.
-    </p>
-
-    <div class="caja-fecha-rango">
-        <div class="caja-field">
-            <label class="caja-label">Desde</label>
-            <input type="date" id="cierreDesde" class="caja-input-date">
-        </div>
-        <div class="caja-field">
-            <label class="caja-label">Hasta</label>
-            <input type="date" id="cierreHasta" class="caja-input-date">
-        </div>
-        <button type="button" class="btn-caja-secundario" id="btnPrevisualizarCierre">
-            Previsualizar
-        </button>
-    </div>
-
-    <div id="cierrePreviewPanel" style="display:none; margin-top:1rem;">
-
-        <div class="caja-cierre-resumen" id="cierreResumen"></div>
-
-        <div class="caja-field" style="margin-top:1rem;">
-            <label class="caja-label">Efectivo físico en caja al cierre</label>
-            <div class="caja-input-wrap">
-                <span class="caja-signo">$</span>
-                <input type="number" id="cierreEfectivoFisico" class="caja-input"
-                       min="0" step="0.01" placeholder="0,00">
-            </div>
-        </div>
-
-        <div id="cierreError" class="alerta-inline alerta-error" style="display:none;"></div>
-
-        <button type="button" class="btn-caja-principal" id="btnEjecutarCierre">
-            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
-                <path d="M3 8.5l3.5 3.5L13 4" stroke="currentColor" stroke-width="2"
-                      stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Ejecutar cierre diario
-        </button>
-    </div>
-
-    <div id="cierreExitoPanel" style="display:none;"></div>
-</div>
 
 
 {# ══ MODAL ÉXITO CIERRE TURNO ══ #}
@@ -304,6 +365,93 @@
         cierrePrevisualizar: "{% url 'cobranzas:cierre_previsualizar' %}",
         cierreEjecutar:      "{% url 'cobranzas:cierre_ejecutar' %}",
         historialCierres:    "{% url 'cobranzas:historial_cierres' %}",
+        reabrirTurno:        "{% url 'cobranzas:caja_reabrir_turno' %}",
+        turnosPendientes:    "{% url 'cobranzas:caja_turnos_pendientes' %}",
     };
+
+    // ── Mapeo de tabs por estado de caja ───────────────────────
+    const TAB_PANELS = {
+        cerrada: {
+            'abrir':        'tabAbrir',
+            'cierre-diario':'tabCierreDiario',
+        },
+        abierta: {
+            'resumen': 'tabResumen',
+            'retiros': 'tabRetiros',
+            'cierre':  'tabCierre',
+        },
+    };
+
+    function cajaSwitchTab(nombre, scope) {
+        if (!scope) {
+            const active = document.querySelector('.caja-tab-btn.caja-tab-activo');
+            scope = active ? active.dataset.scope : 'abierta';
+        }
+        // Actualizar botones del scope
+        document.querySelectorAll(`.caja-tab-btn[data-scope="${scope}"]`).forEach(btn => {
+            btn.classList.toggle('caja-tab-activo', btn.dataset.tab === nombre);
+        });
+        // Ocultar todos los paneles del scope y mostrar el pedido
+        const paneles = TAB_PANELS[scope] || {};
+        Object.values(paneles).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        const target = paneles[nombre];
+        if (target) {
+            const el = document.getElementById(target);
+            if (el) el.style.display = '';
+        }
+    }
+
+    document.querySelectorAll('.caja-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            cajaSwitchTab(btn.dataset.tab, btn.dataset.scope);
+            // Al abrir el tab de cierre diario, cargar pendientes
+            if (btn.dataset.tab === 'cierre-diario') {
+                cargarPendientesCierre();
+            }
+        });
+    });
+
+    async function cargarPendientesCierre() {
+        const banner = document.getElementById('cierrePendientesBanner');
+        if (!banner) return;
+        try {
+            const resp = await fetch(window.cajaUrls.turnosPendientes, {
+                headers: { 'X-CSRFToken': getCsrf() }
+            });
+            const data = await resp.json();
+            if (data.count > 0) {
+                // Pre-llenar las fechas con el rango real de pendientes
+                document.getElementById('cierreDesde').value = data.desde;
+                document.getElementById('cierreHasta').value = data.hasta;
+                // Mostrar banner informativo
+                banner.innerHTML = `<div class="cierre-pendientes-banner">
+                    <svg viewBox="0 0 16 16" fill="none" width="15" height="15" style="flex-shrink:0">
+                        <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/>
+                        <path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        <circle cx="8" cy="11" r=".7" fill="currentColor"/>
+                    </svg>
+                    <span>Hay <strong>${data.count} turno${data.count > 1 ? 's' : ''} pendiente${data.count > 1 ? 's' : ''}</strong> de cierre diario
+                    (del ${data.desde.split('-').reverse().join('/')} al ${data.hasta.split('-').reverse().join('/')}).
+                    El rango fue pre-cargado automáticamente.</span>
+                </div>`;
+                banner.style.display = '';
+            } else {
+                banner.innerHTML = '<div class="cierre-sin-pendientes">✓ No hay turnos pendientes de cierre diario.</div>';
+                banner.style.display = '';
+            }
+        } catch(e) {
+            // silencioso — no es crítico
+        }
+    }
+
+    function getCsrf() {
+        return document.cookie.split(';')
+            .map(c => c.trim())
+            .find(c => c.startsWith('csrftoken='))
+            ?.split('=')[1] || '';
+    }
 </script>
 {% endblock %}

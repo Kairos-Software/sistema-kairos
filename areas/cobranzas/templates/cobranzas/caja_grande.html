@@ -1,0 +1,122 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Caja Grande — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Caja <span>Grande</span></h1>
+        <p class="page-subtitle">Resumen acumulado global de recaudación</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'cobranzas:depositos' %}" class="btn-historial">💳 Ir a Depósitos</a>
+        <a href="{% url 'cobranzas:historial_cierres' %}" class="btn-volver">Ver cierres</a>
+    </div>
+</div>
+
+{# ── TARJETAS RESUMEN ── #}
+<div class="caja-metricas-grid" style="margin-bottom:1.4rem;">
+
+    <div class="metrica-card metrica-card-neutro">
+        <div class="metrica-label">Total recaudado (todos los cierres)</div>
+        <div class="metrica-valor">${{ total_recaudado|floatformat:2 }}</div>
+        <div class="metrica-sub">{{ cant_cierres }} cierre{{ cant_cierres|pluralize }} procesado{{ cant_cierres|pluralize }}</div>
+    </div>
+
+    <div class="metrica-card metrica-card-ok">
+        <div class="metrica-label">Total depositado en banco</div>
+        <div class="metrica-valor metrica-valor-ok">${{ total_depositado|floatformat:2 }}</div>
+        <div class="metrica-sub">{{ cant_depositos }} depósito{{ cant_depositos|pluralize }} registrado{{ cant_depositos|pluralize }}</div>
+    </div>
+
+    <div class="metrica-card {% if pendiente > 0 %}metrica-card-alerta{% elif pendiente < 0 %}metrica-card-alerta{% else %}metrica-card-ok{% endif %}">
+        <div class="metrica-label">Pendiente de depositar</div>
+        <div class="metrica-valor {% if pendiente > 0 %}metrica-valor-alerta{% elif pendiente < 0 %}metrica-valor-alerta{% else %}metrica-valor-ok{% endif %}">
+            ${{ pendiente|floatformat:2 }}
+        </div>
+        <div class="metrica-sub">
+            {% if pendiente > 0 %}⚠ Hay efectivo sin depositar
+            {% elif pendiente < 0 %}⚠ Se depositó más de lo recaudado
+            {% else %}✓ Todo depositado
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+{# ── DESGLOSE POR ENTIDAD ── #}
+<div class="caja-card" style="margin-bottom:1.2rem;">
+    <h2 class="caja-card-titulo">Depósitos por entidad</h2>
+    <div class="caja-totales" style="margin-top:.8rem;">
+        <div class="caja-total-row">
+            <span>PagoFácil</span>
+            <strong>${{ depositos_pf|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-total-row">
+            <span>RapiPago</span>
+            <strong>${{ depositos_rp|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-total-row caja-total-destacado">
+            <span>Total depositado</span>
+            <strong>${{ total_depositado|floatformat:2 }}</strong>
+        </div>
+    </div>
+    <div style="margin-top:1rem;">
+        <a href="{% url 'cobranzas:depositos_historial' %}" class="btn-historial">
+            Ver historial de depósitos →
+        </a>
+    </div>
+</div>
+
+{# ── ÚLTIMOS CIERRES ── #}
+{% if ultimos_cierres %}
+<div class="caja-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.9rem;">
+        <h2 class="caja-card-titulo" style="margin-bottom:0;">Últimos cierres diarios</h2>
+        <a href="{% url 'cobranzas:historial_cierres' %}" class="btn-historial" style="font-size:.82rem;">
+            Ver todos →
+        </a>
+    </div>
+    <div class="tabla-scroll">
+        <table class="tabla-base">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Turnos</th>
+                    <th>Total general</th>
+                    <th>Efectivo físico</th>
+                    <th>Diferencia</th>
+                    <th>Realizado por</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in ultimos_cierres %}
+                <tr>
+                    <td><strong>#{{ c.pk }}</strong></td>
+                    <td>{{ c.fecha|date:"d/m/Y H:i" }}</td>
+                    <td>{{ c.cant_turnos }}</td>
+                    <td><strong>${{ c.total_general|floatformat:2 }}</strong></td>
+                    <td>${{ c.efectivo_fisico|floatformat:2 }}</td>
+                    <td>
+                        <span class="{% if c.diferencia_caja > 0 %}texto-sobrante{% elif c.diferencia_caja < 0 %}texto-faltante{% else %}texto-ok{% endif %}">
+                            {% if c.diferencia_caja > 0 %}+{% endif %}${{ c.diferencia_caja|floatformat:2 }}
+                        </span>
+                    </td>
+                    <td>{{ c.realizado_por }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
