@@ -1142,3 +1142,98 @@
     background: rgba(99,102,241,.15);
     color: #3730a3;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   HISTORIAL — Eliminación de registros
+   Pegar al final de caja.css.
+   Usado por: historial_turnos, historial_cierres, historial_depositos
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Botón "Eliminar seleccionados" en el page-header ──────── */
+.btn-eliminar-registros {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .42rem .9rem;
+    background: rgba(220,38,38,.07);
+    color: #dc2626;
+    border: 1.5px solid rgba(220,38,38,.28);
+    border-radius: 8px;
+    font-size: .82rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, box-shadow .15s, color .15s;
+    white-space: nowrap;
+    letter-spacing: .1px;
+}
+.btn-eliminar-registros:hover {
+    background: #dc2626;
+    color: #fff;
+    border-color: #dc2626;
+    box-shadow: 0 3px 10px rgba(220,38,38,.25);
+}
+.btn-eliminar-registros:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* ── Botón papelera por fila ──────────────────────────────── */
+.btn-eliminar-fila {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: none;
+    color: #ccc;
+    border: 1.5px solid #eee;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+    flex-shrink: 0;
+}
+.btn-eliminar-fila:hover {
+    background: rgba(220,38,38,.07);
+    color: #dc2626;
+    border-color: rgba(220,38,38,.3);
+}
+
+/* ── Mensaje de error dentro de modales ───────────────────── */
+.caja-error-msg {
+    padding: .5rem .8rem;
+    background: rgba(220,38,38,.07);
+    border: 1px solid rgba(220,38,38,.2);
+    border-radius: 8px;
+    color: #b91c1c;
+    font-size: .83rem;
+    font-weight: 600;
+}
+
+/* ── Botón rojo confirmar eliminación (dentro de modal) ───── */
+.btn-confirmar-eliminar {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .52rem 1.2rem;
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: .85rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+}
+.btn-confirmar-eliminar:hover {
+    background: #b91c1c;
+    box-shadow: 0 4px 12px rgba(220,38,38,.3);
+}
+.btn-confirmar-eliminar:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    box-shadow: none;
+}

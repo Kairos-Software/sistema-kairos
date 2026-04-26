@@ -13,11 +13,13 @@
 <div class="page-header">
     <div>
         <h1>Historial de <span>Turnos</span></h1>
-        <p class="page-subtitle" id="subtituloHistorial">{{ turnos|length }} turno{{ turnos|length|pluralize }} encontrado{{ turnos|length|pluralize }}</p>
+        <p class="page-subtitle" id="subtituloHistorial">
+            {{ turnos|length }} turno{{ turnos|length|pluralize }} encontrado{{ turnos|length|pluralize }}
+        </p>
     </div>
     <div class="page-header-actions">
         {% if user.is_staff or user.is_superuser %}
-        <button type="button" class="btn-limpiezaauto" id="btnEliminarSeleccionados" style="display:none;">
+        <button type="button" class="btn-eliminar-registros" id="btnEliminarSeleccionados" style="display:none;">
             <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
                 <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
                       stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -48,8 +50,9 @@
         <thead>
             <tr>
                 {% if user.is_staff or user.is_superuser %}
-                <th style="width:32px;">
-                    <input type="checkbox" id="checkTodos" title="Seleccionar todos" style="accent-color:#E85C0D;cursor:pointer;">
+                <th style="width:36px;">
+                    <input type="checkbox" id="checkTodos" title="Seleccionar todos"
+                           style="accent-color:#E85C0D;cursor:pointer;width:15px;height:15px;">
                 </th>
                 {% endif %}
                 <th>#</th>
@@ -72,7 +75,7 @@
                 {% if user.is_staff or user.is_superuser %}
                 <td>
                     <input type="checkbox" class="check-item" data-id="{{ t.pk }}"
-                           style="accent-color:#E85C0D;cursor:pointer;">
+                           style="accent-color:#E85C0D;cursor:pointer;width:15px;height:15px;">
                 </td>
                 {% endif %}
                 <td><strong>#{{ t.numero }}</strong></td>
@@ -105,7 +108,8 @@
                             Cierre #{{ t.cierre_diario.pk }}
                         </a>
                     {% else %}
-                        <span class="texto-pendiente" title="Este turno aún no fue incluido en un Cierre Diario.">⏳ Pendiente</span>
+                        <span class="texto-pendiente"
+                              title="Este turno aún no fue incluido en un Cierre Diario.">⏳ Pendiente</span>
                     {% endif %}
                 </td>
                 <td>
@@ -119,15 +123,18 @@
                             data-turno-cierre="{{ t.fecha_cierre|date:'d/m/Y H:i' }}"
                             data-tiene-cierre-diario="{% if t.cierre_diario %}1{% else %}0{% endif %}"
                             data-cierre-diario-num="{{ t.cierre_diario.pk|default:'' }}"
-                            title="{% if t.cierre_diario %}Turno incluido en Cierre #{{ t.cierre_diario.pk }}{% else %}Reabrir turno #{{ t.numero }}{% endif %}"
+                            title="{% if t.cierre_diario %}Turno consolidado en Cierre #{{ t.cierre_diario.pk }}{% else %}Reabrir turno #{{ t.numero }}{% endif %}"
                         >
                             ↩ Reabrir
                         </button>
                         {% endif %}
                         {% if user.is_staff or user.is_superuser %}
-                        <button class="btn-eliminar-item" data-id="{{ t.pk }}" title="Eliminar turno #{{ t.numero }}"
-                                style="background:none;border:none;cursor:pointer;color:#dc3545;padding:.2rem .4rem;font-size:.85rem;">
-                            🗑
+                        <button class="btn-eliminar-fila" data-id="{{ t.pk }}"
+                                title="Eliminar turno #{{ t.numero }}">
+                            <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
+                                <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            </svg>
                         </button>
                         {% endif %}
                     </div>
@@ -137,13 +144,14 @@
         </tbody>
     </table>
 </div>
+
 {% else %}
 <div class="estado-vacio">
     <p>No se encontraron turnos con esos filtros.</p>
 </div>
 {% endif %}
 
-{# ── Modal confirmación reapertura ── #}
+{# ── Modal: confirmar reapertura de turno ── #}
 <div class="modal fade" id="modalReabrirTurno" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content caja-modal">
@@ -152,18 +160,23 @@
                 <h5 class="caja-modal-titulo">Reabrir turno</h5>
                 <div id="reabrirAlerta" class="reabrir-alerta" style="display:none"></div>
                 <div class="caja-modal-fila mt-3">
-                    <span>Turno</span><strong id="reabrirTurnoLabel">—</strong>
+                    <span>Turno</span>
+                    <strong id="reabrirTurnoLabel">—</strong>
                 </div>
                 <div class="caja-modal-fila">
-                    <span>Cajero</span><strong id="reabrirCajeroLabel">—</strong>
+                    <span>Cajero</span>
+                    <strong id="reabrirCajeroLabel">—</strong>
                 </div>
                 <div class="caja-modal-fila">
-                    <span>Fecha cierre</span><strong id="reabrirCierreLabel">—</strong>
+                    <span>Fecha cierre</span>
+                    <strong id="reabrirCierreLabel">—</strong>
                 </div>
                 <p class="reabrir-aviso" id="reabrirAviso"></p>
                 <div class="d-flex gap-2 mt-4 justify-content-end">
                     <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn-caja-advertencia" id="btnConfirmarReabrir">↩ Confirmar reapertura</button>
+                    <button type="button" class="btn-caja-advertencia" id="btnConfirmarReabrir">
+                        ↩ Confirmar reapertura
+                    </button>
                 </div>
                 <div id="reabrirError" class="caja-error-msg mt-2" style="display:none"></div>
             </div>
@@ -171,23 +184,32 @@
     </div>
 </div>
 
-{# ── Modal eliminación ── #}
+{# ── Modal: confirmar eliminación ── #}
 {% if user.is_staff or user.is_superuser %}
-<div class="modal fade" id="modalEliminarTurnos" tabindex="-1" aria-hidden="true">
+
+<div id="histEliminarConfig" style="display:none;"
+     data-eliminar-url="{% url 'cobranzas:turnos_eliminar' %}"
+     data-label-singular="turno"
+     data-label-plural="turnos"></div>
+
+<div class="modal fade" id="modalEliminar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content caja-modal">
             <div class="modal-body p-4 text-center">
                 <div class="caja-modal-icono">🗑️</div>
                 <h5 class="caja-modal-titulo">Eliminar turno(s)</h5>
-                <p id="elimTexto" style="margin:.8rem 0 0;color:var(--text-secondary);font-size:.9rem;"></p>
-                <p style="font-size:.8rem;color:#dc3545;margin-top:.4rem;">
-                    ⚠ Esta acción es irreversible. Los cobros asociados también serán eliminados.
+                <p id="elimTexto" style="margin:.8rem 0 0;color:#777;font-size:.9rem;"></p>
+                <p style="font-size:.8rem;color:#dc2626;margin-top:.5rem;font-weight:600;">
+                    ⚠ Esta acción es irreversible. Los cobros del turno también serán eliminados.
                 </p>
-                <div id="elimError" class="caja-error-msg mt-2" style="display:none"></div>
+                <div id="elimError" class="caja-error-msg mt-2" style="display:none;"></div>
                 <div class="d-flex gap-2 mt-4 justify-content-center">
                     <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" id="btnConfirmarElim"
-                            style="background:#dc3545;color:#fff;border:none;border-radius:8px;padding:.5rem 1.2rem;font-weight:600;cursor:pointer;">
+                    <button type="button" id="btnConfirmarElim" class="btn-confirmar-eliminar">
+                        <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
                         Eliminar
                     </button>
                 </div>
@@ -195,14 +217,19 @@
         </div>
     </div>
 </div>
+
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{# ── JS de reapertura — se ejecuta DESPUÉS de que Bootstrap cargó ── #}
 <script>
 (function () {
     'use strict';
 
-    const ELIMINAR_URL = "{% url 'cobranzas:turnos_eliminar' %}";
-    const REABRIR_URL  = "{% url 'cobranzas:caja_reabrir_turno' %}";
+    const REABRIR_URL = "{% url 'cobranzas:caja_reabrir_turno' %}";
 
     function getCsrf() {
         return document.cookie.split(';').map(c => c.trim())
@@ -216,81 +243,6 @@
         });
     }
 
-    // ── Selección masiva ────────────────────────────────────
-    const checkTodos = document.getElementById('checkTodos');
-    const btnElim    = document.getElementById('btnEliminarSeleccionados');
-    const selCount   = document.getElementById('selCount');
-
-    function getSeleccionados() {
-        return [...document.querySelectorAll('.check-item:checked')].map(c => parseInt(c.dataset.id));
-    }
-    function actualizarBarra() {
-        const ids = getSeleccionados();
-        if (btnElim) {
-            btnElim.style.display = ids.length ? '' : 'none';
-            if (selCount) selCount.textContent = ids.length;
-        }
-    }
-
-    checkTodos?.addEventListener('change', function () {
-        document.querySelectorAll('.check-item').forEach(c => c.checked = this.checked);
-        actualizarBarra();
-    });
-    document.querySelectorAll('.check-item').forEach(c =>
-        c.addEventListener('change', actualizarBarra)
-    );
-
-    // ── Modal eliminación ───────────────────────────────────
-    let idsAEliminar = [];
-    const modalElim = document.getElementById('modalEliminarTurnos')
-        ? new bootstrap.Modal(document.getElementById('modalEliminarTurnos')) : null;
-
-    function abrirEliminar(ids) {
-        idsAEliminar = ids;
-        document.getElementById('elimTexto').textContent = ids.length === 1
-            ? `¿Eliminás el turno #${ids[0]}?`
-            : `¿Eliminás los ${ids.length} turnos seleccionados?`;
-        document.getElementById('elimError').style.display = 'none';
-        document.getElementById('btnConfirmarElim').disabled = false;
-        document.getElementById('btnConfirmarElim').textContent = 'Eliminar';
-        modalElim?.show();
-    }
-
-    document.querySelectorAll('.btn-eliminar-item').forEach(btn =>
-        btn.addEventListener('click', () => abrirEliminar([parseInt(btn.dataset.id)]))
-    );
-    btnElim?.addEventListener('click', () => {
-        const ids = getSeleccionados();
-        if (ids.length) abrirEliminar(ids);
-    });
-
-    document.getElementById('btnConfirmarElim')?.addEventListener('click', async function () {
-        this.disabled = true; this.textContent = 'Eliminando…';
-        document.getElementById('elimError').style.display = 'none';
-        try {
-            const res  = await postJSON(ELIMINAR_URL, { ids: idsAEliminar });
-            const data = await res.json();
-            if (data.success) {
-                idsAEliminar.forEach(id => document.querySelector(`.hist-fila[data-id="${id}"]`)?.remove());
-                modalElim?.hide();
-                if (checkTodos) checkTodos.checked = false;
-                actualizarBarra();
-                const n   = document.querySelectorAll('.hist-fila').length;
-                const sub = document.getElementById('subtituloHistorial');
-                if (sub) sub.textContent = `${n} turno${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}`;
-            } else {
-                document.getElementById('elimError').textContent = data.error || 'No se pudo eliminar.';
-                document.getElementById('elimError').style.display = '';
-                this.disabled = false; this.textContent = 'Eliminar';
-            }
-        } catch {
-            document.getElementById('elimError').textContent = 'Error de conexión.';
-            document.getElementById('elimError').style.display = '';
-            this.disabled = false; this.textContent = 'Eliminar';
-        }
-    });
-
-    // ── Lógica de reapertura (sin cambios) ─────────────────
     let turnoIdSeleccionado = null;
 
     document.querySelectorAll('.btn-reabrir-turno').forEach(btn => {
@@ -306,54 +258,64 @@
             document.getElementById('reabrirAlerta').style.display     = 'none';
 
             const avisoEl = document.getElementById('reabrirAviso');
-            const btnConf = document.getElementById('btnConfirmarReabrir');
+            const btnR    = document.getElementById('btnConfirmarReabrir');
 
             if (tieneCierre) {
-                avisoEl.innerHTML = `<strong>🔒 Este turno ya fue consolidado en el Cierre #${cierreNum}.</strong> No puede reabrirse.`;
+                avisoEl.innerHTML = `<strong>🔒 Este turno ya fue consolidado en el Cierre #${cierreNum}.</strong><br>Un cierre diario es definitivo y no puede deshacerse.`;
                 avisoEl.className = 'reabrir-aviso reabrir-aviso-bloqueado';
-                btnConf.disabled  = true; btnConf.style.opacity = '0.4';
+                btnR.disabled     = true;
+                btnR.style.opacity = '0.4';
             } else {
-                btnConf.disabled = false; btnConf.style.opacity = '';
+                btnR.disabled      = false;
+                btnR.style.opacity = '';
                 const [datePart, timePart] = this.dataset.turnoCierre.split(' ');
                 const [d, m, y] = datePart.split('/');
-                const [hh, mm]  = timePart ? timePart.split(':') : ['0','0'];
-                const mins = (Date.now() - new Date(y, m-1, d, hh, mm).getTime()) / 60000;
+                const [hh, mm]  = timePart ? timePart.split(':') : ['0', '0'];
+                const mins      = (Date.now() - new Date(y, m - 1, d, hh, mm).getTime()) / 60000;
                 if (mins <= 60) {
-                    avisoEl.textContent = 'El turno se cerró hace menos de una hora.';
+                    avisoEl.textContent = 'El turno se cerró hace menos de una hora. Se reabrirá como si nunca se hubiera cerrado: los cobros y retiros quedan intactos.';
                     avisoEl.className   = 'reabrir-aviso reabrir-aviso-ok';
                 } else {
                     const horas = Math.floor(mins / 60);
                     const dias  = Math.floor(horas / 24);
                     const t     = dias >= 1 ? `${dias} día${dias > 1 ? 's' : ''}` : `${horas} hora${horas > 1 ? 's' : ''}`;
-                    avisoEl.innerHTML = `<strong>⚠ Este turno fue cerrado hace ${t}.</strong>`;
+                    avisoEl.innerHTML = `<strong>⚠ Este turno fue cerrado hace ${t}.</strong> Al reabrirlo podrás cerrarlo de nuevo con un nuevo efectivo declarado.`;
                     avisoEl.className = 'reabrir-aviso reabrir-aviso-warn';
                 }
             }
-            new bootstrap.Modal(document.getElementById('modalReabrirTurno')).show();
+
+            bootstrap.Modal.getOrCreateInstance(
+                document.getElementById('modalReabrirTurno')
+            ).show();
         });
     });
 
     document.getElementById('btnConfirmarReabrir')?.addEventListener('click', async function () {
         const errEl = document.getElementById('reabrirError');
         errEl.style.display = 'none';
-        this.disabled = true; this.textContent = 'Reabriendo...';
+        this.disabled    = true;
+        this.textContent = 'Reabriendo...';
         try {
             const res  = await postJSON(REABRIR_URL, { turno_id: turnoIdSeleccionado });
             const data = await res.json();
             if (data.success) {
                 window.location.href = "{% url 'cobranzas:caja' %}";
             } else {
-                errEl.textContent = data.error || 'Error al reabrir.';
+                errEl.textContent   = data.error || 'Error al reabrir el turno.';
                 errEl.style.display = '';
-                this.disabled = false; this.textContent = '↩ Confirmar reapertura';
+                this.disabled    = false;
+                this.textContent = '↩ Confirmar reapertura';
             }
         } catch {
-            errEl.textContent = 'Error de red.';
+            errEl.textContent   = 'Error de red. Intentá de nuevo.';
             errEl.style.display = '';
-            this.disabled = false; this.textContent = '↩ Confirmar reapertura';
+            this.disabled    = false;
+            this.textContent = '↩ Confirmar reapertura';
         }
     });
 })();
 </script>
-
+{% if user.is_staff or user.is_superuser %}
+<script src="{% static 'cobranzas/js/historial_eliminar.js' %}"></script>
+{% endif %}
 {% endblock %}

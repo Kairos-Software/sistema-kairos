@@ -13,11 +13,13 @@
 <div class="page-header">
     <div>
         <h1>Historial de <span>Cierres Diarios</span></h1>
-        <p class="page-subtitle" id="subtituloHistorial">{{ cierres|length }} cierre{{ cierres|length|pluralize }} encontrado{{ cierres|length|pluralize }}</p>
+        <p class="page-subtitle" id="subtituloHistorial">
+            {{ cierres|length }} cierre{{ cierres|length|pluralize }} encontrado{{ cierres|length|pluralize }}
+        </p>
     </div>
     <div class="page-header-actions">
         {% if user.is_staff or user.is_superuser %}
-        <button type="button" class="btn-limpiezaauto" id="btnEliminarSeleccionados" style="display:none;">
+        <button type="button" class="btn-eliminar-registros" id="btnEliminarSeleccionados" style="display:none;">
             <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
                 <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
                       stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -48,8 +50,9 @@
         <thead>
             <tr>
                 {% if user.is_staff or user.is_superuser %}
-                <th style="width:32px;">
-                    <input type="checkbox" id="checkTodos" title="Seleccionar todos" style="accent-color:#E85C0D;cursor:pointer;">
+                <th style="width:36px;">
+                    <input type="checkbox" id="checkTodos" title="Seleccionar todos"
+                           style="accent-color:#E85C0D;cursor:pointer;width:15px;height:15px;">
                 </th>
                 {% endif %}
                 <th>#</th>
@@ -67,7 +70,7 @@
                 <th>Ef. Físico</th>
                 <th>Diferencia</th>
                 <th>Realizado por</th>
-                {% if user.is_staff or user.is_superuser %}<th></th>{% endif %}
+                {% if user.is_staff or user.is_superuser %}<th style="width:44px;"></th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -76,7 +79,7 @@
                 {% if user.is_staff or user.is_superuser %}
                 <td>
                     <input type="checkbox" class="check-item" data-id="{{ c.pk }}"
-                           style="accent-color:#E85C0D;cursor:pointer;">
+                           style="accent-color:#E85C0D;cursor:pointer;width:15px;height:15px;">
                 </td>
                 {% endif %}
                 <td><strong>#{{ c.pk }}</strong></td>
@@ -100,9 +103,12 @@
                 <td>{{ c.realizado_por }}</td>
                 {% if user.is_staff or user.is_superuser %}
                 <td>
-                    <button class="btn-eliminar-item" data-id="{{ c.pk }}" title="Eliminar cierre #{{ c.pk }}"
-                            style="background:none;border:none;cursor:pointer;color:#dc3545;padding:.2rem .4rem;font-size:.85rem;">
-                        🗑
+                    <button class="btn-eliminar-fila" data-id="{{ c.pk }}"
+                            title="Eliminar cierre #{{ c.pk }}">
+                        <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
+                            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
                     </button>
                 </td>
                 {% endif %}
@@ -111,29 +117,40 @@
         </tbody>
     </table>
 </div>
+
 {% else %}
 <div class="estado-vacio">
     <p>No se encontraron cierres diarios con esos filtros.</p>
 </div>
 {% endif %}
 
-{# ── Modal eliminación ── #}
 {% if user.is_staff or user.is_superuser %}
-<div class="modal fade" id="modalEliminarCierres" tabindex="-1" aria-hidden="true">
+
+<div id="histEliminarConfig" style="display:none;"
+     data-eliminar-url="{% url 'cobranzas:cierres_eliminar' %}"
+     data-label-singular="cierre"
+     data-label-plural="cierres"></div>
+
+<div class="modal fade" id="modalEliminar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content caja-modal">
             <div class="modal-body p-4 text-center">
                 <div class="caja-modal-icono">🗑️</div>
                 <h5 class="caja-modal-titulo">Eliminar cierre(s)</h5>
-                <p id="elimTexto" style="margin:.8rem 0 0;color:var(--text-secondary);font-size:.9rem;"></p>
-                <p style="font-size:.8rem;color:#dc3545;margin-top:.4rem;">
+                <p id="elimTexto" style="margin:.8rem 0 0;color:#777;font-size:.9rem;"></p>
+                <p style="font-size:.8rem;color:#dc2626;margin-top:.5rem;font-weight:600;">
                     ⚠ Esta acción es irreversible. Los turnos asociados quedarán sin cierre asignado.
                 </p>
-                <div id="elimError" class="caja-error-msg mt-2" style="display:none"></div>
+                <div id="elimError" class="caja-error-msg mt-2" style="display:none;"></div>
                 <div class="d-flex gap-2 mt-4 justify-content-center">
-                    <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" id="btnConfirmarElim"
-                            style="background:#dc3545;color:#fff;border:none;border-radius:8px;padding:.5rem 1.2rem;font-weight:600;cursor:pointer;">
+                    <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btnConfirmarElim" class="btn-confirmar-eliminar">
+                        <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
                         Eliminar
                     </button>
                 </div>
@@ -141,96 +158,14 @@
         </div>
     </div>
 </div>
+
 {% endif %}
 
-<script>
-(function () {
-    'use strict';
+{% endblock %}
 
-    const ELIMINAR_URL = "{% url 'cobranzas:cierres_eliminar' %}";
-
-    function getCsrf() {
-        return document.cookie.split(';').map(c => c.trim())
-            .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
-    }
-    function postJSON(url, body) {
-        return fetch(url, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': getCsrf(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-    }
-
-    // ── Selección masiva ──
-    const checkTodos = document.getElementById('checkTodos');
-    const btnElim    = document.getElementById('btnEliminarSeleccionados');
-    const selCount   = document.getElementById('selCount');
-
-    function getSeleccionados() {
-        return [...document.querySelectorAll('.check-item:checked')].map(c => parseInt(c.dataset.id));
-    }
-    function actualizarBarra() {
-        const ids = getSeleccionados();
-        if (btnElim) { btnElim.style.display = ids.length ? '' : 'none'; }
-        if (selCount) selCount.textContent = ids.length;
-    }
-
-    checkTodos?.addEventListener('change', function () {
-        document.querySelectorAll('.check-item').forEach(c => c.checked = this.checked);
-        actualizarBarra();
-    });
-    document.querySelectorAll('.check-item').forEach(c => c.addEventListener('change', actualizarBarra));
-
-    // ── Modal ──
-    let idsAEliminar = [];
-    const modalElim = document.getElementById('modalEliminarCierres')
-        ? new bootstrap.Modal(document.getElementById('modalEliminarCierres')) : null;
-
-    function abrirEliminar(ids) {
-        idsAEliminar = ids;
-        document.getElementById('elimTexto').textContent = ids.length === 1
-            ? `¿Eliminás el cierre #${ids[0]}?`
-            : `¿Eliminás los ${ids.length} cierres seleccionados?`;
-        document.getElementById('elimError').style.display = 'none';
-        document.getElementById('btnConfirmarElim').disabled    = false;
-        document.getElementById('btnConfirmarElim').textContent = 'Eliminar';
-        modalElim?.show();
-    }
-
-    document.querySelectorAll('.btn-eliminar-item').forEach(btn =>
-        btn.addEventListener('click', () => abrirEliminar([parseInt(btn.dataset.id)]))
-    );
-    btnElim?.addEventListener('click', () => {
-        const ids = getSeleccionados();
-        if (ids.length) abrirEliminar(ids);
-    });
-
-    document.getElementById('btnConfirmarElim')?.addEventListener('click', async function () {
-        this.disabled = true; this.textContent = 'Eliminando…';
-        document.getElementById('elimError').style.display = 'none';
-        try {
-            const res  = await postJSON(ELIMINAR_URL, { ids: idsAEliminar });
-            const data = await res.json();
-            if (data.success) {
-                idsAEliminar.forEach(id => document.querySelector(`.hist-fila[data-id="${id}"]`)?.remove());
-                modalElim?.hide();
-                if (checkTodos) checkTodos.checked = false;
-                actualizarBarra();
-                const n   = document.querySelectorAll('.hist-fila').length;
-                const sub = document.getElementById('subtituloHistorial');
-                if (sub) sub.textContent = `${n} cierre${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}`;
-            } else {
-                document.getElementById('elimError').textContent = data.error || 'No se pudo eliminar.';
-                document.getElementById('elimError').style.display = '';
-                this.disabled = false; this.textContent = 'Eliminar';
-            }
-        } catch {
-            document.getElementById('elimError').textContent = 'Error de conexión.';
-            document.getElementById('elimError').style.display = '';
-            this.disabled = false; this.textContent = 'Eliminar';
-        }
-    });
-})();
-</script>
-
+{% block extra_js %}
+{{ block.super }}
+{% if user.is_staff or user.is_superuser %}
+<script src="{% static 'cobranzas/js/historial_eliminar.js' %}"></script>
+{% endif %}
 {% endblock %}

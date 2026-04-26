@@ -589,15 +589,15 @@ class HistorialCierresDiariosView(LoginRequiredMixin, View):
 # ─────────────────────────────────────────────────────────────
 
 class EliminarTurnosAjax(LoginRequiredMixin, View):
+    """Elimina uno o varios turnos por ID. Solo staff/superuser."""
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
             return JsonResponse({'error': 'Solo administradores pueden eliminar turnos.'}, status=403)
-
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'JSON inválido'}, status=400)
-
+ 
         ids = data.get('ids', [])
         if not ids:
             return JsonResponse({'error': 'No se recibieron IDs.'}, status=400)
@@ -605,27 +605,30 @@ class EliminarTurnosAjax(LoginRequiredMixin, View):
             ids = [int(i) for i in ids]
         except (ValueError, TypeError):
             return JsonResponse({'error': 'IDs inválidos.'}, status=400)
-
+ 
         with transaction.atomic():
+            # Cobro.turno tiene on_delete=PROTECT — hay que borrar los cobros
+            # (y sus items/pagos en cascada) antes de poder borrar el turno.
+            Cobro.objects.filter(turno_id__in=ids).delete()
             eliminados, _ = Turno.objects.filter(pk__in=ids).delete()
 
         return JsonResponse({'success': True, 'eliminados': eliminados})
-
-
-# ─────────────────────────────────────────────────────────────
-# AJAX: eliminar cierres diarios (solo staff/superuser)
-# ─────────────────────────────────────────────────────────────
-
+ 
+ 
 class EliminarCierresAjax(LoginRequiredMixin, View):
+    """
+    Elimina uno o varios CierreDiario por ID. Solo staff/superuser.
+    Antes de borrar el cierre, desvincula los turnos asociados
+    (cierre_diario = None) para que no queden en estado inconsistente.
+    """
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
             return JsonResponse({'error': 'Solo administradores pueden eliminar cierres.'}, status=403)
-
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'JSON inválido'}, status=400)
-
+ 
         ids = data.get('ids', [])
         if not ids:
             return JsonResponse({'error': 'No se recibieron IDs.'}, status=400)
@@ -633,11 +636,10 @@ class EliminarCierresAjax(LoginRequiredMixin, View):
             ids = [int(i) for i in ids]
         except (ValueError, TypeError):
             return JsonResponse({'error': 'IDs inválidos.'}, status=400)
-
+ 
         with transaction.atomic():
-            # Al eliminar el cierre, los turnos asociados quedan sin cierre_diario
-            # para que puedan volver a usarse o eliminarse por separado
+            # Desvincular turnos antes de borrar el cierre
             Turno.objects.filter(cierre_diario_id__in=ids).update(cierre_diario=None)
             eliminados, _ = CierreDiario.objects.filter(pk__in=ids).delete()
-
+ 
         return JsonResponse({'success': True, 'eliminados': eliminados})

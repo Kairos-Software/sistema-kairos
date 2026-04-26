@@ -11,7 +11,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views import View
-
+from django.db import transaction
 from .models import DepositoBancario
 
 
@@ -201,4 +201,28 @@ class EliminarDepositosAjax(LoginRequiredMixin, View):
         with transaction.atomic():
             eliminados, _ = DepositoBancario.objects.filter(pk__in=ids).delete()
 
+        return JsonResponse({'success': True, 'eliminados': eliminados})
+    
+
+class EliminarDepositosAjax(LoginRequiredMixin, View):
+    """Elimina uno o varios DepositoBancario por ID. Solo staff/superuser."""
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return JsonResponse({'error': 'Solo administradores pueden eliminar depósitos.'}, status=403)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+ 
+        ids = data.get('ids', [])
+        if not ids:
+            return JsonResponse({'error': 'No se recibieron IDs.'}, status=400)
+        try:
+            ids = [int(i) for i in ids]
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'IDs inválidos.'}, status=400)
+ 
+        with transaction.atomic():
+            eliminados, _ = DepositoBancario.objects.filter(pk__in=ids).delete()
+ 
         return JsonResponse({'success': True, 'eliminados': eliminados})
