@@ -3,6 +3,8 @@ views_cobros.py
 Vistas del módulo de cobros.
 CAMBIO: ConfirmarCobroAjax ahora requiere un turno abierto y
         asocia el cobro al turno activo.
+NUEVO:  EditarCobroAjax permite corregir un cobro ya cerrado
+        (ítems, pagos, fecha, observaciones) sin romper balances.
 """
 import re
 import json
@@ -12,6 +14,7 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.db import transaction
 from django.db.models import Q, Sum
 
@@ -101,6 +104,20 @@ def _qs_por_filtros(filtros: dict):
             pass
 
     return qs.distinct()
+
+
+# ═══════════════════════════════════════════════════════════
+# HELPER PERMISOS — reemplazá con tu sistema cuando esté listo
+# ═══════════════════════════════════════════════════════════
+
+def puede_editar_cobros(user):
+    """
+    Retorna True si el usuario puede editar cobros.
+    Cuando tengas tu sistema de permisos personalizado, reemplazá
+    esta función. Ejemplo:
+        return user.perfil.tiene_permiso('editar_cobros') or user.is_superuser
+    """
+    return user.is_staff or user.is_superuser
 
 
 # ═══════════════════════════════════════════════════════════
@@ -269,6 +286,147 @@ class HistorialCobrosView(LoginRequiredMixin, View):
             'desde':           desde,
             'hasta':           hasta,
             'metodos_choices': PagoCobro.METODOS,
+        })
+
+
+# ═══════════════════════════════════════════════════════════
+# EDICIÓN DE COBROS
+# ═══════════════════════════════════════════════════════════
+
+class EditarCobroAjax(LoginRequiredMixin, View):
+    """
+    Edita un cobro ya cerrado reemplazando sus ItemCobro y PagoCobro.
+
+    - El Cobro en sí (turno, creado_por, estado) NO se toca.
+    - Si se envía fecha_cierre, se actualiza.
+    - Los totales de caja se recalculan solos porque total_general(),
+      total_boletas() y total_adicionales() son métodos calculados
+      sobre los ítems y pagos relacionados, no campos guardados.
+
+    Payload POST JSON:
+    {
+        "items": [
+            {
+                "servicio_id":     <int>,
+                "monto_servicio":  <float>,
+                "monto_adicional": <float>,
+                "canal":           "pagofacil" | "rapipago" | "otro"
+            }
+        ],
+        "pagos": [
+            {
+                "metodo": "efectivo" | "transferencia" | "debito" | "credito" | "qr",
+                "monto":  <float>
+            }
+        ],
+        "observaciones": <str>,
+        "fecha_cierre":  <str>  "YYYY-MM-DDTHH:MM"  (null = no cambiar)
+    }
+    """
+
+    def post(self, request, cobro_id):
+        # ── Permiso ───────────────────────────────────────────────────────────
+        if not puede_editar_cobros(request.user):
+            return JsonResponse(
+                {'error': 'No tenés permiso para editar cobros.'},
+                status=403,
+            )
+
+        # ── Cobro ─────────────────────────────────────────────────────────────
+        cobro = get_object_or_404(Cobro, pk=cobro_id, estado=Cobro.ESTADO_CERRADO)
+
+        # ── Parse body ────────────────────────────────────────────────────────
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        items_data    = data.get('items', [])
+        pagos_data    = data.get('pagos', [])
+        observaciones = data.get('observaciones', '').strip()
+        fecha_raw     = (data.get('fecha_cierre') or '').strip()
+
+        # ── Validaciones básicas ──────────────────────────────────────────────
+        if not items_data:
+            return JsonResponse({'error': 'El cobro debe tener al menos un ítem.'}, status=400)
+        if not pagos_data:
+            return JsonResponse({'error': 'Debe registrar al menos un método de pago.'}, status=400)
+
+        total_items = sum(
+            float(i.get('monto_servicio', 0)) + float(i.get('monto_adicional', 0))
+            for i in items_data
+        )
+        total_pagos = sum(float(p.get('monto', 0)) for p in pagos_data)
+
+        if round(total_pagos, 2) < round(total_items, 2):
+            return JsonResponse({
+                'error': (
+                    f'Los pagos (${total_pagos:,.2f}) no cubren el total '
+                    f'(${total_items:,.2f}).'
+                )
+            }, status=400)
+
+        # ── Validar y parsear fecha ───────────────────────────────────────────
+        nueva_fecha = None
+        if fecha_raw:
+            nueva_fecha = parse_datetime(fecha_raw)
+            if nueva_fecha is None:
+                return JsonResponse(
+                    {'error': 'Formato de fecha inválido. Usá YYYY-MM-DDTHH:MM.'},
+                    status=400,
+                )
+            if timezone.is_naive(nueva_fecha):
+                nueva_fecha = timezone.make_aware(nueva_fecha)
+
+        # ── Transacción: reemplazar ítems y pagos ─────────────────────────────
+        with transaction.atomic():
+            # Borrar todo lo anterior
+            cobro.items.all().delete()
+            cobro.pagos.all().delete()
+
+            # Insertar nuevos ítems
+            for orden, item in enumerate(items_data):
+                servicio = get_object_or_404(Servicio, pk=item['servicio_id'], activo=True)
+                ItemCobro.objects.create(
+                    cobro=cobro,
+                    servicio=servicio,
+                    monto_servicio=float(item.get('monto_servicio', 0)),
+                    monto_adicional=float(item.get('monto_adicional', 0)),
+                    canal=item.get('canal', ItemCobro.CANAL_PAGOFACIL),
+                    orden=orden,
+                )
+
+            # Insertar nuevos pagos
+            for pago in pagos_data:
+                monto_pago = float(pago.get('monto', 0))
+                if monto_pago > 0:
+                    PagoCobro.objects.create(
+                        cobro=cobro,
+                        metodo=pago['metodo'],
+                        monto=monto_pago,
+                    )
+
+            # Actualizar campos del cobro
+            campos_a_guardar = ['observaciones']
+            cobro.observaciones = observaciones
+            if nueva_fecha:
+                cobro.fecha_cierre = nueva_fecha
+                campos_a_guardar.append('fecha_cierre')
+            cobro.save(update_fields=campos_a_guardar)
+
+        # ── Respuesta ─────────────────────────────────────────────────────────
+        totales_por_metodo = {
+            p.get_metodo_display(): float(p.monto)
+            for p in cobro.pagos.all()
+        }
+        return JsonResponse({
+            'success':           True,
+            'cobro_id':          cobro.pk,
+            'total_general':     float(cobro.total_general()),
+            'total_boletas':     float(cobro.total_boletas()),
+            'total_adicionales': float(cobro.total_adicionales()),
+            'pagos':             totales_por_metodo,
+            'fecha':             cobro.fecha_cierre.strftime('%d/%m/%Y %H:%M'),
         })
 
 

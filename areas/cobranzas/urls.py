@@ -27,6 +27,7 @@ urlpatterns = [
     path('cobros/eliminar/', views_cobros.EliminarCobrosAjax.as_view(), name='cobros_eliminar'),
     path('cobros/previsualizar-filtro/', views_cobros.PrevisualizarElimFiltroAjax.as_view(), name='cobros_previsualizar_filtro'),
     path('cobros/limpieza-automatica/', views_cobros.LimpiezaAutomaticaAjax.as_view(), name='cobros_limpieza_automatica'),
+    path('cobros/<int:cobro_id>/editar/', views_cobros.EditarCobroAjax.as_view(), name='cobro_editar'),  # ← NUEVA
 
     # ── Caja / Turnos ────────────────────────────────────────
     path('caja/', views_caja.CajaView.as_view(), name='caja'),
@@ -37,13 +38,13 @@ urlpatterns = [
     path('caja/reabrir-turno/', views_caja.ReabrirTurnoAjax.as_view(), name='caja_reabrir_turno'),
     path('caja/turnos-pendientes/', views_caja.TurnosPendientesAjax.as_view(), name='caja_turnos_pendientes'),
     path('caja/turnos/', views_caja.HistorialTurnosView.as_view(), name='historial_turnos'),
-    path('caja/turnos/eliminar/', views_caja.EliminarTurnosAjax.as_view(), name='turnos_eliminar'),      # NUEVO
+    path('caja/turnos/eliminar/', views_caja.EliminarTurnosAjax.as_view(), name='turnos_eliminar'),
 
     # ── Cierre diario ────────────────────────────────────────
     path('cierre-diario/previsualizar/', views_caja.PrevisualizarCierreDiarioAjax.as_view(), name='cierre_previsualizar'),
     path('cierre-diario/ejecutar/', views_caja.EjecutarCierreDiarioAjax.as_view(), name='cierre_ejecutar'),
     path('cierre-diario/historial/', views_caja.HistorialCierresDiariosView.as_view(), name='historial_cierres'),
-    path('cierre-diario/eliminar/', views_caja.EliminarCierresAjax.as_view(), name='cierres_eliminar'),  # NUEVO
+    path('cierre-diario/eliminar/', views_caja.EliminarCierresAjax.as_view(), name='cierres_eliminar'),
 
     # ── Caja Grande ──────────────────────────────────────────
     path('caja-grande/', views_caja_grande.CajaGrandeView.as_view(), name='caja_grande'),
@@ -53,5 +54,5 @@ urlpatterns = [
     path('depositos/', views_depositos.DepositosView.as_view(), name='depositos'),
     path('depositos/registrar/', views_depositos.RegistrarDepositoAjax.as_view(), name='depositos_registrar'),
     path('depositos/historial/', views_depositos.HistorialDepositosView.as_view(), name='depositos_historial'),
-    path('depositos/eliminar/', views_depositos.EliminarDepositosAjax.as_view(), name='depositos_eliminar'),  # NUEVO
+    path('depositos/eliminar/', views_depositos.EliminarDepositosAjax.as_view(), name='depositos_eliminar'),
 ]

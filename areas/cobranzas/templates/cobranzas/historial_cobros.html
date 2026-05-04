@@ -6,6 +6,92 @@
 {% block extra_css %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}">
+<style>
+/* ── Modal edición ── */
+.edit-items-lista { display:flex; flex-direction:column; gap:.6rem; }
+.edit-item-row {
+    background:#f8f9fb; border:1px solid #eee; border-radius:8px;
+    padding:.7rem .8rem; display:flex; flex-direction:column; gap:.45rem;
+}
+.edit-item-header { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.edit-item-desc { font-size:.8rem; color:#555; }
+.edit-item-montos { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:.2rem; }
+.edit-monto-label { font-size:.72rem; color:#888; display:block; margin-bottom:.15rem; }
+.edit-input-monto {
+    width: 110px; padding:.3rem .5rem; border:1px solid #ddd;
+    border-radius:6px; font-size:.83rem; text-align:right;
+}
+.edit-canal-sel {
+    padding:.28rem .5rem; border:1px solid #ddd; border-radius:6px;
+    font-size:.8rem; background:#fff;
+}
+.edit-item-remove {
+    margin-left:auto; background:none; border:none; color:#e85c0d;
+    cursor:pointer; font-size:1rem; line-height:1; padding:.1rem .3rem;
+}
+.edit-pagos-lista { display:flex; flex-direction:column; gap:.4rem; }
+.edit-pago-row { display:flex; align-items:center; gap:.5rem; }
+.edit-pago-metodo {
+    flex:1; padding:.3rem .5rem; border:1px solid #ddd;
+    border-radius:6px; font-size:.83rem; background:#fff;
+}
+.edit-pago-monto {
+    width:120px; padding:.3rem .5rem; border:1px solid #ddd;
+    border-radius:6px; font-size:.83rem; text-align:right;
+}
+.edit-pago-remove {
+    background:none; border:none; color:#e85c0d;
+    cursor:pointer; font-size:1rem; line-height:1;
+}
+.edit-balance {
+    display:flex; justify-content:space-between; align-items:center;
+    background:#f0f4ff; border-radius:7px; padding:.45rem .8rem;
+    font-size:.83rem; font-weight:600; margin-top:.3rem;
+}
+.edit-balance-ok    { color:#16a34a; }
+.edit-balance-faltan { color:#e85c0d; }
+.edit-balance-sobra  { color:#b45309; }
+.edit-section-label {
+    font-size:.75rem; font-weight:700; color:#888;
+    text-transform:uppercase; letter-spacing:.04em;
+    margin:.8rem 0 .35rem;
+}
+.edit-fecha-input {
+    padding:.3rem .5rem; border:1px solid #ddd; border-radius:6px;
+    font-size:.83rem; width:100%; max-width:220px;
+}
+.edit-obs-input {
+    width:100%; padding:.35rem .5rem; border:1px solid #ddd;
+    border-radius:6px; font-size:.83rem; resize:vertical;
+}
+.btn-edit-add-pago {
+    background:none; border:1px dashed #bbb; border-radius:6px;
+    color:#555; font-size:.8rem; padding:.3rem .7rem;
+    cursor:pointer; margin-top:.2rem; width:100%;
+}
+.btn-edit-add-pago:hover { border-color:#e85c0d; color:#e85c0d; }
+.modal-header-edit {
+    background: linear-gradient(135deg,#1a1a2e,#16213e);
+    color:#fff; border-radius: .5rem .5rem 0 0;
+}
+.modal-header-edit .btn-close { filter:invert(1); }
+.edit-badge-editando {
+    display:inline-flex; align-items:center; gap:.3rem;
+    background:rgba(232,92,13,.15); color:#e85c0d;
+    border:1px solid rgba(232,92,13,.3); border-radius:20px;
+    font-size:.7rem; font-weight:700; padding:.15rem .55rem;
+    text-transform:uppercase; letter-spacing:.04em;
+}
+/* Botón editar en tabla */
+.btn-editar-cobro {
+    display:inline-flex; align-items:center; gap:.25rem;
+    padding:.28rem .55rem; border-radius:6px;
+    background:rgba(232,92,13,.1); border:1px solid rgba(232,92,13,.3);
+    color:#e85c0d; font-size:.75rem; font-weight:600; cursor:pointer;
+    white-space:nowrap; transition:background .15s;
+}
+.btn-editar-cobro:hover { background:rgba(232,92,13,.2); }
+</style>
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -45,7 +131,7 @@
     </div>
 </div>
 
-{# ── FILTROS DE BÚSQUEDA — simples, solo fechas ── #}
+{# ── FILTROS ── #}
 <form method="get" class="filtros-bar" id="formFiltros">
     <div class="filtro-fecha-wrap">
         <label class="filtro-fecha-label">Desde</label>
@@ -63,7 +149,6 @@
 
 {% if cobros %}
 
-{# ── BARRA DE SELECCIÓN MASIVA ── #}
 {% if user.is_staff or user.is_superuser %}
 <div class="hist-acciones-masivas" id="barraAccionesMasivas" style="display:none;">
     <span class="hist-sel-count" id="selCount">0 seleccionados</span>
@@ -165,6 +250,8 @@
                 </td>
                 <td>
                     <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:nowrap;">
+
+                        {# ── Botón Ver detalle ── #}
                         <button class="btn-accion btn-editar hist-btn-detalle"
                                 data-id="{{ cobro.pk }}"
                                 data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}{% if not forloop.last %};;{% endif %}{% endfor %}"
@@ -172,7 +259,25 @@
                                 data-obs="{{ cobro.observaciones }}">
                             Ver detalle
                         </button>
+
+                        {# ── Botón Editar — solo staff/superuser (o tu sistema de permisos) ── #}
                         {% if user.is_staff or user.is_superuser %}
+                        <button class="btn-editar-cobro hist-btn-editar"
+                                data-id="{{ cobro.pk }}"
+                                data-fecha="{{ cobro.fecha_cierre|date:'Y-m-d' }}T{{ cobro.fecha_cierre|date:'H:i' }}"
+                                data-obs="{{ cobro.observaciones }}"
+                                data-items-full="{% for item in cobro.items.all %}{{ item.servicio.pk }}|{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:40 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-pagos-full="{% for pago in cobro.pagos.all %}{{ pago.metodo }}|{{ pago.monto }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                title="Editar este cobro">
+                            <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
+                                <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z"
+                                      stroke="currentColor" stroke-width="1.3"
+                                      stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Editar
+                        </button>
+
+                        {# ── Botón Eliminar ── #}
                         <button class="btn-eliminar-cobro" data-id="{{ cobro.pk }}" title="Eliminar este cobro">
                             <svg viewBox="0 0 14 14" fill="none" width="12" height="12">
                                 <path d="M2 3.5h10M5 3.5V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4"
@@ -181,6 +286,7 @@
                             </svg>
                         </button>
                         {% endif %}
+
                     </div>
                 </td>
             </tr>
@@ -200,7 +306,7 @@
 {% endif %}
 
 
-{# ════ MODAL DETALLE ════ #}
+{# ════ MODAL DETALLE (sin cambios) ════ #}
 <div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -229,7 +335,71 @@
 </div>
 
 
-{# ════ MODAL CONFIRMAR ELIMINACIÓN (individual / selección masiva) ════ #}
+{# ════ MODAL EDITAR COBRO ════ #}
+<div class="modal fade" id="modalEditarCobro" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header modal-header-edit">
+                <div>
+                    <h5 class="modal-title" id="editTitle">Editar cobro</h5>
+                    <p class="modal-subtitle" id="editSubtitle" style="color:#aaa;font-size:.8rem;margin:0;"></p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                {# Fecha #}
+                <p class="edit-section-label">Fecha y hora del cobro</p>
+                <input type="datetime-local" id="editFecha" class="edit-fecha-input">
+
+                {# Items #}
+                <p class="edit-section-label" style="margin-top:1rem;">
+                    Boletas
+                    <span class="edit-badge-editando">editable</span>
+                </p>
+                <div id="editItemsLista" class="edit-items-lista"></div>
+                <p style="font-size:.75rem;color:#999;margin-top:.4rem;">
+                    ⚠ Podés modificar montos y canal. No podés cambiar el servicio — si es incorrecto, eliminá el cobro y hacé uno nuevo.
+                </p>
+
+                {# Pagos #}
+                <p class="edit-section-label" style="margin-top:1rem;">
+                    Métodos de pago
+                    <span class="edit-badge-editando">editable</span>
+                </p>
+                <div id="editPagosLista" class="edit-pagos-lista"></div>
+                <button type="button" class="btn-edit-add-pago" id="editBtnAddPago">
+                    + Agregar otro método de pago
+                </button>
+
+                {# Balance #}
+                <div class="edit-balance" id="editBalance" style="margin-top:.6rem;">
+                    <span>Balance pagos vs. total</span>
+                    <strong id="editBalanceMonto">—</strong>
+                </div>
+
+                {# Observaciones #}
+                <p class="edit-section-label" style="margin-top:.9rem;">Observaciones</p>
+                <textarea id="editObs" class="edit-obs-input" rows="2"
+                          placeholder="Observaciones opcionales..."></textarea>
+
+                {# Error #}
+                <div id="editError" class="alerta-inline alerta-error mt-2" style="display:none;"></div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-sm" id="btnGuardarEdicion"
+                        style="background:#e85c0d;color:#fff;font-weight:600;">
+                    Guardar cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{# ════ MODAL CONFIRMAR ELIMINACIÓN ════ #}
 <div class="modal fade" id="modalEliminarCobros" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
@@ -267,7 +437,6 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-
                 <div class="elim-filtros-grid">
                     <div class="elim-filtro-group">
                         <label class="elim-filtro-label">Fecha desde</label>
@@ -307,8 +476,6 @@
                                class="filtro-fecha-input" style="width:100%;" min="0" step="0.01">
                     </div>
                 </div>
-
-                {# Resultado de previsualización #}
                 <div class="elim-preview" id="elimFiltroPreview" style="display:none;">
                     <svg viewBox="0 0 16 16" fill="none" width="14" height="14" style="flex-shrink:0;">
                         <circle cx="8" cy="8" r="6.5" stroke="#E85C0D" stroke-width="1.4"/>
@@ -316,17 +483,14 @@
                     </svg>
                     <span>Se eliminarán <strong id="elimFiltroCount">—</strong> cobros con los criterios ingresados.</span>
                 </div>
-
                 <div id="elimFiltroError" class="alerta-inline alerta-error" style="display:none;margin-top:.6rem;"></div>
-
                 <p class="eliminar-warning" style="margin-top:.75rem;">
                     ⚠ Esta acción no se puede deshacer. Se borrarán los cobros que coincidan, incluyendo sus ítems y pagos.
                 </p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-secondary btn-sm" id="btnPrevisualizarElim"
-                        style="border-color:#E85C0D;color:#E85C0D;background:#fff8f4;">
+                <button type="button" class="btn btn-outline-danger btn-sm" id="btnPrevisualizarElim">
                     Previsualizar
                 </button>
                 <button type="button" class="btn btn-danger btn-sm" id="btnConfirmarElimFiltro" disabled>
@@ -377,9 +541,12 @@
 // ════════════════════════════════════════════════════════════
 
 const CANALES_HIST      = { pagofacil: 'Pago Fácil', rapipago: 'Rapipago', otro: 'Otro' };
+const METODOS_EDIT      = { efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito', qr:'QR' };
 const ELIMINAR_URL      = "{% url 'cobranzas:cobros_eliminar' %}";
 const LIMPIEZA_URL      = "{% url 'cobranzas:cobros_limpieza_automatica' %}";
 const PREVISUALIZAR_URL = "{% url 'cobranzas:cobros_previsualizar_filtro' %}";
+// ↓ Ajustá el nombre de la URL según lo que pongas en urls.py
+const EDITAR_BASE_URL = "{% url 'cobranzas:cobro_editar' cobro_id=0 %}".replace('0/editar/', '');
 
 function fmt(n) {
     return '$' + parseFloat(n || 0).toLocaleString('es-AR', {
@@ -458,7 +625,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function getIdsSeleccionados() {
         return [...document.querySelectorAll('.check-cobro:checked')].map(c => parseInt(c.dataset.id));
     }
-
     function actualizarBarra() {
         const ids   = getIdsSeleccionados();
         const barra = el('barraAccionesMasivas');
@@ -471,12 +637,12 @@ document.addEventListener('DOMContentLoaded', () => {
             checkTodos.checked = ids.length === total && total > 0;
         }
     }
-
     checkTodos?.addEventListener('change', () => {
         document.querySelectorAll('.check-cobro').forEach(c => c.checked = checkTodos.checked);
         actualizarBarra();
     });
     document.querySelectorAll('.check-cobro').forEach(c => c.addEventListener('change', actualizarBarra));
+
     el('btnDeseleccionarTodo')?.addEventListener('click', () => {
         document.querySelectorAll('.check-cobro').forEach(c => c.checked = false);
         if (checkTodos) checkTodos.checked = false;
@@ -484,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ════════════════════════════════════════════════════════
-    // ELIMINACIÓN INDIVIDUAL + POR CHECKBOX
+    // ELIMINACIÓN INDIVIDUAL + MASIVA
     // ════════════════════════════════════════════════════════
     let idsAEliminar = [];
     const modalElim = new bootstrap.Modal(el('modalEliminarCobros'));
@@ -644,6 +810,283 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.disabled = false; btn.textContent = 'Ejecutar limpieza';
         }
     });
+
+
+    // ════════════════════════════════════════════════════════
+    // MODAL EDITAR COBRO
+    // ════════════════════════════════════════════════════════
+
+    let editState = { cobroId: null, items: [], pagos: [], pagoSeq: 0 };
+    const modalEditar = new bootstrap.Modal(el('modalEditarCobro'));
+
+    // ── Abrir modal edición ──────────────────────────────────
+    document.querySelectorAll('.hist-btn-editar').forEach(btn => {
+        btn.addEventListener('click', () => {
+            editState.cobroId = parseInt(btn.dataset.id);
+            editState.pagoSeq = 0;
+
+            // Parsear items: srvId|codigo|desc|montoSrv|montoAd|canal
+            const itemsRaw = btn.dataset.itemsFull ? btn.dataset.itemsFull.split(';;') : [];
+            editState.items = itemsRaw.map(raw => {
+                const [srvId, codigo, desc, montoSrv, montoAd, canal] = raw.split('|');
+                return {
+                    servicio_id:     parseInt(srvId),
+                    codigo,
+                    desc,
+                    monto_servicio:  parseFloat(montoSrv)  || 0,
+                    monto_adicional: parseFloat(montoAd)   || 0,
+                    canal:           canal || 'pagofacil',
+                };
+            });
+
+            // Parsear pagos: metodo|monto
+            const pagosRaw = btn.dataset.pagosFull ? btn.dataset.pagosFull.split(';;') : [];
+            editState.pagos = pagosRaw.map(raw => {
+                const [metodo, monto] = raw.split('|');
+                return { id: ++editState.pagoSeq, metodo, monto: parseFloat(monto) || 0 };
+            });
+
+            el('editTitle').textContent    = `Editar cobro #${editState.cobroId}`;
+            el('editSubtitle').textContent = `${editState.items.length} boleta${editState.items.length !== 1 ? 's' : ''}`;
+            el('editFecha').value          = btn.dataset.fecha || '';
+            el('editObs').value            = btn.dataset.obs   || '';
+            el('editError').style.display  = 'none';
+
+            renderEditItems();
+            renderEditPagos();
+            actualizarEditBalance();
+            modalEditar.show();
+        });
+    });
+
+    // ── Render items editables ───────────────────────────────
+    function renderEditItems() {
+        el('editItemsLista').innerHTML = editState.items.map((it, idx) => `
+            <div class="edit-item-row" data-idx="${idx}">
+                <div class="edit-item-header">
+                    <span class="codigo-badge">${it.codigo}</span>
+                    <select class="edit-canal-sel" data-idx="${idx}" data-field="canal">
+                        <option value="pagofacil" ${it.canal==='pagofacil'?'selected':''}>Pago Fácil</option>
+                        <option value="rapipago"  ${it.canal==='rapipago' ?'selected':''}>Rapipago</option>
+                        <option value="otro"      ${it.canal==='otro'     ?'selected':''}>Otro</option>
+                    </select>
+                </div>
+                <div class="edit-item-desc">${it.desc}</div>
+                <div class="edit-item-montos">
+                    <div>
+                        <span class="edit-monto-label">Factura $</span>
+                        <input type="number" class="edit-input-monto" min="0" step="0.01"
+                               data-idx="${idx}" data-field="monto_servicio"
+                               value="${it.monto_servicio.toFixed(2)}">
+                    </div>
+                    <span style="color:#aaa;font-size:.9rem;">+</span>
+                    <div>
+                        <span class="edit-monto-label">Adicional $</span>
+                        <input type="number" class="edit-input-monto" min="0" step="0.01"
+                               data-idx="${idx}" data-field="monto_adicional"
+                               value="${it.monto_adicional.toFixed(2)}">
+                    </div>
+                    <span style="color:#aaa;font-size:.9rem;">=</span>
+                    <div>
+                        <span class="edit-monto-label">Subtotal</span>
+                        <span class="edit-input-monto" style="display:inline-flex;align-items:center;
+                              justify-content:flex-end;background:#f0f0f0;border-color:#e0e0e0;
+                              font-weight:700;" id="editSubt${idx}">
+                            ${fmt(it.monto_servicio + it.monto_adicional)}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        // Listeners montos
+        el('editItemsLista').querySelectorAll('[data-field="monto_servicio"],[data-field="monto_adicional"]')
+            .forEach(inp => {
+                inp.addEventListener('input', () => {
+                    const idx = parseInt(inp.dataset.idx);
+                    editState.items[idx][inp.dataset.field] = parseFloat(inp.value) || 0;
+                    const it = editState.items[idx];
+                    const subtEl = document.getElementById(`editSubt${idx}`);
+                    if (subtEl) subtEl.textContent = fmt(it.monto_servicio + it.monto_adicional);
+                    actualizarEditBalance();
+                });
+            });
+
+        // Listeners canal
+        el('editItemsLista').querySelectorAll('[data-field="canal"]').forEach(sel => {
+            sel.addEventListener('change', () => {
+                editState.items[parseInt(sel.dataset.idx)].canal = sel.value;
+            });
+        });
+    }
+
+    // ── Render pagos editables ───────────────────────────────
+    function renderEditPagos() {
+        const lista = el('editPagosLista');
+        lista.innerHTML = editState.pagos.map(p => `
+            <div class="edit-pago-row" data-pago-id="${p.id}">
+                <select class="edit-pago-metodo" data-pago-id="${p.id}">
+                    ${Object.entries(METODOS_EDIT).map(([val, lbl]) =>
+                        `<option value="${val}" ${p.metodo===val?'selected':''}>${lbl}</option>`
+                    ).join('')}
+                </select>
+                <span style="font-size:.85rem;color:#777;">$</span>
+                <input type="number" class="edit-pago-monto" min="0" step="0.01"
+                       data-pago-id="${p.id}"
+                       value="${p.monto > 0 ? p.monto.toFixed(2) : ''}">
+                ${editState.pagos.length > 1
+                    ? `<button class="edit-pago-remove" data-pago-id="${p.id}">×</button>`
+                    : '<span></span>'}
+            </div>
+        `).join('');
+
+        lista.querySelectorAll('.edit-pago-metodo').forEach(sel => {
+            sel.addEventListener('change', () => {
+                const p = editState.pagos.find(x => x.id === parseInt(sel.dataset.pagoId));
+                if (p) p.metodo = sel.value;
+            });
+        });
+        lista.querySelectorAll('.edit-pago-monto').forEach(inp => {
+            inp.addEventListener('input', () => {
+                const p = editState.pagos.find(x => x.id === parseInt(inp.dataset.pagoId));
+                if (p) p.monto = parseFloat(inp.value) || 0;
+                actualizarEditBalance();
+            });
+        });
+        lista.querySelectorAll('.edit-pago-remove').forEach(btn => {
+            btn.addEventListener('click', () => {
+                editState.pagos = editState.pagos.filter(x => x.id !== parseInt(btn.dataset.pagoId));
+                renderEditPagos();
+                actualizarEditBalance();
+            });
+        });
+    }
+
+    el('editBtnAddPago')?.addEventListener('click', () => {
+        editState.pagos.push({ id: ++editState.pagoSeq, metodo: 'efectivo', monto: 0 });
+        renderEditPagos();
+        actualizarEditBalance();
+    });
+
+    // ── Balance ──────────────────────────────────────────────
+    function actualizarEditBalance() {
+        const total    = editState.items.reduce((s, i) => s + i.monto_servicio + i.monto_adicional, 0);
+        const asignado = editState.pagos.reduce((s, p) => s + p.monto, 0);
+        const diff     = asignado - total;
+        const balEl    = el('editBalanceMonto');
+        if (Math.abs(diff) < 0.01) {
+            balEl.textContent = '✓ Cubierto';
+            balEl.className = 'edit-balance-ok';
+        } else if (diff < 0) {
+            balEl.textContent = `Faltan ${fmt(Math.abs(diff))}`;
+            balEl.className = 'edit-balance-faltan';
+        } else {
+            balEl.textContent = `Sobran ${fmt(diff)}`;
+            balEl.className = 'edit-balance-sobra';
+        }
+    }
+
+    // ── Guardar edición ──────────────────────────────────────
+    el('btnGuardarEdicion')?.addEventListener('click', async () => {
+        el('editError').style.display = 'none';
+
+        // Validar balance
+        const total    = editState.items.reduce((s, i) => s + i.monto_servicio + i.monto_adicional, 0);
+        const asignado = editState.pagos.reduce((s, p) => s + p.monto, 0);
+        if (Math.round(asignado * 100) < Math.round(total * 100)) {
+            el('editError').textContent = `Los pagos (${fmt(asignado)}) no cubren el total (${fmt(total)}).`;
+            el('editError').style.display = '';
+            return;
+        }
+
+        const payload = {
+            items: editState.items.map(i => ({
+                servicio_id:     i.servicio_id,
+                monto_servicio:  i.monto_servicio,
+                monto_adicional: i.monto_adicional,
+                canal:           i.canal,
+            })),
+            pagos: editState.pagos.filter(p => p.monto > 0).map(p => ({
+                metodo: p.metodo,
+                monto:  p.monto,
+            })),
+            observaciones: el('editObs').value.trim(),
+            fecha_cierre:  el('editFecha').value || null,
+        };
+
+        const btn = el('btnGuardarEdicion');
+        btn.disabled = true; btn.textContent = 'Guardando…';
+
+        try {
+            const url = EDITAR_BASE_URL + editState.cobroId + '/editar/';
+            const res  = await postJSON(url, payload);
+            const data = await res.json();
+
+            if (data.success) {
+                // Actualizar fila en la tabla sin recargar la página
+                const fila = document.querySelector(`.hist-fila[data-id="${editState.cobroId}"]`);
+                if (fila) {
+                    fila.dataset.totalBoletas     = data.total_boletas;
+                    fila.dataset.totalAdicionales = data.total_adicionales;
+                    fila.dataset.totalGeneral     = data.total_general;
+
+                    // Celda fecha
+                    const fechaSplit = data.fecha.split(' ');
+                    const tdFecha = fila.querySelector('.hist-fecha');
+                    const tdHora  = fila.querySelector('.hist-hora');
+                    if (tdFecha) tdFecha.textContent = fechaSplit[0] || '';
+                    if (tdHora)  tdHora.textContent  = fechaSplit[1] || '';
+
+                    // Celda totales
+                    const tds = fila.querySelectorAll('td');
+                    // Buscamos por strong dentro de la celda de total cobrado
+                    fila.querySelectorAll('.hist-total').forEach(el => {
+                        el.textContent = fmt(data.total_general);
+                    });
+                    // Celda adicional
+                    fila.querySelectorAll('.hist-adicional').forEach(el => {
+                        el.textContent = fmt(data.total_adicionales);
+                    });
+
+                    // Recalcular resumen de cabecera
+                    sumBoletas = sumAdicionales = sumGeneral = 0;
+                    document.querySelectorAll('.hist-fila').forEach(f => {
+                        sumBoletas     += parseFloat(f.dataset.totalBoletas     || 0);
+                        sumAdicionales += parseFloat(f.dataset.totalAdicionales || 0);
+                        sumGeneral     += parseFloat(f.dataset.totalGeneral     || 0);
+                    });
+                    if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(sumBoletas);
+                    if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(sumAdicionales);
+                    if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(sumGeneral);
+                }
+                modalEditar.hide();
+                // Pequeño toast de éxito visual sin alert()
+                mostrarToastExito(`Cobro #${data.cobro_id} actualizado correctamente.`);
+            } else {
+                el('editError').textContent = data.error || 'No se pudo guardar.';
+                el('editError').style.display = '';
+            }
+        } catch {
+            el('editError').textContent = 'Error de conexión. Intentá de nuevo.';
+            el('editError').style.display = '';
+        } finally {
+            btn.disabled = false; btn.textContent = 'Guardar cambios';
+        }
+    });
+
+    // ── Toast éxito ──────────────────────────────────────────
+    function mostrarToastExito(msg) {
+        const t = document.createElement('div');
+        t.textContent = msg;
+        Object.assign(t.style, {
+            position:'fixed', bottom:'1.5rem', right:'1.5rem', zIndex:9999,
+            background:'#16a34a', color:'#fff', borderRadius:'8px',
+            padding:'.65rem 1.1rem', fontWeight:'600', fontSize:'.85rem',
+            boxShadow:'0 4px 16px rgba(0,0,0,.18)', transition:'opacity .4s',
+        });
+        document.body.appendChild(t);
+        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3000);
+    }
 
 });
 </script>
