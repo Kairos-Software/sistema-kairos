@@ -15,6 +15,63 @@ function fmt(n) {
         minimumFractionDigits: 2, maximumFractionDigits: 2
     });
 }
+
+/**
+ * Anima el conteo de un elemento desde su valor actual hasta `destino`.
+ * Para números enteros (cobros) y monetarios (facturas, etc.)
+ * @param {HTMLElement} elem   - el elemento a animar
+ * @param {number}      destino - valor final
+ * @param {boolean}     esMonto - true → formato $, false → entero
+ * @param {number}      duracion - ms, default 500
+ */
+function animarContador(elem, destino, esMonto = true, duracion = 500) {
+    if (!elem) return;
+
+    // Leer valor actual del DOM
+    const textoActual = elem.textContent.replace(/[$.\s]/g, '').replace(',', '.');
+    const origen = parseFloat(textoActual) || 0;
+
+    if (Math.abs(destino - origen) < 0.005) {
+        elem.textContent = esMonto ? fmt(destino) : destino;
+        return;
+    }
+
+    const inicio = performance.now();
+    // Easing "ease-out" suave
+    function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+    function tick(ahora) {
+        const t       = Math.min((ahora - inicio) / duracion, 1);
+        const progreso = easeOut(t);
+        const valor   = origen + (destino - origen) * progreso;
+
+        elem.textContent = esMonto
+            ? fmt(valor)
+            : String(Math.round(valor));
+
+        if (t < 1) requestAnimationFrame(tick);
+        else elem.textContent = esMonto ? fmt(destino) : destino;
+    }
+
+    requestAnimationFrame(tick);
+}
+
+/** Recalcula y anima los 4 cards del resumen desde los data-* de las filas visibles */
+function recalcularResumen() {
+    let sumBoletas = 0, sumAdicionales = 0, sumGeneral = 0;
+    let count = 0;
+    document.querySelectorAll('.hist-fila').forEach(f => {
+        sumBoletas     += parseFloat(f.dataset.totalBoletas     || 0);
+        sumAdicionales += parseFloat(f.dataset.totalAdicionales || 0);
+        sumGeneral     += parseFloat(f.dataset.totalGeneral     || 0);
+        count++;
+    });
+    animarContador(el('resumenCobros'),      count,          false);
+    animarContador(el('resumenFacturas'),    sumBoletas,     true);
+    animarContador(el('resumenAdicionales'), sumAdicionales, true);
+    animarContador(el('resumenGeneral'),     sumGeneral,     true);
+    return { sumBoletas, sumAdicionales, sumGeneral };
+}
 function getCsrf() {
     return document.cookie.split(';').map(c => c.trim())
         .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
@@ -30,16 +87,19 @@ const el = id => document.getElementById(id);
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ── Resumen totales ──────────────────────────────────────
+    // ── Resumen totales (con animación inicial) ──────────────
     let sumBoletas = 0, sumAdicionales = 0, sumGeneral = 0;
     document.querySelectorAll('.hist-fila').forEach(f => {
         sumBoletas     += parseFloat(f.dataset.totalBoletas     || 0);
         sumAdicionales += parseFloat(f.dataset.totalAdicionales || 0);
         sumGeneral     += parseFloat(f.dataset.totalGeneral     || 0);
     });
-    if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(sumBoletas);
-    if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(sumAdicionales);
-    if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(sumGeneral);
+    const cobrosCount = document.querySelectorAll('.hist-fila').length;
+    // Animar desde 0 al cargar la página (efecto Power BI al entrar)
+    animarContador(el('resumenCobros'),      cobrosCount,    false, 700);
+    animarContador(el('resumenFacturas'),    sumBoletas,     true,  700);
+    animarContador(el('resumenAdicionales'), sumAdicionales, true,  700);
+    animarContador(el('resumenGeneral'),     sumGeneral,     true,  700);
 
     // ── Modal detalle ────────────────────────────────────────
     document.querySelectorAll('.hist-btn-detalle').forEach(btn => {
@@ -150,6 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const n = document.querySelectorAll('.hist-fila').length;
                 const sub = el('subtituloHistorial');
                 if (sub) sub.textContent = `${n} cobro${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''}`;
+                recalcularResumen();
             } else {
                 el('elimError').textContent = data.error || 'No se pudo eliminar.';
                 el('elimError').style.display = '';
@@ -510,16 +571,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         el.textContent = fmt(data.total_adicionales);
                     });
 
-                    // Recalcular resumen de cabecera
+                    // Recalcular resumen animado
                     sumBoletas = sumAdicionales = sumGeneral = 0;
                     document.querySelectorAll('.hist-fila').forEach(f => {
                         sumBoletas     += parseFloat(f.dataset.totalBoletas     || 0);
                         sumAdicionales += parseFloat(f.dataset.totalAdicionales || 0);
                         sumGeneral     += parseFloat(f.dataset.totalGeneral     || 0);
                     });
-                    if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(sumBoletas);
-                    if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(sumAdicionales);
-                    if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(sumGeneral);
+                    recalcularResumen();
                 }
                 modalEditar.hide();
                 // Pequeño toast de éxito visual sin alert()
