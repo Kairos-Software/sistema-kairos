@@ -7,6 +7,23 @@
 (function () {
     'use strict';
 
+    const STORAGE_KEY = 'vp_estado'; // { abierto, minimizado }
+
+    // ── Persistencia ──────────────────────────────────────────
+    function leerEstado() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        } catch { return {}; }
+    }
+
+    function guardarEstado(cambios) {
+        try {
+            const actual = leerEstado();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...actual, ...cambios }));
+        } catch { /* localStorage no disponible */ }
+    }
+
+    // ── Formato ───────────────────────────────────────────────
     function fmt(n) {
         return '$ ' + Math.abs(n).toLocaleString('es-AR', {
             minimumFractionDigits: 2,
@@ -14,6 +31,7 @@
         });
     }
 
+    // ── Construcción del panel ────────────────────────────────
     function construirPanel() {
         const panel = document.createElement('div');
         panel.id = 'vueltoPanel';
@@ -82,8 +100,10 @@
         return panel;
     }
 
+    // ── Estado local ──────────────────────────────────────────
     let minimizado = false;
 
+    // ── Cálculo ───────────────────────────────────────────────
     function calcular() {
         const total   = parseFloat(document.getElementById('vpTotal').value)   || 0;
         const entrega = parseFloat(document.getElementById('vpEntrega').value) || 0;
@@ -131,6 +151,7 @@
         document.getElementById('vpTotal').focus();
     }
 
+    // ── Abrir / Cerrar ────────────────────────────────────────
     function abrir() {
         const panel = document.getElementById('vueltoPanel');
         if (!panel) return;
@@ -138,11 +159,13 @@
         if (!minimizado) {
             setTimeout(() => document.getElementById('vpTotal').focus(), 60);
         }
+        guardarEstado({ abierto: true });
     }
 
     function cerrar() {
         const panel = document.getElementById('vueltoPanel');
         if (panel) panel.classList.remove('abierto');
+        guardarEstado({ abierto: false });
     }
 
     function toggle() {
@@ -151,17 +174,36 @@
         panel.classList.contains('abierto') ? cerrar() : abrir();
     }
 
+    // ── Minimizar / Expandir ──────────────────────────────────
     function minimizar() {
         minimizado = true;
         document.getElementById('vueltoPanel').classList.add('minimizado');
+        guardarEstado({ minimizado: true });
     }
 
     function expandir() {
         minimizado = false;
         document.getElementById('vueltoPanel').classList.remove('minimizado');
         setTimeout(() => document.getElementById('vpTotal').focus(), 60);
+        guardarEstado({ minimizado: false });
     }
 
+    // ── Restaurar estado al cargar la página ──────────────────
+    function restaurarEstado() {
+        const estado = leerEstado();
+        if (estado.minimizado) {
+            minimizado = true;
+            document.getElementById('vueltoPanel').classList.add('minimizado');
+        }
+        if (estado.abierto) {
+            requestAnimationFrame(() => {
+                document.getElementById('vueltoPanel').classList.add('abierto');
+                calcular(); // recalcular por si los inputs cambiaron
+            });
+        }
+    }
+
+    // ── Drag ─────────────────────────────────────────────────
     function habilitarDrag(panel) {
         const header  = panel.querySelector('#vpHeader');
         const miniBar = panel.querySelector('#vpMinimizadoBar');
@@ -192,16 +234,15 @@
         });
     }
 
+    // ── Init ─────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
         if (!document.querySelector('.cobranzas-layout')) return;
 
         const panel = construirPanel();
 
-        // Calcular en tiempo real
         panel.querySelector('#vpTotal').addEventListener('input', calcular);
         panel.querySelector('#vpEntrega').addEventListener('input', calcular);
 
-        // Tab en "Total a cobrar" → salta a "Entrega"
         panel.querySelector('#vpTotal').addEventListener('keydown', e => {
             if (e.key === 'Tab') {
                 e.preventDefault();
@@ -220,11 +261,9 @@
 
         habilitarDrag(panel);
 
-        // Botón sidebar
         const btnSidebar = document.getElementById('btnVuelto');
         if (btnSidebar) btnSidebar.addEventListener('click', toggle);
 
-        // Atajo Alt+V
         document.addEventListener('keydown', e => {
             if (!e.altKey || !(e.key === 'v' || e.key === 'V')) return;
             const tag = document.activeElement.tagName;
@@ -234,6 +273,9 @@
             e.preventDefault();
             toggle();
         });
+
+        // Restaurar estado guardado de la navegación anterior
+        restaurarEstado();
     });
 
 })();

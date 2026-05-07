@@ -674,6 +674,9 @@ function mostrarExito(data) {
     new bootstrap.Modal(document.getElementById('modalExito')).show();
 }
 
+// Resetear siempre que el modal se cierre, sin importar si fue con el botón,
+// la X, Escape o clic fuera — así el carrito nunca queda con datos del cobro anterior.
+document.getElementById('modalExito').addEventListener('hidden.bs.modal', resetear);
 document.getElementById('btnNuevoCobro').addEventListener('click', resetear);
 
 function resetear() {

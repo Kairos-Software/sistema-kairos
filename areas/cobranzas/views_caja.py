@@ -4,17 +4,20 @@ Vistas para la gestión de turnos, apertura/cierre de caja,
 retiros y cierre diario.
 """
 import json
+import csv
 from decimal import Decimal
+from datetime import date
 
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q, Value, DecimalField, Subquery, OuterRef
+from django.db.models.functions import Coalesce
 
-from .models import Turno, RetiroCaja, Cobro, PagoCobro, CierreDiario
+from .models import Turno, RetiroCaja, Cobro, PagoCobro, CierreDiario, ItemCobro
 
 
 # ─────────────────────────────────────────────────────────────
@@ -308,7 +311,6 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
             return JsonResponse({'error': 'Las fechas desde y hasta son obligatorias.'}, status=400)
 
         try:
-            from datetime import date
             desde = date.fromisoformat(desde_str)
             hasta = date.fromisoformat(hasta_str)
         except ValueError:
@@ -317,14 +319,12 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
         if desde > hasta:
             return JsonResponse({'error': 'La fecha "desde" no puede ser mayor que "hasta".'}, status=400)
 
-        # No puede haber turno abierto
         if get_turno_abierto():
             return JsonResponse(
                 {'error': 'Hay un turno abierto. Cerralo antes de hacer el cierre diario.'},
                 status=400
             )
 
-        # Turnos cerrados pendientes (sin cierre diario asignado) en el rango
         turnos = Turno.objects.filter(
             estado=Turno.ESTADO_CERRADO,
             cierre_diario__isnull=True,
@@ -338,7 +338,6 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
                 status=400
             )
 
-        # Calcular totales sumando los cobros de esos turnos
         ids_turnos = list(turnos.values_list('pk', flat=True))
 
         pagos_qs = PagoCobro.objects.filter(
@@ -351,7 +350,6 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
                 pagos_qs.filter(metodo=metodo).aggregate(t=Sum('monto'))['t'] or 0
             )
 
-        from .models import ItemCobro
         tot_adicionales = float(
             ItemCobro.objects.filter(
                 cobro__turno_id__in=ids_turnos,
@@ -370,9 +368,6 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
         )
         tot_general = tot_efe + tot_tra + tot_deb + tot_cre + tot_qr
 
-        # Efectivo esperado en caja = monto_inicial(primer turno) + cobros efe - retiros
-        # En cierre diario usamos el efectivo_esperado del ÚLTIMO turno del día,
-        # ya que cada turno arranca con lo que dejó el anterior.
         monto_inicial_dia = float(turnos.first().monto_inicial)
         efectivo_esperado_dia = monto_inicial_dia + tot_efe - tot_ret
 
@@ -417,7 +412,6 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
         hasta_str = (data.get('hasta') or '').strip()
 
         try:
-            from datetime import date
             desde = date.fromisoformat(desde_str)
             hasta = date.fromisoformat(hasta_str)
         except ValueError:
@@ -458,7 +452,6 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
                 pagos_qs.filter(metodo=metodo).aggregate(t=Sum('monto'))['t'] or 0
             )
 
-        from .models import ItemCobro
         tot_adicionales = Decimal(
             ItemCobro.objects.filter(
                 cobro__turno_id__in=ids_turnos,
@@ -477,7 +470,6 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
         )
         tot_general = tot_efe + tot_tra + tot_deb + tot_cre + tot_qr
 
-        # Efectivo esperado en caja al cierre del día
         monto_inicial_dia = turnos.order_by('fecha_apertura').first().monto_inicial
         ef_esperado = monto_inicial_dia + tot_efe - tot_ret
         diferencia  = efectivo_fisico - ef_esperado
@@ -499,7 +491,6 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
                 efectivo_fisico     = efectivo_fisico,
                 diferencia_caja     = diferencia,
             )
-            # Marcar los turnos como incluidos en este cierre
             turnos.update(cierre_diario=cierre)
 
         return JsonResponse({
@@ -515,9 +506,308 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
 
 
 # ─────────────────────────────────────────────────────────────
-# HISTORIAL DE TURNOS
+# HISTORIAL DE TURNOS (con filtros avanzados)
 # ─────────────────────────────────────────────────────────────
 
+class HistorialTurnosView(LoginRequiredMixin, View):
+    def get(self, request):
+        # Obtener parámetros de filtro
+        desde = request.GET.get('desde', '').strip()
+        hasta = request.GET.get('hasta', '').strip()
+        estado = request.GET.get('estado', '')
+        metodos_raw = request.GET.getlist('metodos') or request.GET.get('metodos', '').split(',')
+        metodos = [m for m in metodos_raw if m]  # limpiar vacíos
+        canales_raw = request.GET.getlist('canales') or request.GET.get('canales', '').split(',')
+        canales = [c for c in canales_raw if c]
+        diferencia = request.GET.get('diferencia', '')
+        tiene_cierre = request.GET.get('tiene_cierre', '')
+        order_by = request.GET.get('order_by', '-fecha_apertura')
+
+        # Base queryset con relaciones necesarias
+        qs = Turno.objects.select_related('cajero', 'cierre_diario')
+
+        # Filtros de fecha
+        if desde:
+            qs = qs.filter(fecha_apertura__date__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha_apertura__date__lte=hasta)
+
+        # Filtro por estado
+        if estado:
+            qs = qs.filter(estado=estado)
+
+        # Filtro por si tiene cierre diario asignado
+        if tiene_cierre == 'si':
+            qs = qs.filter(cierre_diario__isnull=False)
+        elif tiene_cierre == 'no':
+            qs = qs.filter(cierre_diario__isnull=True)
+
+        # Filtro por tipo de diferencia (solo para turnos cerrados)
+        if diferencia:
+            qs = qs.filter(tipo_diferencia=diferencia)
+
+        # Subconsultas para totales por método y canal
+        subq_efe = Subquery(
+            PagoCobro.objects.filter(
+                cobro__turno=OuterRef('pk'),
+                cobro__estado=Cobro.ESTADO_CERRADO,
+                metodo=PagoCobro.METODO_EFECTIVO
+            ).values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+        )
+        subq_tra = Subquery(
+            PagoCobro.objects.filter(
+                cobro__turno=OuterRef('pk'),
+                cobro__estado=Cobro.ESTADO_CERRADO,
+                metodo=PagoCobro.METODO_TRANSFERENCIA
+            ).values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+        )
+        subq_deb = Subquery(
+            PagoCobro.objects.filter(
+                cobro__turno=OuterRef('pk'),
+                cobro__estado=Cobro.ESTADO_CERRADO,
+                metodo=PagoCobro.METODO_DEBITO
+            ).values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+        )
+        subq_cre = Subquery(
+            PagoCobro.objects.filter(
+                cobro__turno=OuterRef('pk'),
+                cobro__estado=Cobro.ESTADO_CERRADO,
+                metodo=PagoCobro.METODO_CREDITO
+            ).values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+        )
+        subq_qr = Subquery(
+            PagoCobro.objects.filter(
+                cobro__turno=OuterRef('pk'),
+                cobro__estado=Cobro.ESTADO_CERRADO,
+                metodo=PagoCobro.METODO_QR
+            ).values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+        )
+
+        subq_pf = Subquery(
+            ItemCobro.objects.filter(
+                cobro__turno=OuterRef('pk'),
+                cobro__estado=Cobro.ESTADO_CERRADO,
+                canal=ItemCobro.CANAL_PAGOFACIL
+            ).values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
+        )
+        subq_rp = Subquery(
+            ItemCobro.objects.filter(
+                cobro__turno=OuterRef('pk'),
+                cobro__estado=Cobro.ESTADO_CERRADO,
+                canal=ItemCobro.CANAL_RAPIPAGO
+            ).values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
+        )
+        subq_otro = Subquery(
+            ItemCobro.objects.filter(
+                cobro__turno=OuterRef('pk'),
+                cobro__estado=Cobro.ESTADO_CERRADO,
+                canal=ItemCobro.CANAL_OTRO
+            ).values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
+        )
+
+        qs = qs.annotate(
+            total_efe=Coalesce(subq_efe, Value(0, output_field=DecimalField())),
+            total_tra=Coalesce(subq_tra, Value(0, output_field=DecimalField())),
+            total_deb=Coalesce(subq_deb, Value(0, output_field=DecimalField())),
+            total_cre=Coalesce(subq_cre, Value(0, output_field=DecimalField())),
+            total_qr=Coalesce(subq_qr, Value(0, output_field=DecimalField())),
+            total_pf=Coalesce(subq_pf, Value(0, output_field=DecimalField())),
+            total_rp=Coalesce(subq_rp, Value(0, output_field=DecimalField())),
+            total_otro=Coalesce(subq_otro, Value(0, output_field=DecimalField())),
+        )
+
+        # Filtrar por métodos: si se seleccionaron, el turno debe tener algún monto > 0 en esos métodos
+        if metodos:
+            q_metodos = Q()
+            for met in metodos:
+                if met == PagoCobro.METODO_EFECTIVO:
+                    q_metodos |= Q(total_efe__gt=0)
+                elif met == PagoCobro.METODO_TRANSFERENCIA:
+                    q_metodos |= Q(total_tra__gt=0)
+                elif met == PagoCobro.METODO_DEBITO:
+                    q_metodos |= Q(total_deb__gt=0)
+                elif met == PagoCobro.METODO_CREDITO:
+                    q_metodos |= Q(total_cre__gt=0)
+                elif met == PagoCobro.METODO_QR:
+                    q_metodos |= Q(total_qr__gt=0)
+            qs = qs.filter(q_metodos)
+
+        # Filtrar por canales
+        if canales:
+            q_canales = Q()
+            for can in canales:
+                if can == ItemCobro.CANAL_PAGOFACIL:
+                    q_canales |= Q(total_pf__gt=0)
+                elif can == ItemCobro.CANAL_RAPIPAGO:
+                    q_canales |= Q(total_rp__gt=0)
+                elif can == ItemCobro.CANAL_OTRO:
+                    q_canales |= Q(total_otro__gt=0)
+            qs = qs.filter(q_canales)
+
+        # Ordenamiento
+        if order_by in ('numero', 'fecha_apertura', 'fecha_cierre', 'estado', 'monto_inicial', 'total_general'):
+            qs = qs.order_by(order_by)
+        else:
+            qs = qs.order_by('-fecha_apertura')
+
+        # Limitar a últimos 500 para performance
+        turnos = qs[:500]
+
+        return render(request, 'cobranzas/historial_turnos.html', {
+            'turnos': turnos,
+            'desde':  desde,
+            'hasta':  hasta,
+            'estado': estado,
+            'metodos_seleccionados': metodos,
+            'canales_seleccionados': canales,
+            'diferencia': diferencia,
+            'tiene_cierre': tiene_cierre,
+            'order_by': order_by,
+        })
+
+
+# ─────────────────────────────────────────────────────────────
+# EXPORTAR TURNOS A CSV
+# ─────────────────────────────────────────────────────────────
+
+def export_turnos_csv(request):
+    """Exportar los turnos filtrados a CSV (mismos filtros que HistorialTurnosView)"""
+    if not request.user.is_authenticated:
+        return HttpResponse("No autorizado", status=401)
+
+    desde = request.GET.get('desde', '').strip()
+    hasta = request.GET.get('hasta', '').strip()
+    estado = request.GET.get('estado', '')
+    metodos_raw = request.GET.getlist('metodos') or request.GET.get('metodos', '').split(',')
+    metodos = [m for m in metodos_raw if m]
+    canales_raw = request.GET.getlist('canales') or request.GET.get('canales', '').split(',')
+    canales = [c for c in canales_raw if c]
+    diferencia = request.GET.get('diferencia', '')
+    tiene_cierre = request.GET.get('tiene_cierre', '')
+
+    qs = Turno.objects.select_related('cajero', 'cierre_diario')
+
+    if desde:
+        qs = qs.filter(fecha_apertura__date__gte=desde)
+    if hasta:
+        qs = qs.filter(fecha_apertura__date__lte=hasta)
+    if estado:
+        qs = qs.filter(estado=estado)
+    if tiene_cierre == 'si':
+        qs = qs.filter(cierre_diario__isnull=False)
+    elif tiene_cierre == 'no':
+        qs = qs.filter(cierre_diario__isnull=True)
+    if diferencia:
+        qs = qs.filter(tipo_diferencia=diferencia)
+
+    # Subconsultas
+    subq_efe = Subquery(
+        PagoCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, metodo=PagoCobro.METODO_EFECTIVO)
+        .values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+    )
+    subq_tra = Subquery(
+        PagoCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, metodo=PagoCobro.METODO_TRANSFERENCIA)
+        .values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+    )
+    subq_deb = Subquery(
+        PagoCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, metodo=PagoCobro.METODO_DEBITO)
+        .values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+    )
+    subq_cre = Subquery(
+        PagoCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, metodo=PagoCobro.METODO_CREDITO)
+        .values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+    )
+    subq_qr = Subquery(
+        PagoCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, metodo=PagoCobro.METODO_QR)
+        .values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
+    )
+    subq_pf = Subquery(
+        ItemCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, canal=ItemCobro.CANAL_PAGOFACIL)
+        .values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
+    )
+    subq_rp = Subquery(
+        ItemCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, canal=ItemCobro.CANAL_RAPIPAGO)
+        .values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
+    )
+    subq_otro = Subquery(
+        ItemCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, canal=ItemCobro.CANAL_OTRO)
+        .values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
+    )
+
+    qs = qs.annotate(
+        total_efe=Coalesce(subq_efe, Value(0, output_field=DecimalField())),
+        total_tra=Coalesce(subq_tra, Value(0, output_field=DecimalField())),
+        total_deb=Coalesce(subq_deb, Value(0, output_field=DecimalField())),
+        total_cre=Coalesce(subq_cre, Value(0, output_field=DecimalField())),
+        total_qr=Coalesce(subq_qr, Value(0, output_field=DecimalField())),
+        total_pf=Coalesce(subq_pf, Value(0, output_field=DecimalField())),
+        total_rp=Coalesce(subq_rp, Value(0, output_field=DecimalField())),
+        total_otro=Coalesce(subq_otro, Value(0, output_field=DecimalField())),
+    )
+
+    if metodos:
+        q_metodos = Q()
+        for met in metodos:
+            if met == PagoCobro.METODO_EFECTIVO:
+                q_metodos |= Q(total_efe__gt=0)
+            elif met == PagoCobro.METODO_TRANSFERENCIA:
+                q_metodos |= Q(total_tra__gt=0)
+            elif met == PagoCobro.METODO_DEBITO:
+                q_metodos |= Q(total_deb__gt=0)
+            elif met == PagoCobro.METODO_CREDITO:
+                q_metodos |= Q(total_cre__gt=0)
+            elif met == PagoCobro.METODO_QR:
+                q_metodos |= Q(total_qr__gt=0)
+        qs = qs.filter(q_metodos)
+
+    if canales:
+        q_canales = Q()
+        for can in canales:
+            if can == ItemCobro.CANAL_PAGOFACIL:
+                q_canales |= Q(total_pf__gt=0)
+            elif can == ItemCobro.CANAL_RAPIPAGO:
+                q_canales |= Q(total_rp__gt=0)
+            elif can == ItemCobro.CANAL_OTRO:
+                q_canales |= Q(total_otro__gt=0)
+        qs = qs.filter(q_canales)
+
+    qs = qs.order_by('fecha_apertura')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="turnos_export.csv"'
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow([
+        'Número', 'Cajero', 'Fecha apertura', 'Fecha cierre', 'Estado',
+        'Fondo inicial', 'Total efectivo', 'Total transferencia', 'Total débito',
+        'Total crédito', 'Total QR', 'Total retiros', 'Total general',
+        'Total PagoFácil', 'Total Rapipago', 'Total Otro canal',
+        'Efectivo declarado', 'Diferencia', 'Cierre diario ID'
+    ])
+
+    for t in qs:
+        writer.writerow([
+            t.numero,
+            str(t.cajero),
+            t.fecha_apertura.strftime('%Y-%m-%d %H:%M:%S'),
+            t.fecha_cierre.strftime('%Y-%m-%d %H:%M:%S') if t.fecha_cierre else '',
+            t.get_estado_display(),
+            float(t.monto_inicial),
+            float(getattr(t, 'total_efe', 0)),
+            float(getattr(t, 'total_tra', 0)),
+            float(getattr(t, 'total_deb', 0)),
+            float(getattr(t, 'total_cre', 0)),
+            float(getattr(t, 'total_qr', 0)),
+            float(t.total_retiros()),
+            float(t.total_general()),
+            float(getattr(t, 'total_pf', 0)),
+            float(getattr(t, 'total_rp', 0)),
+            float(getattr(t, 'total_otro', 0)),
+            float(t.efectivo_declarado or 0),
+            float(t.diferencia or 0),
+            t.cierre_diario_id or '',
+        ])
+
+    return response
 
 
 # ─────────────────────────────────────────────────────────────
@@ -542,24 +832,6 @@ class TurnosPendientesAjax(LoginRequiredMixin, View):
         hasta_str  = agg['hasta'].date().isoformat()  if agg['hasta']  else None
         return JsonResponse({'count': count, 'desde': desde_str, 'hasta': hasta_str})
 
-class HistorialTurnosView(LoginRequiredMixin, View):
-    def get(self, request):
-        desde = request.GET.get('desde', '').strip()
-        hasta = request.GET.get('hasta', '').strip()
-
-        qs = Turno.objects.select_related('cajero', 'cierre_diario').all()
-
-        if desde:
-            qs = qs.filter(fecha_apertura__date__gte=desde)
-        if hasta:
-            qs = qs.filter(fecha_apertura__date__lte=hasta)
-
-        return render(request, 'cobranzas/historial_turnos.html', {
-            'turnos': qs[:200],
-            'desde':  desde,
-            'hasta':  hasta,
-        })
-
 
 # ─────────────────────────────────────────────────────────────
 # HISTORIAL DE CIERRES DIARIOS
@@ -569,6 +841,9 @@ class HistorialCierresDiariosView(LoginRequiredMixin, View):
     def get(self, request):
         desde = request.GET.get('desde', '').strip()
         hasta = request.GET.get('hasta', '').strip()
+        diferencia = request.GET.get('diferencia', '')
+        metodos_raw = request.GET.getlist('metodos') or request.GET.get('metodos', '').split(',')
+        metodos = [m for m in metodos_raw if m]
 
         qs = CierreDiario.objects.select_related('realizado_por').all()
 
@@ -577,19 +852,46 @@ class HistorialCierresDiariosView(LoginRequiredMixin, View):
         if hasta:
             qs = qs.filter(fecha__date__lte=hasta)
 
+        # Filtro por diferencia
+        if diferencia == 'sobrante':
+            qs = qs.filter(diferencia_caja__gt=0)
+        elif diferencia == 'faltante':
+            qs = qs.filter(diferencia_caja__lt=0)
+        elif diferencia == 'sin_diferencia':
+            qs = qs.filter(diferencia_caja=0)
+
+        # Filtro por métodos de pago: mostrar cierres que tengan al menos un monto >0 en los métodos seleccionados
+        if metodos:
+            q_metodos = Q()
+            for met in metodos:
+                if met == PagoCobro.METODO_EFECTIVO:
+                    q_metodos |= Q(total_efectivo__gt=0)
+                elif met == PagoCobro.METODO_TRANSFERENCIA:
+                    q_metodos |= Q(total_transferencia__gt=0)
+                elif met == PagoCobro.METODO_DEBITO:
+                    q_metodos |= Q(total_debito__gt=0)
+                elif met == PagoCobro.METODO_CREDITO:
+                    q_metodos |= Q(total_credito__gt=0)
+                elif met == PagoCobro.METODO_QR:
+                    q_metodos |= Q(total_qr__gt=0)
+            qs = qs.filter(q_metodos)
+
+        qs = qs.order_by('-fecha')
+
         return render(request, 'cobranzas/historial_cierres.html', {
             'cierres': qs[:200],
-            'desde':   desde,
-            'hasta':   hasta,
+            'desde': desde,
+            'hasta': hasta,
+            'diferencia': diferencia,
+            'metodos_seleccionados': metodos,
         })
-    
+
 
 # ─────────────────────────────────────────────────────────────
-# AJAX: eliminar turnos (solo staff/superuser — modo desarrollo)
+# AJAX: eliminar turnos (solo staff/superuser)
 # ─────────────────────────────────────────────────────────────
 
 class EliminarTurnosAjax(LoginRequiredMixin, View):
-    """Elimina uno o varios turnos por ID. Solo staff/superuser."""
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
             return JsonResponse({'error': 'Solo administradores pueden eliminar turnos.'}, status=403)
@@ -597,7 +899,7 @@ class EliminarTurnosAjax(LoginRequiredMixin, View):
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'JSON inválido'}, status=400)
- 
+
         ids = data.get('ids', [])
         if not ids:
             return JsonResponse({'error': 'No se recibieron IDs.'}, status=400)
@@ -605,22 +907,15 @@ class EliminarTurnosAjax(LoginRequiredMixin, View):
             ids = [int(i) for i in ids]
         except (ValueError, TypeError):
             return JsonResponse({'error': 'IDs inválidos.'}, status=400)
- 
+
         with transaction.atomic():
-            # Cobro.turno tiene on_delete=PROTECT — hay que borrar los cobros
-            # (y sus items/pagos en cascada) antes de poder borrar el turno.
             Cobro.objects.filter(turno_id__in=ids).delete()
             eliminados, _ = Turno.objects.filter(pk__in=ids).delete()
 
         return JsonResponse({'success': True, 'eliminados': eliminados})
- 
- 
+
+
 class EliminarCierresAjax(LoginRequiredMixin, View):
-    """
-    Elimina uno o varios CierreDiario por ID. Solo staff/superuser.
-    Antes de borrar el cierre, desvincula los turnos asociados
-    (cierre_diario = None) para que no queden en estado inconsistente.
-    """
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
             return JsonResponse({'error': 'Solo administradores pueden eliminar cierres.'}, status=403)
@@ -628,7 +923,7 @@ class EliminarCierresAjax(LoginRequiredMixin, View):
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'JSON inválido'}, status=400)
- 
+
         ids = data.get('ids', [])
         if not ids:
             return JsonResponse({'error': 'No se recibieron IDs.'}, status=400)
@@ -636,10 +931,9 @@ class EliminarCierresAjax(LoginRequiredMixin, View):
             ids = [int(i) for i in ids]
         except (ValueError, TypeError):
             return JsonResponse({'error': 'IDs inválidos.'}, status=400)
- 
+
         with transaction.atomic():
-            # Desvincular turnos antes de borrar el cierre
             Turno.objects.filter(cierre_diario_id__in=ids).update(cierre_diario=None)
             eliminados, _ = CierreDiario.objects.filter(pk__in=ids).delete()
- 
+
         return JsonResponse({'success': True, 'eliminados': eliminados})

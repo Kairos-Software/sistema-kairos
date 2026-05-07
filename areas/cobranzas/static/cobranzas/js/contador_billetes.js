@@ -7,6 +7,8 @@
 (function () {
     'use strict';
 
+    const STORAGE_KEY = 'cbp_estado'; // { abierto, minimizado }
+
     const BILLETES = [
         { valor: 20000, label: '$20.000' },
         { valor: 10000, label: '$10.000' },
@@ -21,6 +23,21 @@
         { valor:    10, label: '$10'     },
     ];
 
+    // ── Persistencia ──────────────────────────────────────────
+    function leerEstado() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        } catch { return {}; }
+    }
+
+    function guardarEstado(cambios) {
+        try {
+            const actual = leerEstado();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...actual, ...cambios }));
+        } catch { /* localStorage no disponible */ }
+    }
+
+    // ── Helpers de formato ────────────────────────────────────
     function formatearPesos(n) {
         return '$ ' + n.toLocaleString('es-AR', {
             minimumFractionDigits: 2,
@@ -28,6 +45,7 @@
         });
     }
 
+    // ── Construcción del panel ────────────────────────────────
     function construirPanel() {
         const panel = document.createElement('div');
         panel.id = 'contadorBilletesPanel';
@@ -91,12 +109,15 @@
         return panel;
     }
 
+    // ── Estado local (en memoria, sincronizado con localStorage) ──
     let minimizado = false;
 
+    // ── Minimizar / Expandir ──────────────────────────────────
     function minimizar() {
         minimizado = true;
         document.getElementById('contadorBilletesPanel').classList.add('minimizado');
         sincronizarMiniTotal();
+        guardarEstado({ minimizado: true });
     }
 
     function expandir() {
@@ -105,8 +126,10 @@
         panel.classList.remove('minimizado');
         const primero = panel.querySelector('.cbp-cantidad');
         if (primero) primero.focus();
+        guardarEstado({ minimizado: false });
     }
 
+    // ── Total ─────────────────────────────────────────────────
     function sincronizarMiniTotal() {
         const totalEl = document.getElementById('cbpTotal');
         const miniEl  = document.getElementById('cbpMiniTotal');
@@ -146,6 +169,7 @@
         actualizarTotal();
     }
 
+    // ── Abrir / Cerrar ────────────────────────────────────────
     function abrirContador() {
         const panel = document.getElementById('contadorBilletesPanel');
         if (!panel) return;
@@ -154,11 +178,13 @@
             const primero = panel.querySelector('.cbp-cantidad');
             if (primero) primero.focus();
         }
+        guardarEstado({ abierto: true });
     }
 
     function cerrarContador() {
         const panel = document.getElementById('contadorBilletesPanel');
         if (panel) panel.classList.remove('abierto');
+        guardarEstado({ abierto: false });
     }
 
     function toggleContador() {
@@ -167,6 +193,23 @@
         panel.classList.contains('abierto') ? cerrarContador() : abrirContador();
     }
 
+    // ── Restaurar estado al cargar la página ──────────────────
+    function restaurarEstado() {
+        const estado = leerEstado();
+        if (estado.minimizado) {
+            minimizado = true;
+            document.getElementById('contadorBilletesPanel').classList.add('minimizado');
+        }
+        if (estado.abierto) {
+            // Pequeño delay para que el panel esté en el DOM y con CSS listo
+            requestAnimationFrame(() => {
+                document.getElementById('contadorBilletesPanel').classList.add('abierto');
+                sincronizarMiniTotal();
+            });
+        }
+    }
+
+    // ── Drag ─────────────────────────────────────────────────
     function habilitarDrag(panel) {
         const header  = panel.querySelector('#cbpHeader');
         const miniBar = panel.querySelector('#cbpMinimizadoBar');
@@ -197,6 +240,7 @@
         });
     }
 
+    // ── Init ─────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
         if (!document.querySelector('.cobranzas-layout')) return;
 
@@ -231,6 +275,9 @@
             e.preventDefault();
             toggleContador();
         });
+
+        // Restaurar estado guardado de la navegación anterior
+        restaurarEstado();
     });
 
 })();

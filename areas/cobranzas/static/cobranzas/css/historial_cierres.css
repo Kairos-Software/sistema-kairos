@@ -1,0 +1,289 @@
+/* ============================================================
+   historial_cierres.css
+   Estilos específicos para la página de Historial de Cierres
+   ============================================================ */
+
+.filtros-avanzados {
+    background: #fff;
+    border-radius: 14px;
+    padding: 1.2rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e8e8ee;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.grupo-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+    align-items: flex-end;
+}
+
+.grupo-filtros label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #777;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.filtro-input {
+    border: 1.5px solid #e8e8ee;
+    border-radius: 8px;
+    padding: 0.48rem 0.7rem;
+    font-size: 0.86rem;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    background: #fafafa;
+    color: #111;
+    outline: none;
+    min-width: 140px;
+}
+
+.filtro-input:focus {
+    border-color: rgba(232,92,13,0.5);
+    box-shadow: 0 0 0 3px rgba(232,92,13,0.1);
+    background: #fff;
+}
+
+.filtro-check-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    background: #fafafa;
+    padding: 0.5rem 1rem;
+    border-radius: 30px;
+    border: 1px solid #e8e8ee;
+}
+
+.filtro-check-group label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    text-transform: none;
+    font-size: 0.82rem;
+    color: #333;
+    margin-bottom: 0;
+    cursor: pointer;
+    letter-spacing: normal;
+}
+
+.filtro-check-group input[type="checkbox"] {
+    accent-color: #E85C0D;
+    width: 15px;
+    height: 15px;
+    margin: 0;
+}
+
+.botones-filtros {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.btn-filtrar-avanzado {
+    background: #E85C0D;
+    border: none;
+    color: white;
+    padding: 0.5rem 1.3rem;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-filtrar-avanzado:hover {
+    background: #c44a0a;
+    transform: translateY(-1px);
+}
+
+.btn-limpiar {
+    background: #e9ecef;
+    color: #2d3748;
+    border: none;
+    padding: 0.5rem 1.3rem;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.btn-limpiar:hover {
+    background: #dee2e6;
+}
+
+.tabla-scroll {
+    overflow-x: auto;
+    border-radius: 14px;
+    border: 1px solid #eef2f6;
+    background: #fff;
+}
+
+.tabla-base {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    min-width: 1200px;
+}
+
+.tabla-base th {
+    background: #f8fafc;
+    padding: 0.7rem 0.8rem;
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #4b5563;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.tabla-base td {
+    padding: 0.7rem 0.8rem;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.tabla-base tr:hover td {
+    background: #fef9f2;
+}
+
+.texto-sobrante {
+    color: #10b981;
+    font-weight: 700;
+}
+.texto-faltante {
+    color: #ef4444;
+    font-weight: 700;
+}
+.texto-ok {
+    color: #6366f1;
+    font-weight: 700;
+}
+.texto-adicionales strong {
+    color: #16a34a;
+}
+
+.btn-eliminar-fila {
+    background: none;
+    border: 1px solid #e2e8f0;
+    color: #94a3b8;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.btn-eliminar-fila:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #dc2626;
+}
+
+.btn-eliminar-registros {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.9rem;
+    background: rgba(220,38,38,0.07);
+    color: #dc2626;
+    border: 1.5px solid rgba(220,38,38,0.28);
+    border-radius: 30px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-eliminar-registros:hover {
+    background: #dc2626;
+    color: #fff;
+    border-color: #dc2626;
+}
+
+.btn-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 1rem;
+    background: #fff;
+    color: #555;
+    border: 1.5px solid #ddd;
+    border-radius: 30px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.btn-volver:hover {
+    border-color: #E85C0D;
+    color: #E85C0D;
+}
+
+.estado-vacio {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #bbb;
+    font-weight: 600;
+}
+
+.caja-modal .modal-body {
+    background: #fff;
+    border-radius: 14px;
+}
+.caja-modal-icono {
+    font-size: 2rem;
+    text-align: center;
+}
+.caja-modal-titulo {
+    text-align: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+.caja-error-msg {
+    padding: 0.5rem 0.8rem;
+    background: rgba(220,38,38,0.07);
+    border: 1px solid rgba(220,38,38,0.2);
+    border-radius: 8px;
+    color: #b91c1c;
+}
+.btn-caja-secundario {
+    background: #fff;
+    color: #555;
+    border: 1.5px solid #ddd;
+    padding: 0.52rem 1.1rem;
+    border-radius: 8px;
+    font-weight: 700;
+}
+.btn-confirmar-eliminar {
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    padding: 0.52rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .grupo-filtros {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .botones-filtros {
+        justify-content: flex-start;
+    }
+}

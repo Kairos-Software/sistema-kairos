@@ -6,6 +6,7 @@
 {% block extra_css %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}">
+<link rel="stylesheet" href="{% static 'cobranzas/css/historial_cobros.css' %}">
 <style>
 /* ── Modal edición ── */
 .edit-items-lista { display:flex; flex-direction:column; gap:.6rem; }
@@ -131,20 +132,70 @@
     </div>
 </div>
 
-{# ── FILTROS ── #}
-<form method="get" class="filtros-bar" id="formFiltros">
-    <div class="filtro-fecha-wrap">
-        <label class="filtro-fecha-label">Desde</label>
-        <input type="date" name="desde" value="{{ desde }}" class="filtro-fecha-input">
+{# ── RESUMEN (primero) ── #}
+{% if cobros %}
+<div class="hist-resumen-grid">
+    <div class="hist-resumen-card">
+        <span class="hist-resumen-label">Total cobros</span>
+        <strong class="hist-resumen-valor">{{ cobros|length }}</strong>
     </div>
-    <div class="filtro-fecha-wrap">
-        <label class="filtro-fecha-label">Hasta</label>
-        <input type="date" name="hasta" value="{{ hasta }}" class="filtro-fecha-input">
+    <div class="hist-resumen-card">
+        <span class="hist-resumen-label">Total facturas</span>
+        <strong class="hist-resumen-valor" id="resumenFacturas">—</strong>
     </div>
-    <button type="submit" class="btn-nuevo" style="padding:.42rem .9rem;">Filtrar</button>
-    {% if desde or hasta %}
-    <a href="{% url 'cobranzas:historial_cobros' %}" class="btn-limpiar">× Limpiar</a>
-    {% endif %}
+    <div class="hist-resumen-card hist-resumen-card-destacado">
+        <span class="hist-resumen-label">Total adicionales</span>
+        <strong class="hist-resumen-valor" id="resumenAdicionales">—</strong>
+    </div>
+    <div class="hist-resumen-card hist-resumen-card-total">
+        <span class="hist-resumen-label">Total general</span>
+        <strong class="hist-resumen-valor" id="resumenGeneral">—</strong>
+    </div>
+</div>
+{% endif %}
+
+{# ── FILTROS COMPACTOS ── #}
+<form method="get" class="filtros-compactos" id="formFiltros">
+    <div class="filtros-compactos-fila">
+        <input type="date" name="desde" value="{{ desde }}" class="filtro-input-mini" title="Desde">
+        <span class="filtro-sep">→</span>
+        <input type="date" name="hasta" value="{{ hasta }}" class="filtro-input-mini" title="Hasta">
+        <input type="text" name="usuario" value="{{ usuario }}" placeholder="Usuario"
+               class="filtro-input-mini" style="width:130px;">
+
+        {# toggle avanzado #}
+        <button type="button" class="btn-toggle-avanzado" id="btnToggleFiltros">
+            <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
+                <path d="M1 3h12M3 7h8M5 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Más filtros
+        </button>
+
+        <button type="submit" class="btn-filtrar-mini">Filtrar</button>
+        <a href="{% url 'cobranzas:historial_cobros' %}" class="btn-limpiar-mini">Limpiar</a>
+    </div>
+
+    {# panel avanzado colapsable #}
+    <div class="filtros-avanzados-panel" id="filtrosAvanzadosPanel" style="display:none;">
+        <div class="filtro-grupo-inline">
+            <span class="filtro-grupo-titulo">Métodos</span>
+            <div class="filtro-check-group">
+                <label><input type="checkbox" name="metodos" value="efectivo" {% if 'efectivo' in metodos_seleccionados %}checked{% endif %}> Efectivo</label>
+                <label><input type="checkbox" name="metodos" value="transferencia" {% if 'transferencia' in metodos_seleccionados %}checked{% endif %}> Transferencia</label>
+                <label><input type="checkbox" name="metodos" value="debito" {% if 'debito' in metodos_seleccionados %}checked{% endif %}> Débito</label>
+                <label><input type="checkbox" name="metodos" value="credito" {% if 'credito' in metodos_seleccionados %}checked{% endif %}> Crédito</label>
+                <label><input type="checkbox" name="metodos" value="qr" {% if 'qr' in metodos_seleccionados %}checked{% endif %}> QR</label>
+            </div>
+        </div>
+        <div class="filtro-grupo-inline">
+            <span class="filtro-grupo-titulo">Canales</span>
+            <div class="filtro-check-group">
+                <label><input type="checkbox" name="canales" value="pagofacil" {% if 'pagofacil' in canales_seleccionados %}checked{% endif %}> PagoFácil</label>
+                <label><input type="checkbox" name="canales" value="rapipago" {% if 'rapipago' in canales_seleccionados %}checked{% endif %}> Rapipago</label>
+                <label><input type="checkbox" name="canales" value="otro" {% if 'otro' in canales_seleccionados %}checked{% endif %}> Otro</label>
+            </div>
+        </div>
+    </div>
 </form>
 
 {% if cobros %}
@@ -164,26 +215,6 @@
     </button>
 </div>
 {% endif %}
-
-{# ── RESUMEN ── #}
-<div class="hist-resumen-grid">
-    <div class="hist-resumen-card">
-        <span class="hist-resumen-label">Total cobros</span>
-        <strong class="hist-resumen-valor">{{ cobros|length }}</strong>
-    </div>
-    <div class="hist-resumen-card">
-        <span class="hist-resumen-label">Total facturas</span>
-        <strong class="hist-resumen-valor" id="resumenFacturas">—</strong>
-    </div>
-    <div class="hist-resumen-card hist-resumen-card-destacado">
-        <span class="hist-resumen-label">Total adicionales</span>
-        <strong class="hist-resumen-valor" id="resumenAdicionales">—</strong>
-    </div>
-    <div class="hist-resumen-card hist-resumen-card-total">
-        <span class="hist-resumen-label">Total general</span>
-        <strong class="hist-resumen-valor" id="resumenGeneral">—</strong>
-    </div>
-</div>
 
 {# ── TABLA ── #}
 <div class="table-card">
@@ -567,6 +598,22 @@ async function postJSON(url, body) {
 const el = id => document.getElementById(id);
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    // ── Toggle filtros avanzados ─────────────────────────────
+    const btnToggle = el('btnToggleFiltros');
+    const panelAv   = el('filtrosAvanzadosPanel');
+    if (btnToggle && panelAv) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('metodos') || params.has('canales')) {
+            panelAv.style.display = '';
+            btnToggle.classList.add('activo');
+        }
+        btnToggle.addEventListener('click', () => {
+            const open = panelAv.style.display !== 'none';
+            panelAv.style.display = open ? 'none' : '';
+            btnToggle.classList.toggle('activo', !open);
+        });
+    }
 
     // ── Resumen totales ──────────────────────────────────────
     let sumBoletas = 0, sumAdicionales = 0, sumGeneral = 0;

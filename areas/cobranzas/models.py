@@ -359,3 +359,39 @@ class DepositoBancario(models.Model):
             f"Depósito {self.get_entidad_display()} "
             f"${self.monto} — {self.fecha:%d/%m/%Y}"
         )
+    
+
+class RecaudacionDiaria(models.Model):
+    ENTIDAD_PAGOFACIL = 'pagofacil'
+    ENTIDAD_RAPIPAGO  = 'rapipago'
+    ENTIDADES = [
+        (ENTIDAD_PAGOFACIL, 'PagoFácil'),
+        (ENTIDAD_RAPIPAGO,  'RapiPago'),
+    ]
+ 
+    entidad        = models.CharField(max_length=20, choices=ENTIDADES)
+    fecha          = models.DateField(help_text="Fecha de la recaudación")
+    monto          = models.DecimalField(
+                         max_digits=12, decimal_places=2,
+                         help_text="Monto recaudado en el día")
+    observaciones  = models.TextField(blank=True)
+    registrado_por = models.ForeignKey(
+                         'core.Usuario', on_delete=models.SET_NULL,
+                         null=True, related_name='recaudaciones_registradas')
+    fecha_registro = models.DateTimeField(
+                         auto_now_add=True,
+                         help_text="Momento en que se cargó en el sistema")
+ 
+    class Meta:
+        ordering = ['-fecha', '-fecha_registro']
+        # Un registro por entidad por día (se puede modificar o eliminar si se
+        # quiere permitir múltiples registros por día — ver nota en views_recaudaciones.py)
+        unique_together = [('entidad', 'fecha')]
+        verbose_name        = 'Recaudación diaria'
+        verbose_name_plural = 'Recaudaciones diarias'
+ 
+    def __str__(self):
+        return (
+            f"Recaudación {self.get_entidad_display()} "
+            f"${self.monto} — {self.fecha:%d/%m/%Y}"
+        )

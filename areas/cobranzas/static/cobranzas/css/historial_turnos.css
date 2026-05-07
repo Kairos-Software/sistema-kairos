@@ -1,0 +1,494 @@
+/* ============================================================
+   historial_turnos.css
+   Estilos específicos para la página de Historial de Turnos
+   ============================================================ */
+
+/* ─── Filtros avanzados ───────────────────────────────────── */
+.filtros-avanzados {
+    background: #fff;
+    border-radius: 14px;
+    padding: 1.2rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e8e8ee;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.grupo-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+    align-items: flex-end;
+}
+
+.grupo-filtros label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #777;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.filtro-input {
+    border: 1.5px solid #e8e8ee;
+    border-radius: 8px;
+    padding: 0.48rem 0.7rem;
+    font-size: 0.86rem;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    background: #fafafa;
+    color: #111;
+    outline: none;
+    transition: all 0.15s;
+    min-width: 140px;
+}
+
+.filtro-input:focus {
+    border-color: rgba(232,92,13,0.5);
+    box-shadow: 0 0 0 3px rgba(232,92,13,0.1);
+    background: #fff;
+}
+
+/* Grupos de checkboxes (métodos / canales) */
+.filtro-check-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    background: #fafafa;
+    padding: 0.5rem 1rem;
+    border-radius: 30px;
+    border: 1px solid #e8e8ee;
+}
+
+.filtro-check-group label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    text-transform: none;
+    font-size: 0.82rem;
+    color: #333;
+    margin-bottom: 0;
+    cursor: pointer;
+    letter-spacing: normal;
+}
+
+.filtro-check-group input[type="checkbox"] {
+    accent-color: #E85C0D;
+    width: 15px;
+    height: 15px;
+    margin: 0;
+}
+
+.botones-filtros {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.btn-filtrar-avanzado {
+    background: #E85C0D;
+    border: none;
+    color: white;
+    padding: 0.5rem 1.3rem;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.btn-filtrar-avanzado:hover {
+    background: #c44a0a;
+    transform: translateY(-1px);
+}
+
+.btn-limpiar {
+    background: #e9ecef;
+    color: #2d3748;
+    border: none;
+    padding: 0.5rem 1.3rem;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 0.15s;
+}
+
+.btn-limpiar:hover {
+    background: #dee2e6;
+}
+
+/* ─── Botón de exportar CSV ──────────────────────────────── */
+.export-csv-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 1rem;
+    background: #2c7a41;
+    color: #fff;
+    border: none;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-decoration: none;
+    margin-right: 0.5rem;
+}
+
+.export-csv-btn:hover {
+    background: #1f5a31;
+}
+
+/* ─── Tabla más legible ───────────────────────────────────── */
+.tabla-scroll {
+    overflow-x: auto;
+    border-radius: 14px;
+    border: 1px solid #eef2f6;
+    background: #fff;
+}
+
+.tabla-base {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    min-width: 1100px;
+}
+
+.tabla-base th {
+    background: #f8fafc;
+    padding: 0.7rem 0.8rem;
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #4b5563;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.tabla-base td {
+    padding: 0.7rem 0.8rem;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.tabla-base tr:hover td {
+    background: #fef9f2;
+}
+
+/* ─── Resaltado de diferencias ───────────────────────────── */
+.texto-sobrante {
+    color: #10b981;
+    font-weight: 700;
+}
+.texto-faltante {
+    color: #ef4444;
+    font-weight: 700;
+}
+.texto-ok {
+    color: #6366f1;
+    font-weight: 700;
+}
+.texto-pendiente {
+    color: #d97706;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ─── Badge de estado del turno ──────────────────────────── */
+.badge-estado {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 30px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+.badge-abierto {
+    background: #e0f2fe;
+    color: #0284c7;
+}
+.badge-cerrado {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+/* ─── Link de cierre diario ──────────────────────────────── */
+.badge-cierre-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    background: #eef2ff;
+    color: #4f46e5;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+.badge-cierre-link:hover {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+
+/* ─── Botón eliminar fila (dentro de la tabla) ───────────── */
+.btn-eliminar-fila {
+    background: none;
+    border: 1px solid #e2e8f0;
+    color: #94a3b8;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-eliminar-fila:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #dc2626;
+}
+
+/* ─── Botón reabrir turno ────────────────────────────────── */
+.btn-reabrir-turno {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #c2410c;
+    padding: 0.25rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-reabrir-turno:hover {
+    background: #ffedd5;
+    border-color: #fdba74;
+}
+.btn-reabrir-turno.btn-reabrir-bloqueado {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #64748b;
+}
+
+/* ─── Botón eliminar seleccionados (header) ───────────────── */
+.btn-eliminar-registros {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.9rem;
+    background: rgba(220,38,38,0.07);
+    color: #dc2626;
+    border: 1.5px solid rgba(220,38,38,0.28);
+    border-radius: 30px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-eliminar-registros:hover {
+    background: #dc2626;
+    color: #fff;
+    border-color: #dc2626;
+    box-shadow: 0 3px 10px rgba(220,38,38,0.25);
+}
+
+/* ─── Modal de reapertura y eliminación ───────────────────── */
+.caja-modal .modal-body {
+    background: #fff;
+    border-radius: 14px;
+}
+.caja-modal-icono {
+    font-size: 2rem;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+.caja-modal-titulo {
+    text-align: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 1rem;
+    color: #111;
+}
+.caja-modal-fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.38rem 0;
+    border-bottom: 1px solid #f5f5f8;
+    font-size: 0.87rem;
+    color: #555;
+}
+.caja-modal-fila span {
+    color: #888;
+}
+.caja-modal-fila strong {
+    color: #111;
+}
+.caja-error-msg {
+    padding: 0.5rem 0.8rem;
+    background: rgba(220,38,38,0.07);
+    border: 1px solid rgba(220,38,38,0.2);
+    border-radius: 8px;
+    color: #b91c1c;
+    font-size: 0.83rem;
+    font-weight: 600;
+}
+.btn-caja-secundario {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.52rem 1.1rem;
+    background: #fff;
+    color: #555;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-caja-secundario:hover {
+    background: #f5f5f8;
+    border-color: #bbb;
+}
+.btn-caja-advertencia {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.2rem;
+    background: #d97706;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-caja-advertencia:hover {
+    background: #b45309;
+}
+.btn-confirmar-eliminar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.52rem 1.2rem;
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-confirmar-eliminar:hover {
+    background: #b91c1c;
+}
+
+/* Mensajes de aviso en el modal de reapertura */
+.reabrir-aviso {
+    margin: 0.9rem 0 0;
+    padding: 0.7rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.83rem;
+    line-height: 1.5;
+}
+.reabrir-aviso-ok {
+    background: rgba(22,163,74,0.07);
+    border: 1px solid rgba(22,163,74,0.2);
+    color: #15803d;
+}
+.reabrir-aviso-warn {
+    background: rgba(217,119,6,0.07);
+    border: 1px solid rgba(217,119,6,0.25);
+    color: #92400e;
+}
+.reabrir-aviso-bloqueado {
+    background: rgba(100,116,139,0.07);
+    border: 1px solid rgba(100,116,139,0.2);
+    color: #475569;
+}
+.reabrir-alerta {
+    padding: 0.55rem 0.8rem;
+    background: rgba(220,38,38,0.07);
+    border: 1px solid rgba(220,38,38,0.2);
+    border-radius: 8px;
+    color: #b91c1c;
+    font-size: 0.83rem;
+    margin-bottom: 0.5rem;
+}
+
+/* ─── Estado vacío (sin resultados) ───────────────────────── */
+.estado-vacio {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #bbb;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* ─── Botón volver (header) ──────────────────────────────── */
+.btn-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 1rem;
+    background: #fff;
+    color: #555;
+    border: 1.5px solid #ddd;
+    border-radius: 30px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.15s;
+}
+.btn-volver:hover {
+    border-color: #E85C0D;
+    color: #E85C0D;
+    background: rgba(232,92,13,0.04);
+}
+
+/* ─── Ajustes responsive ─────────────────────────────────── */
+@media (max-width: 768px) {
+    .grupo-filtros {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filtro-check-group {
+        flex-wrap: wrap;
+    }
+    .botones-filtros {
+        justify-content: flex-start;
+    }
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    .page-header-actions {
+        align-self: flex-start;
+    }
+}

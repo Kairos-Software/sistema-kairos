@@ -288,7 +288,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── CIERRE DIARIO ─────────────────────────────────────────
     function setTodayDates() {
-        const hoy = new Date().toISOString().slice(0, 10);
+        const now = new Date();
+        const hoy = now.getFullYear() + '-'
+            + String(now.getMonth() + 1).padStart(2, '0') + '-'
+            + String(now.getDate()).padStart(2, '0');
         document.getElementById('cierreDesde').value = hoy;
         document.getElementById('cierreHasta').value = hoy;
     }

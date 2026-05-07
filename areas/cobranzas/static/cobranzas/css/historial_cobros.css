@@ -1,0 +1,630 @@
+/* ============================================================
+   historial_cobros.css
+   Estilos específicos para la página de Historial de Cobros
+   ============================================================ */
+
+/* ─── Filtros compactos (barra única) ────────────────────── */
+.filtros-compactos {
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.5rem 0.8rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e8e8ee;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.filtros-compactos-fila {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.filtro-sep {
+    color: #bbb;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.filtro-input-mini {
+    border: 1.5px solid #e8e8ee;
+    border-radius: 7px;
+    padding: 0.32rem 0.55rem;
+    font-size: 0.82rem;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    background: #fafafa;
+    color: #111;
+    outline: none;
+    transition: all 0.15s;
+    height: 32px;
+}
+
+.filtro-input-mini:focus {
+    border-color: rgba(232,92,13,0.5);
+    box-shadow: 0 0 0 3px rgba(232,92,13,0.1);
+    background: #fff;
+}
+
+.btn-toggle-avanzado {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    background: #f1f5f9;
+    border: 1.5px solid #e2e8f0;
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+    height: 32px;
+}
+.btn-toggle-avanzado:hover,
+.btn-toggle-avanzado.activo {
+    background: rgba(232,92,13,0.08);
+    border-color: rgba(232,92,13,0.35);
+    color: #E85C0D;
+}
+
+.btn-filtrar-mini {
+    background: #E85C0D;
+    border: none;
+    color: white;
+    padding: 0.3rem 1rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    height: 32px;
+    transition: background 0.15s;
+}
+.btn-filtrar-mini:hover { background: #c44a0a; }
+
+.btn-limpiar-mini {
+    background: #e9ecef;
+    color: #475569;
+    border: none;
+    padding: 0.3rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    transition: background 0.15s;
+}
+.btn-limpiar-mini:hover { background: #dee2e6; color: #333; }
+
+/* Panel avanzado colapsable */
+.filtros-avanzados-panel {
+    border-top: 1px solid #f1f5f9;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.filtro-grupo-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filtro-grupo-titulo {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+/* ─── Mantener retrocompat con filtro-input ──────────────── */
+.filtro-input {
+    border: 1.5px solid #e8e8ee;
+    border-radius: 8px;
+    padding: 0.48rem 0.7rem;
+    font-size: 0.86rem;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    background: #fafafa;
+    color: #111;
+    outline: none;
+    transition: all 0.15s;
+    min-width: 140px;
+}
+.filtro-input:focus {
+    border-color: rgba(232,92,13,0.5);
+    box-shadow: 0 0 0 3px rgba(232,92,13,0.1);
+    background: #fff;
+}
+
+/* Grupos de checkboxes (métodos / canales) */
+.filtro-check-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    background: #fafafa;
+    padding: 0.5rem 1rem;
+    border-radius: 30px;
+    border: 1px solid #e8e8ee;
+}
+
+.filtro-check-group label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    text-transform: none;
+    font-size: 0.82rem;
+    color: #333;
+    margin-bottom: 0;
+    cursor: pointer;
+    letter-spacing: normal;
+}
+
+.filtro-check-group input[type="checkbox"] {
+    accent-color: #E85C0D;
+    width: 15px;
+    height: 15px;
+    margin: 0;
+}
+
+.botones-filtros {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.btn-filtrar-avanzado {
+    background: #E85C0D;
+    border: none;
+    color: white;
+    padding: 0.5rem 1.3rem;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: all 0.2s;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+}
+
+.btn-filtrar-avanzado:hover {
+    background: #c44a0a;
+    transform: translateY(-1px);
+}
+
+.btn-limpiar {
+    background: #e9ecef;
+    color: #2d3748;
+    border: none;
+    padding: 0.5rem 1.3rem;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 0.15s;
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-limpiar:hover {
+    background: #dee2e6;
+    color: #2d3748;
+}
+
+/* ─── Tarjetas de resumen ─────────────────────────────────── */
+.hist-resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+}
+
+.hist-resumen-card {
+    background: #fff;
+    border: 1px solid #e8e8ee;
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.hist-resumen-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+}
+
+.hist-resumen-valor {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #1e293b;
+    font-family: 'Rajdhani', sans-serif;
+    letter-spacing: 0.5px;
+}
+
+.hist-resumen-card-destacado {
+    border-color: #e8e8ee;
+    background: #fff;
+    border-left: 3px solid #E85C0D;
+}
+
+.hist-resumen-card-destacado .hist-resumen-label {
+    color: rgba(232,92,13,0.7);
+}
+
+.hist-resumen-card-destacado .hist-resumen-valor {
+    color: #E85C0D;
+}
+
+.hist-resumen-card-total {
+    border-color: #e8e8ee;
+    background: #fff;
+    border-left: 3px solid #6366f1;
+}
+
+.hist-resumen-card-total .hist-resumen-label {
+    color: rgba(99,102,241,0.7);
+}
+
+.hist-resumen-card-total .hist-resumen-valor {
+    color: #6366f1;
+}
+
+/* ─── Tabla de cobros ─────────────────────────────────────── */
+.table-card {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #eef2f6;
+    overflow-x: auto;
+}
+
+.table-card .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    min-width: 900px;
+    margin: 0;
+}
+
+.table-card .table th {
+    background: #f8fafc;
+    padding: 0.7rem 0.85rem;
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #4b5563;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.table-card .table td {
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+    color: #1e293b;
+    font-weight: 500;
+    vertical-align: middle;
+}
+
+.table-card .table tr:last-child td {
+    border-bottom: none;
+}
+
+.table-card .table tbody tr:hover td {
+    background: #fef9f2;
+}
+
+/* ─── Elementos de celda ──────────────────────────────────── */
+.hist-id {
+    font-weight: 800;
+    color: #475569;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem;
+    letter-spacing: 0.3px;
+}
+
+.hist-fecha {
+    display: block;
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.83rem;
+}
+
+.hist-hora {
+    display: block;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-top: 0.05rem;
+}
+
+.hist-usuario {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.user-avatar-mini {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #E85C0D, #ff8c42);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ─── Pills de métodos de pago ────────────────────────────── */
+.hist-metodos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.hist-metodo-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.hist-metodo-efectivo     { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.hist-metodo-transferencia{ background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.hist-metodo-debito       { background: #faf5ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+.hist-metodo-credito      { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.hist-metodo-qr           { background: #f0f9ff; color: #0284c7; border: 1px solid #bae6fd; }
+
+/* ─── Botón eliminar cobro (celda) ───────────────────────── */
+.btn-eliminar-cobro {
+    background: none;
+    border: 1px solid #e2e8f0;
+    color: #94a3b8;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.btn-eliminar-cobro:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #dc2626;
+}
+
+/* ─── Barra de acciones masivas ──────────────────────────── */
+.hist-acciones-masivas {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: #fff7ed;
+    border: 1.5px solid rgba(232,92,13,0.25);
+    border-radius: 10px;
+    padding: 0.55rem 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.hist-sel-count {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #E85C0D;
+}
+
+.btn-eliminar-sel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.38rem 0.9rem;
+    background: rgba(220,38,38,0.07);
+    color: #dc2626;
+    border: 1.5px solid rgba(220,38,38,0.28);
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-eliminar-sel:hover {
+    background: #dc2626;
+    color: #fff;
+    border-color: #dc2626;
+}
+
+.btn-deseleccionar-todo {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    padding: 0.38rem 0.6rem;
+    border-radius: 20px;
+    transition: background 0.15s;
+}
+
+.btn-deseleccionar-todo:hover {
+    background: #e9ecef;
+    color: #444;
+}
+
+/* ─── Estado vacío ────────────────────────────────────────── */
+.cobro-estado-vacio {
+    text-align: center;
+    color: #bbb;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 4rem 1rem;
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #eef2f6;
+}
+
+.cobro-estado-vacio svg {
+    display: block;
+    margin: 0 auto 1rem;
+}
+
+/* ─── Botones de acción masiva en header ─────────────────── */
+.btn-limpiezaauto {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.9rem;
+    background: rgba(100,116,139,0.07);
+    color: #475569;
+    border: 1.5px solid rgba(100,116,139,0.25);
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-limpiezaauto:hover {
+    background: rgba(100,116,139,0.15);
+    border-color: rgba(100,116,139,0.4);
+}
+
+/* ─── Modales ─────────────────────────────────────────────── */
+.modal-subtitle {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin: 0.15rem 0 0;
+}
+
+.alerta-inline {
+    padding: 0.5rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.83rem;
+    font-weight: 600;
+}
+
+.alerta-error {
+    background: rgba(220,38,38,0.07);
+    border: 1px solid rgba(220,38,38,0.2);
+    color: #b91c1c;
+}
+
+.modal-header-danger {
+    background: linear-gradient(135deg, #7f1d1d, #991b1b);
+    color: #fff;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.modal-header-danger .btn-close { filter: invert(1); }
+
+.eliminar-warning {
+    font-size: 0.8rem;
+    color: #dc2626;
+    font-weight: 600;
+    margin: 0.3rem 0 0;
+}
+
+/* Grilla de filtros del modal eliminar por filtros */
+.elim-filtros-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+}
+
+.elim-filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.elim-filtro-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #777;
+}
+
+.filtro-select {
+    border: 1.5px solid #e8e8ee;
+    border-radius: 8px;
+    padding: 0.42rem 0.6rem;
+    font-size: 0.84rem;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    background: #fafafa;
+    color: #111;
+    outline: none;
+}
+
+.elim-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(232,92,13,0.06);
+    border: 1px solid rgba(232,92,13,0.2);
+    border-radius: 8px;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.83rem;
+    color: #555;
+    font-weight: 600;
+}
+
+/* ─── Ajustes responsive ─────────────────────────────────── */
+@media (max-width: 768px) {
+    .filtros-compactos-fila {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filtro-input-mini { width: 100% !important; }
+    .filtro-sep { display: none; }
+    .btn-toggle-avanzado,
+    .btn-filtrar-mini,
+    .btn-limpiar-mini { width: 100%; justify-content: center; }
+    .filtros-avanzados-panel {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filtro-grupo-inline { flex-direction: column; align-items: flex-start; }
+    .filtro-check-group {
+        flex-wrap: wrap;
+        border-radius: 12px;
+    }
+    .hist-resumen-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .hist-acciones-masivas {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

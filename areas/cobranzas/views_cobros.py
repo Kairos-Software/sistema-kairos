@@ -274,18 +274,33 @@ class HistorialCobrosView(LoginRequiredMixin, View):
             .prefetch_related('items__servicio', 'pagos')
         )
 
-        desde = request.GET.get('desde', '').strip()
-        hasta = request.GET.get('hasta', '').strip()
+        desde       = request.GET.get('desde',   '').strip()
+        hasta       = request.GET.get('hasta',   '').strip()
+        usuario     = request.GET.get('usuario', '').strip()
+        metodos_sel = request.GET.getlist('metodos')
+        canales_sel = request.GET.getlist('canales')
+
         if desde:
             cobros = cobros.filter(fecha_cierre__date__gte=desde)
         if hasta:
             cobros = cobros.filter(fecha_cierre__date__lte=hasta)
+        if usuario:
+            cobros = cobros.filter(creado_por__username__icontains=usuario)
+        if metodos_sel:
+            cobros = cobros.filter(pagos__metodo__in=metodos_sel)
+        if canales_sel:
+            cobros = cobros.filter(items__canal__in=canales_sel)
+
+        cobros = cobros.distinct()
 
         return render(request, 'cobranzas/historial_cobros.html', {
-            'cobros':          cobros[:500],
-            'desde':           desde,
-            'hasta':           hasta,
-            'metodos_choices': PagoCobro.METODOS,
+            'cobros':                cobros[:500],
+            'desde':                 desde,
+            'hasta':                 hasta,
+            'usuario':               usuario,
+            'metodos_seleccionados': metodos_sel,
+            'canales_seleccionados': canales_sel,
+            'metodos_choices':       PagoCobro.METODOS,
         })
 
 

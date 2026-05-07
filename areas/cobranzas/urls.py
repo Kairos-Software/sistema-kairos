@@ -4,6 +4,12 @@ from . import views_cobros
 from . import views_caja
 from . import views_caja_grande
 from . import views_depositos
+from .views_recaudaciones import (
+    RecaudacionesView,
+    RegistrarRecaudacionAjax,
+    EliminarRecaudacionAjax,
+    EstadoRecaudacionAjax,
+)
 
 app_name = 'cobranzas'
 
@@ -55,4 +61,12 @@ urlpatterns = [
     path('depositos/registrar/', views_depositos.RegistrarDepositoAjax.as_view(), name='depositos_registrar'),
     path('depositos/historial/', views_depositos.HistorialDepositosView.as_view(), name='depositos_historial'),
     path('depositos/eliminar/', views_depositos.EliminarDepositosAjax.as_view(), name='depositos_eliminar'),
+
+    path('recaudaciones/',           RecaudacionesView.as_view(),        name='recaudaciones'),
+    path('recaudaciones/registrar/', RegistrarRecaudacionAjax.as_view(), name='recaudaciones_registrar'),
+    path('recaudaciones/eliminar/',  EliminarRecaudacionAjax.as_view(),  name='recaudaciones_eliminar'),
+    path('recaudaciones/estado/',    EstadoRecaudacionAjax.as_view(),    name='recaudaciones_estado'),
+
+    # Dentro de urlpatterns
+    path('historial/turnos/exportar/', views_caja.export_turnos_csv, name='exportar_turnos_csv'),
 ]

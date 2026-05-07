@@ -6,6 +6,7 @@
 {% block extra_css %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+<link rel="stylesheet" href="{% static 'cobranzas/css/historial_cierres.css' %}">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -27,21 +28,48 @@
             Eliminar seleccionados (<span id="selCount">0</span>)
         </button>
         {% endif %}
-        <a href="{% url 'cobranzas:caja' %}" class="btn-volver">← Volver a Caja</a>
+        <a href="{% url 'cobranzas:caja' %}" class="btn-volver">Volver a Caja</a>
     </div>
 </div>
 
-<form method="get" class="filtros-bar">
-    <div class="filtro-fecha-wrap">
-        <label>Desde</label>
-        <input type="date" name="desde" value="{{ desde }}" class="filtro-input">
+<form method="get" class="filtros-avanzados" id="filtrosForm">
+    <div class="grupo-filtros">
+        <div>
+            <label>Desde</label>
+            <input type="date" name="desde" value="{{ desde }}" class="filtro-input" style="width:150px;">
+        </div>
+        <div>
+            <label>Hasta</label>
+            <input type="date" name="hasta" value="{{ hasta }}" class="filtro-input" style="width:150px;">
+        </div>
+        <div>
+            <label>Diferencia</label>
+            <select name="diferencia" class="filtro-input" style="width:150px;">
+                <option value="">Todas</option>
+                <option value="sobrante" {% if diferencia == 'sobrante' %}selected{% endif %}>Sobrante</option>
+                <option value="faltante" {% if diferencia == 'faltante' %}selected{% endif %}>Faltante</option>
+                <option value="sin_diferencia" {% if diferencia == 'sin_diferencia' %}selected{% endif %}>Sin diferencia</option>
+            </select>
+        </div>
     </div>
-    <div class="filtro-fecha-wrap">
-        <label>Hasta</label>
-        <input type="date" name="hasta" value="{{ hasta }}" class="filtro-input">
+
+    <div class="grupo-filtros">
+        <div style="flex:1;">
+            <label>Métodos de pago (mostrar cierres con ingresos en...)</label>
+            <div class="filtro-check-group">
+                <label><input type="checkbox" name="metodos" value="efectivo" {% if 'efectivo' in metodos_seleccionados %}checked{% endif %}> Efectivo</label>
+                <label><input type="checkbox" name="metodos" value="transferencia" {% if 'transferencia' in metodos_seleccionados %}checked{% endif %}> Transferencia</label>
+                <label><input type="checkbox" name="metodos" value="debito" {% if 'debito' in metodos_seleccionados %}checked{% endif %}> Débito</label>
+                <label><input type="checkbox" name="metodos" value="credito" {% if 'credito' in metodos_seleccionados %}checked{% endif %}> Crédito</label>
+                <label><input type="checkbox" name="metodos" value="qr" {% if 'qr' in metodos_seleccionados %}checked{% endif %}> QR</label>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn-filtrar">Filtrar</button>
-    <a href="{% url 'cobranzas:historial_cierres' %}" class="btn-volver">Limpiar</a>
+
+    <div class="botones-filtros">
+        <button type="submit" class="btn-filtrar-avanzado">Aplicar filtros</button>
+        <a href="{% url 'cobranzas:historial_cierres' %}" class="btn-limpiar">Limpiar</a>
+    </div>
 </form>
 
 {% if cierres %}
@@ -117,7 +145,6 @@
         </tbody>
     </table>
 </div>
-
 {% else %}
 <div class="estado-vacio">
     <p>No se encontraron cierres diarios con esos filtros.</p>
@@ -125,7 +152,6 @@
 {% endif %}
 
 {% if user.is_staff or user.is_superuser %}
-
 <div id="histEliminarConfig" style="display:none;"
      data-eliminar-url="{% url 'cobranzas:cierres_eliminar' %}"
      data-label-singular="cierre"
@@ -135,17 +161,15 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content caja-modal">
             <div class="modal-body p-4 text-center">
-                <div class="caja-modal-icono">🗑️</div>
+                <div class="caja-modal-icono"></div>
                 <h5 class="caja-modal-titulo">Eliminar cierre(s)</h5>
                 <p id="elimTexto" style="margin:.8rem 0 0;color:#777;font-size:.9rem;"></p>
                 <p style="font-size:.8rem;color:#dc2626;margin-top:.5rem;font-weight:600;">
-                    ⚠ Esta acción es irreversible. Los turnos asociados quedarán sin cierre asignado.
+                    Esta acción es irreversible. Los turnos asociados quedarán sin cierre asignado.
                 </p>
                 <div id="elimError" class="caja-error-msg mt-2" style="display:none;"></div>
                 <div class="d-flex gap-2 mt-4 justify-content-center">
-                    <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">
-                        Cancelar
-                    </button>
+                    <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" id="btnConfirmarElim" class="btn-confirmar-eliminar">
                         <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
                             <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
@@ -158,7 +182,6 @@
         </div>
     </div>
 </div>
-
 {% endif %}
 
 {% endblock %}

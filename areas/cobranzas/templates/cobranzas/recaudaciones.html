@@ -1,0 +1,606 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Recaudaciones — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Recaudaciones <span>Diarias</span></h1>
+        <p class="page-subtitle">Registrá lo recaudado por PagoFácil y RapiPago cada día</p>
+    </div>
+</div>
+
+{# ── SELECTOR DE ENTIDAD ── #}
+<div class="caja-card" style="margin-bottom:1.2rem;">
+    <h2 class="caja-card-titulo" style="margin-bottom:.9rem;">Seleccionar entidad</h2>
+    <div class="dep-entidad-selector">
+
+        <a href="?entidad={{ ENTIDAD_PF }}"
+           class="dep-entidad-btn {% if entidad == ENTIDAD_PF %}dep-entidad-activa{% endif %}">
+            <span class="dep-entidad-icono">💳</span>
+            <span class="dep-entidad-nombre">PagoFácil</span>
+            <span class="dep-entidad-recaudado">${{ tot_pf.recaudado|floatformat:2 }}</span>
+            <span class="dep-entidad-sub">
+                recaudado · {{ cant_pf }} día{{ cant_pf|pluralize }}
+            </span>
+            <span class="dep-pendiente-pill {% if tot_pf.pendiente > 0 %}pill-alerta{% else %}pill-ok{% endif %}">
+                {% if tot_pf.pendiente > 0 %}
+                    Pendiente ${{ tot_pf.pendiente|floatformat:2 }}
+                {% else %}
+                    Sin pendiente
+                {% endif %}
+            </span>
+        </a>
+
+        <a href="?entidad={{ ENTIDAD_RP }}"
+           class="dep-entidad-btn {% if entidad == ENTIDAD_RP %}dep-entidad-activa{% endif %}">
+            <span class="dep-entidad-icono">🏦</span>
+            <span class="dep-entidad-nombre">RapiPago</span>
+            <span class="dep-entidad-recaudado">${{ tot_rp.recaudado|floatformat:2 }}</span>
+            <span class="dep-entidad-sub">
+                recaudado · {{ cant_rp }} día{{ cant_rp|pluralize }}
+            </span>
+            <span class="dep-pendiente-pill {% if tot_rp.pendiente > 0 %}pill-alerta{% else %}pill-ok{% endif %}">
+                {% if tot_rp.pendiente > 0 %}
+                    Pendiente ${{ tot_rp.pendiente|floatformat:2 }}
+                {% else %}
+                    Sin pendiente
+                {% endif %}
+            </span>
+        </a>
+
+    </div>
+</div>
+
+{# ── BALANCE CARD ── #}
+<div class="caja-card rec-balance-card" id="balanceCard" style="margin-bottom:1.2rem;">
+    <h2 class="caja-card-titulo">
+        Balance —
+        <span id="labelEntidadBalance" class="dep-entidad-label-activa">{{ entidad_label }}</span>
+    </h2>
+    <div class="rec-balance-grid">
+        <div class="rec-balance-item">
+            <span class="rec-balance-label">Total recaudado</span>
+            <span class="rec-balance-valor" id="balRecaudado">
+                ${{ tot_activo.recaudado|floatformat:2 }}
+            </span>
+        </div>
+        <div class="rec-balance-item">
+            <span class="rec-balance-label">Ya depositado</span>
+            <span class="rec-balance-valor rec-depositado" id="balDepositado">
+                ${{ tot_activo.depositado|floatformat:2 }}
+            </span>
+        </div>
+        <div class="rec-balance-item rec-balance-pendiente">
+            <span class="rec-balance-label">Pendiente de depositar</span>
+            <span class="rec-balance-valor" id="balPendiente">
+                ${{ tot_activo.pendiente|floatformat:2 }}
+            </span>
+        </div>
+    </div>
+    <p class="rec-balance-hint">
+        El pendiente se reduce automáticamente al registrar un depósito bancario en la sección
+        <a href="{% url 'cobranzas:depositos' %}">Depósitos</a>.
+    </p>
+</div>
+
+{# ── FORMULARIO ── #}
+<div class="caja-card" style="margin-bottom:1.2rem;">
+    <h2 class="caja-card-titulo">
+        Registrar recaudación —
+        <span id="labelEntidadForm" class="dep-entidad-label-activa">{{ entidad_label }}</span>
+    </h2>
+
+    {% if recaudacion_hoy %}
+    <div class="alerta-inline alerta-warn" id="alertaYaExiste">
+        ⚠️ Ya existe una recaudación para hoy ({{ hoy|date:"d/m/Y" }}):
+        <strong>${{ recaudacion_hoy.monto|floatformat:2 }}</strong>.
+        Si registrás un nuevo monto para la misma fecha, <strong>reemplazará</strong> al existente.
+    </div>
+    {% endif %}
+
+    <div class="dep-form-grid" style="margin-top:.8rem;">
+        <div class="caja-field">
+            <label class="caja-label">Fecha</label>
+            <input type="date" id="inputFecha" class="dep-input" value="{{ hoy|date:'Y-m-d' }}">
+        </div>
+        <div class="caja-field">
+            <label class="caja-label">Importe recaudado</label>
+            <div class="dep-input-money">
+                <span class="dep-signo">$</span>
+                <input type="number" id="inputMonto" class="dep-input dep-input-num"
+                       min="0.01" step="0.01" placeholder="0,00"
+                       {% if recaudacion_hoy %}value="{{ recaudacion_hoy.monto }}"{% endif %}>
+            </div>
+        </div>
+        <div class="caja-field">
+            <label class="caja-label">
+                Observaciones <span class="caja-hint">(opcional)</span>
+            </label>
+            <input type="text" id="inputObservaciones" class="dep-input"
+                   placeholder="Ej: Liquidación N° 1234"
+                   value="{% if recaudacion_hoy %}{{ recaudacion_hoy.observaciones }}{% endif %}">
+        </div>
+    </div>
+
+    <div id="recError" class="alerta-inline alerta-error" style="display:none; margin-top:.8rem;"></div>
+    <div id="recExito" class="alerta-inline alerta-exito" style="display:none; margin-top:.8rem;"></div>
+
+    <div style="margin-top:1rem;">
+        <button type="button" class="btn-caja-principal" id="btnRegistrar">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Registrar recaudación
+        </button>
+    </div>
+</div>
+
+{# ── TABLA DE RECAUDACIONES ── #}
+<div class="caja-card" id="panelUltimas">
+    <div class="dep-table-header">
+        <h2 class="caja-card-titulo" style="margin-bottom:0;">
+            Recaudaciones — <span id="labelEntidadTabla">{{ entidad_label }}</span>
+        </h2>
+    </div>
+
+    <div class="tabla-scroll" style="margin-top:.9rem;">
+        <table class="tabla-base">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Monto</th>
+                    <th>Observaciones</th>
+                    <th>Registrado por</th>
+                    {% if user.is_staff or user.is_superuser %}
+                    <th>Acción</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody id="tbodyRecaudaciones">
+                {% for r in ultimas %}
+                <tr data-id="{{ r.pk }}">
+                    <td><strong>#{{ r.pk }}</strong></td>
+                    <td>{{ r.fecha|date:"d/m/Y" }}</td>
+                    <td><strong>${{ r.monto|floatformat:2 }}</strong></td>
+                    <td>{{ r.observaciones|default:"—" }}</td>
+                    <td>{{ r.registrado_por }}</td>
+                    {% if user.is_staff or user.is_superuser %}
+                    <td>
+                        <button class="btn-eliminar-rec btn-caja-secundario"
+                                data-id="{{ r.pk }}" style="font-size:.78rem; padding:.25rem .6rem;">
+                            Eliminar
+                        </button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr id="trVacio">
+                    <td colspan="{% if user.is_staff or user.is_superuser %}6{% else %}5{% endif %}"
+                        class="dep-vacio">
+                        No hay recaudaciones registradas para esta entidad.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# ── Modal confirmación ── #}
+<div class="modal fade" id="modalConfirmar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content caja-modal">
+            <div class="modal-body p-4">
+                <div class="caja-modal-icono">💳</div>
+                <h5 class="caja-modal-titulo">Confirmar recaudación</h5>
+
+                <div class="caja-modal-fila mt-3">
+                    <span>Entidad</span>
+                    <strong id="modalEntidad">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span>Fecha</span>
+                    <strong id="modalFecha">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span>Importe</span>
+                    <strong id="modalMonto">—</strong>
+                </div>
+                <div class="caja-modal-fila" id="modalFilaObs" style="display:none;">
+                    <span>Observaciones</span>
+                    <strong id="modalObs">—</strong>
+                </div>
+                <div id="modalAlertaReemplazo" class="alerta-inline alerta-warn mt-3"
+                     style="display:none; font-size:.83rem;">
+                    Esta acción <strong>reemplazará</strong> la recaudación existente para este día.
+                </div>
+
+                <div class="d-flex gap-2 mt-4 justify-content-end">
+                    <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn-caja-principal" id="btnConfirmar">
+                        Confirmar
+                    </button>
+                </div>
+                <div id="modalError" class="caja-error-msg mt-2" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ── Reutiliza clases de depositos.html ── */
+.dep-entidad-selector    { display: flex; gap: 1rem; }
+.dep-entidad-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: .2rem; padding: 1rem;
+    background: var(--surface-raised, #f4f4f5);
+    border: 2px solid transparent; border-radius: 10px;
+    cursor: pointer; transition: border-color .15s, background .15s;
+    text-decoration: none; /* para cuando es <a> */
+    color: inherit;        /* para cuando es <a> */
+}
+.dep-entidad-btn:hover   { border-color: var(--accent, #E85C0D); background: var(--surface, #fff); }
+.dep-entidad-activa      { border-color: var(--accent, #E85C0D) !important; background: var(--surface, #fff) !important; }
+.dep-entidad-icono       { font-size: 1.6rem; }
+.dep-entidad-nombre      { font-weight: 700; font-size: .95rem; color: var(--text-primary, #111); }
+.dep-entidad-recaudado   { font-size: 1.05rem; font-weight: 600; color: var(--accent, #E85C0D); }
+.dep-entidad-sub         { font-size: .78rem; color: var(--text-muted, #888); }
+.dep-entidad-label-activa { color: var(--accent, #E85C0D); }
+
+/* ── Pill de pendiente ── */
+.dep-pendiente-pill {
+    margin-top: .2rem; font-size: .75rem; font-weight: 600;
+    padding: .15rem .55rem; border-radius: 99px;
+}
+.pill-alerta { background: #fff3cd; color: #856404; }
+.pill-ok     { background: #d1fae5; color: #065f46; }
+
+/* ── Balance card ── */
+.rec-balance-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: .8rem 1.4rem;
+    margin-top: .8rem;
+}
+.rec-balance-item { display: flex; flex-direction: column; gap: .2rem; }
+.rec-balance-label { font-size: .78rem; color: var(--text-muted, #888); font-weight: 500; }
+.rec-balance-valor { font-size: 1.3rem; font-weight: 700; color: var(--text-primary, #111); }
+.rec-depositado    { color: #16a34a; }
+.rec-balance-pendiente .rec-balance-valor { color: var(--accent, #E85C0D); }
+.rec-balance-hint {
+    margin-top: .8rem; font-size: .8rem;
+    color: var(--text-muted, #888);
+}
+.rec-balance-hint a { color: var(--accent, #E85C0D); }
+
+/* ── Form grid ── */
+.dep-form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .8rem 1.2rem; }
+.dep-input {
+    width: 100%; padding: .5rem .75rem;
+    border: 1.5px solid var(--border, #d1d5db); border-radius: 7px;
+    background: var(--surface, #fff); color: var(--text-primary, #111);
+    font-size: .9rem; outline: none; transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box; font-family: inherit;
+}
+.dep-input:focus { border-color: var(--accent, #E85C0D); box-shadow: 0 0 0 3px rgba(232,92,13,.12); }
+.dep-input-money {
+    display: flex; align-items: center;
+    border: 1.5px solid var(--border, #d1d5db); border-radius: 7px;
+    background: var(--surface, #fff); overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
+}
+.dep-input-money:focus-within { border-color: var(--accent, #E85C0D); box-shadow: 0 0 0 3px rgba(232,92,13,.12); }
+.dep-signo  { padding: 0 .5rem 0 .75rem; color: var(--text-muted, #6b7280); font-weight: 600; }
+.dep-input-num { border: none !important; box-shadow: none !important; padding-left: 0; }
+
+/* ── Tabla header ── */
+.dep-table-header { display: flex; align-items: center; justify-content: space-between; }
+.dep-vacio { text-align: center; color: var(--text-muted, #888); padding: 1.5rem 0; }
+
+/* ── Alerta warn ── */
+.alerta-warn {
+    background: #fff3cd; color: #856404;
+    border: 1px solid #ffc107; border-radius: 7px;
+    padding: .6rem .9rem; font-size: .87rem;
+}
+
+@media (max-width: 640px) {
+    .dep-entidad-selector { flex-direction: column; }
+    .dep-form-grid        { grid-template-columns: 1fr; }
+    .rec-balance-grid     { grid-template-columns: 1fr; }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+
+    const urlRegistrar = "{% url 'cobranzas:recaudaciones_registrar' %}";
+    const urlEliminar  = "{% url 'cobranzas:recaudaciones_eliminar' %}";
+    const urlEstado    = "{% url 'cobranzas:recaudaciones_estado' %}";
+    const esAdmin      = {{ user.is_staff|yesno:"true,false" }} || {{ user.is_superuser|yesno:"true,false" }};
+
+    let entidadActual = "{{ entidad }}";
+    let modalInstance = null;
+
+    // Totales iniciales desde el servidor (para el balance card sin reload)
+    const totalesInit = {
+        '{{ ENTIDAD_PF }}': {
+            recaudado:  {{ tot_pf.recaudado|floatformat:2 }},
+            depositado: {{ tot_pf.depositado|floatformat:2 }},
+            pendiente:  {{ tot_pf.pendiente|floatformat:2 }},
+        },
+        '{{ ENTIDAD_RP }}': {
+            recaudado:  {{ tot_rp.recaudado|floatformat:2 }},
+            depositado: {{ tot_rp.depositado|floatformat:2 }},
+            pendiente:  {{ tot_rp.pendiente|floatformat:2 }},
+        },
+    };
+
+    // ── Utilidades ────────────────────────────────────────
+    function getCsrf() {
+        return document.cookie.split(';')
+            .map(c => c.trim())
+            .find(c => c.startsWith('csrftoken='))
+            ?.split('=')[1] || '';
+    }
+
+    function fmt(n) {
+        return '$' + parseFloat(n).toLocaleString('es-AR', {
+            minimumFractionDigits: 2, maximumFractionDigits: 2,
+        });
+    }
+
+    // ── Actualizar balance card ───────────────────────────
+    function actualizarBalance(totales) {
+        document.getElementById('balRecaudado').textContent  = fmt(totales.recaudado);
+        document.getElementById('balDepositado').textContent = fmt(totales.depositado);
+        document.getElementById('balPendiente').textContent  = fmt(totales.pendiente);
+    }
+
+    // ── Actualizar pills en los botones de entidad ────────
+    function actualizarPill(entidad, totales) {
+        const btn  = document.querySelector(`.dep-entidad-btn[data-entidad="${entidad}"]`);
+        if (!btn) return;
+        btn.querySelector('.dep-entidad-recaudado').textContent = fmt(totales.recaudado);
+        const pill = btn.querySelector('.dep-pendiente-pill');
+        if (totales.pendiente > 0) {
+            pill.textContent = `Pendiente ${fmt(totales.pendiente)}`;
+            pill.className   = 'dep-pendiente-pill pill-alerta';
+        } else {
+            pill.textContent = 'Sin pendiente';
+            pill.className   = 'dep-pendiente-pill pill-ok';
+        }
+    }
+
+    // Inicializar balance card con la entidad activa
+    actualizarBalance(totalesInit[entidadActual]);
+
+    // ── Verificar si ya existe recaudación para la fecha seleccionada ──
+    async function checkExistente(fecha) {
+        try {
+            const r = await fetch(`${urlEstado}?entidad=${entidadActual}`);
+            const d = await r.json();
+            // Buscar en las últimas si hay una para esa fecha
+            return d.ultimas?.find(u => u.fecha_iso === fecha) || null;
+        } catch {
+            return null;
+        }
+    }
+
+    // ── Botón Registrar → abre modal ──────────────────────
+    document.getElementById('btnRegistrar').addEventListener('click', async function () {
+        const fecha  = document.getElementById('inputFecha').value;
+        const monto  = parseFloat(document.getElementById('inputMonto').value);
+        const obs    = document.getElementById('inputObservaciones').value.trim();
+        const errEl  = document.getElementById('recError');
+        const okEl   = document.getElementById('recExito');
+
+        errEl.style.display = 'none';
+        okEl.style.display  = 'none';
+
+        if (!fecha) {
+            errEl.textContent = 'La fecha es obligatoria.';
+            errEl.style.display = '';
+            return;
+        }
+        if (!monto || monto <= 0) {
+            errEl.textContent = 'El monto debe ser mayor a cero.';
+            errEl.style.display = '';
+            return;
+        }
+
+        // Poblar modal
+        const labelMap = {
+            '{{ ENTIDAD_PF }}': 'PagoFácil',
+            '{{ ENTIDAD_RP }}': 'RapiPago',
+        };
+        document.getElementById('modalEntidad').textContent = labelMap[entidadActual] || entidadActual;
+        const [y, m, d] = fecha.split('-');
+        document.getElementById('modalFecha').textContent  = `${d}/${m}/${y}`;
+        document.getElementById('modalMonto').textContent  = fmt(monto);
+
+        const filaObs = document.getElementById('modalFilaObs');
+        if (obs) {
+            document.getElementById('modalObs').textContent = obs;
+            filaObs.style.display = '';
+        } else {
+            filaObs.style.display = 'none';
+        }
+
+        // Verificar si existe una recaudación para esa fecha
+        const existente = await checkExistente(fecha);
+        const alertaReemplazo = document.getElementById('modalAlertaReemplazo');
+        alertaReemplazo.style.display = existente ? '' : 'none';
+
+        document.getElementById('modalError').style.display = 'none';
+        const btnConf = document.getElementById('btnConfirmar');
+        btnConf.disabled    = false;
+        btnConf.textContent = 'Confirmar';
+
+        modalInstance = new bootstrap.Modal(document.getElementById('modalConfirmar'));
+        modalInstance.show();
+    });
+
+    // ── Confirmar ─────────────────────────────────────────
+    document.getElementById('btnConfirmar').addEventListener('click', async function () {
+        const fecha  = document.getElementById('inputFecha').value;
+        const monto  = parseFloat(document.getElementById('inputMonto').value);
+        const obs    = document.getElementById('inputObservaciones').value.trim();
+        const errEl  = document.getElementById('modalError');
+        const btn    = this;
+
+        btn.disabled    = true;
+        btn.textContent = 'Registrando...';
+        errEl.style.display = 'none';
+
+        let resp;
+        try {
+            resp = await fetch(urlRegistrar, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrf(),
+                },
+                body: JSON.stringify({
+                    entidad:       entidadActual,
+                    fecha,
+                    monto,
+                    observaciones: obs,
+                    modo:          'reemplazar',
+                }),
+            });
+        } catch (e) {
+            errEl.textContent = 'Error de red. Verificá tu conexión e intentá de nuevo.';
+            errEl.style.display = '';
+            btn.disabled = false; btn.textContent = 'Confirmar';
+            return;
+        }
+
+        let data;
+        try {
+            data = await resp.json();
+        } catch (e) {
+            errEl.textContent = 'No se pudo leer la respuesta. Recargá la página.';
+            errEl.style.display = '';
+            btn.disabled = false; btn.textContent = 'Confirmar';
+            return;
+        }
+
+        if (data.success) {
+            // Cerrar modal
+            if (modalInstance) { try { modalInstance.hide(); } catch(_) {} modalInstance = null; }
+
+            // Actualizar balance card
+            actualizarBalance({
+                recaudado:  data.total_recaudado,
+                depositado: data.total_depositado,
+                pendiente:  data.pendiente,
+            });
+
+            // Actualizar pill del botón de entidad
+            actualizarPill(entidadActual, {
+                recaudado: data.total_recaudado,
+                pendiente: data.pendiente,
+            });
+
+            // Actualizar o agregar fila en tabla
+            const tbody = document.getElementById('tbodyRecaudaciones');
+            const trVacio = document.getElementById('trVacio');
+            if (trVacio) trVacio.remove();
+
+            const rec = data.recaudacion;
+            // ¿ya existe fila con ese id?
+            const filaExistente = tbody.querySelector(`tr[data-id="${rec.id}"]`);
+
+            const celdaAccion = esAdmin
+                ? `<td><button class="btn-eliminar-rec btn-caja-secundario"
+                      data-id="${rec.id}" style="font-size:.78rem;padding:.25rem .6rem;">
+                      Eliminar</button></td>`
+                : '';
+
+            const html = `
+                <td><strong>#${rec.id}</strong></td>
+                <td>${rec.fecha}</td>
+                <td><strong>${fmt(rec.monto)}</strong></td>
+                <td>${rec.observaciones || '—'}</td>
+                <td>${rec.registrado_por}</td>
+                ${celdaAccion}
+            `;
+
+            if (filaExistente) {
+                filaExistente.innerHTML = html;
+            } else {
+                const tr = document.createElement('tr');
+                tr.dataset.id = rec.id;
+                tr.innerHTML  = html;
+                tbody.prepend(tr);
+            }
+
+            // Rebindear eventos eliminar
+            bindEliminar();
+
+            // Mensaje de éxito
+            const okEl = document.getElementById('recExito');
+            okEl.textContent = `Recaudación de ${fmt(rec.monto)} registrada para ${rec.entidad_label} el ${rec.fecha}.`;
+            okEl.style.display = '';
+            setTimeout(() => { okEl.style.display = 'none'; }, 6000);
+
+            // Limpiar alerta "ya existe"
+            const alertaExiste = document.getElementById('alertaYaExiste');
+            if (alertaExiste) alertaExiste.remove();
+
+        } else {
+            errEl.textContent = data.error || 'Error al registrar la recaudación.';
+            errEl.style.display = '';
+            btn.disabled = false; btn.textContent = 'Confirmar';
+        }
+    });
+
+    // ── Eliminar (solo staff) ─────────────────────────────
+    function bindEliminar() {
+        document.querySelectorAll('.btn-eliminar-rec').forEach(btn => {
+            btn.onclick = async function () {
+                const id = this.dataset.id;
+                if (!confirm(`¿Eliminar recaudación #${id}? Esta acción no se puede deshacer.`)) return;
+
+                const r = await fetch(urlEliminar, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                    body: JSON.stringify({ ids: [id] }),
+                });
+                const d = await r.json();
+                if (d.success) {
+                    const fila = document.querySelector(`tr[data-id="${id}"]`);
+                    if (fila) fila.remove();
+
+                    // Refrescar balance
+                    const est = await fetch(`${urlEstado}?entidad=${entidadActual}`);
+                    const ed  = await est.json();
+                    actualizarBalance(ed);
+                    actualizarPill(entidadActual, ed);
+                } else {
+                    alert(d.error || 'Error al eliminar.');
+                }
+            };
+        });
+    }
+
+    bindEliminar();
+
+}); // DOMContentLoaded
+</script>
+
+{% endblock %}
