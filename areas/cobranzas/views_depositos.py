@@ -10,9 +10,11 @@ from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views import View
 from django.db import transaction
 from .models import DepositoBancario
+from .views_recaudaciones import _totales_por_entidad
 
 
 class DepositosView(LoginRequiredMixin, View):
@@ -65,9 +67,14 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
         if entidad not in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
             return JsonResponse({'error': 'Entidad inválida.'}, status=400)
 
-        fecha = data.get('fecha', '').strip()
-        if not fecha:
+        fecha_raw = data.get('fecha', '').strip()
+        if not fecha_raw:
             return JsonResponse({'error': 'La fecha es obligatoria.'}, status=400)
+        fecha = parse_date(fecha_raw)
+        if fecha is None:
+            return JsonResponse({'error': 'Fecha inválida. Usá el formato AAAA-MM-DD.'}, status=400)
+        if fecha > timezone.localdate():
+            return JsonResponse({'error': 'La fecha no puede ser futura.'}, status=400)
 
         try:
             monto = Decimal(str(data.get('monto', 0)))
@@ -80,14 +87,22 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
         observaciones      = data.get('observaciones', '').strip()
 
         try:
-            deposito = DepositoBancario.objects.create(
-                entidad=entidad,
-                fecha=fecha,
-                monto=monto,
-                numero_comprobante=numero_comprobante,
-                observaciones=observaciones,
-                realizado_por=request.user,
-            )
+            with transaction.atomic():
+                # Pendiente ANTES de este depósito → así 'diferencia' refleja
+                # sobrante/faltante de este depósito puntual, igual que en
+                # ModDepositos.bas::RegistrarRecaudacion del Excel de referencia.
+                pendiente_al_momento = _totales_por_entidad(entidad)['pendiente']
+                diferencia = monto - pendiente_al_momento
+
+                deposito = DepositoBancario.objects.create(
+                    entidad=entidad,
+                    fecha=fecha,
+                    monto=monto,
+                    numero_comprobante=numero_comprobante,
+                    diferencia=diferencia,
+                    observaciones=observaciones,
+                    realizado_por=request.user,
+                )
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -98,20 +113,14 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
             .aggregate(t=Sum('monto'))['t'] or Decimal('0')
         )
 
-        # Convertir fecha de forma segura (puede ser date o string según la DB)
-        try:
-            fecha_display = deposito.fecha.strftime('%d/%m/%Y')
-        except AttributeError:
-            from datetime import datetime
-            fecha_display = datetime.strptime(str(deposito.fecha), '%Y-%m-%d').strftime('%d/%m/%Y')
+        fecha_display = deposito.fecha.strftime('%d/%m/%Y')
 
         try:
             realizado_por_str = request.user.get_full_name() or request.user.username
         except Exception:
             realizado_por_str = str(request.user.pk)
 
-        try:
-            return JsonResponse({
+        return JsonResponse({
             'success':            True,
             'deposito_id':        deposito.pk,
             'entidad':            entidad,
@@ -119,26 +128,11 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
             'fecha':              fecha_display,
             'monto':              float(deposito.monto),
             'numero_comprobante': deposito.numero_comprobante or '',
+            'diferencia':         float(deposito.diferencia) if deposito.diferencia is not None else None,
             'observaciones':      deposito.observaciones or '',
             'realizado_por':      realizado_por_str,
             'nuevo_total':        float(nuevo_total),
         })
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            # El depósito YA SE GUARDÓ — devolvemos éxito con datos mínimos
-            return JsonResponse({
-                'success':       True,
-                'deposito_id':   deposito.pk,
-                'entidad':       entidad,
-                'entidad_label': dict(DepositoBancario.ENTIDADES).get(entidad, entidad),
-                'fecha':         str(deposito.fecha),
-                'monto':         float(deposito.monto),
-                'numero_comprobante': '',
-                'observaciones': '',
-                'realizado_por': request.user.username,
-                'nuevo_total':   float(nuevo_total),
-            })
 
 
 class HistorialDepositosView(LoginRequiredMixin, View):
@@ -177,31 +171,6 @@ class HistorialDepositosView(LoginRequiredMixin, View):
             'ENTIDAD_PF':         DepositoBancario.ENTIDAD_PAGOFACIL,
             'ENTIDAD_RP':         DepositoBancario.ENTIDAD_RAPIPAGO,
         })
-    
-
-class EliminarDepositosAjax(LoginRequiredMixin, View):
-    def post(self, request):
-        if not (request.user.is_staff or request.user.is_superuser):
-            return JsonResponse({'error': 'Solo administradores pueden eliminar depósitos.'}, status=403)
-
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'JSON inválido'}, status=400)
-
-        ids = data.get('ids', [])
-        if not ids:
-            return JsonResponse({'error': 'No se recibieron IDs.'}, status=400)
-        try:
-            ids = [int(i) for i in ids]
-        except (ValueError, TypeError):
-            return JsonResponse({'error': 'IDs inválidos.'}, status=400)
-
-        from django.db import transaction
-        with transaction.atomic():
-            eliminados, _ = DepositoBancario.objects.filter(pk__in=ids).delete()
-
-        return JsonResponse({'success': True, 'eliminados': eliminados})
     
 
 class EliminarDepositosAjax(LoginRequiredMixin, View):

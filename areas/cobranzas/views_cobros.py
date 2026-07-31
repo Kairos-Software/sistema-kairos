@@ -5,8 +5,10 @@ CAMBIO: ConfirmarCobroAjax ahora requiere un turno abierto y
         asocia el cobro al turno activo.
 NUEVO:  EditarCobroAjax permite corregir un cobro ya cerrado
         (ítems, pagos, fecha, observaciones) sin romper balances.
+CAMBIO: resolver_adicional ahora consulta los campos estructurados
+        familia/tipo_precio/rango_desde/rango_hasta de Servicio en vez
+        de parsear con regex el texto de descripcion en cada request.
 """
-import re
 import json
 from datetime import date
 from django.http import JsonResponse
@@ -26,36 +28,17 @@ from .views_caja import get_turno_abierto
 # LÓGICA DE RANGOS
 # ═══════════════════════════════════════════════════════════
 
-_PATRONES_RANGO = [
-    re.compile(r'RANGO:\s*(\d+)\s*[-–]\s*(\d+)', re.IGNORECASE),
-    re.compile(r'desde\s+(\d+)\s+hasta\s+(\d+)', re.IGNORECASE),
-    re.compile(r'\bde\s+(\d+)\s+a\s+(\d+)\b', re.IGNORECASE),
-    re.compile(r'entre\s+(\d+)\s+y\s+(\d+)', re.IGNORECASE),
-    re.compile(r'(?<!\w)(\d+)\s*[-–]\s*(\d+)(?!\w)'),
-]
+def resolver_adicional(familia: str, valor_boleta: float):
+    familia = familia.strip().upper()
 
+    fijos = list(Servicio.objects.filter(
+        activo=True, familia=familia, tipo_precio=Servicio.TIPO_FIJO,
+    ))
+    rangos_coinciden = list(Servicio.objects.filter(
+        activo=True, familia=familia, tipo_precio=Servicio.TIPO_RANGO,
+        rango_desde__lte=valor_boleta, rango_hasta__gte=valor_boleta,
+    ))
 
-def extraer_rango(descripcion: str):
-    for patron in _PATRONES_RANGO:
-        m = patron.search(descripcion)
-        if m:
-            a, b = int(m.group(1)), int(m.group(2))
-            return (min(a, b), max(a, b))
-    return None
-
-
-def resolver_adicional(prefijo: str, valor_boleta: float):
-    prefijo = prefijo.strip().upper()
-    candidatos = list(Servicio.objects.filter(activo=True, codigo__istartswith=prefijo))
-    rangos_coinciden, fijos = [], []
-    for s in candidatos:
-        rango = extraer_rango(s.descripcion)
-        if rango is None:
-            fijos.append(s)
-        else:
-            lo, hi = rango
-            if lo <= valor_boleta <= hi:
-                rangos_coinciden.append(s)
     if len(rangos_coinciden) == 1:
         return {'servicio': rangos_coinciden[0], 'tipo': 'rango'}
     if len(rangos_coinciden) > 1:

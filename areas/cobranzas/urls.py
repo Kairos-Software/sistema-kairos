@@ -4,6 +4,7 @@ from . import views_cobros
 from . import views_caja
 from . import views_caja_grande
 from . import views_depositos
+from . import views_servicios_io
 from .views_recaudaciones import (
     RecaudacionesView,
     RegistrarRecaudacionAjax,
@@ -24,6 +25,8 @@ urlpatterns = [
     path('servicios/activar/', views.ServicioActivarAjax.as_view(), name='servicio_activar'),
     path('servicios/siguiente-codigo/', views.ServicioSiguienteCodigoAjax.as_view(), name='servicio_siguiente_codigo'),
     path('servicios/prefijos/', views.PrefijosAjax.as_view(), name='servicio_prefijos'),
+    path('servicios/exportar/', views_servicios_io.ExportarServiciosCsvAjax.as_view(), name='servicio_exportar'),
+    path('servicios/importar/', views_servicios_io.ImportarServiciosCsvAjax.as_view(), name='servicio_importar'),
 
     # ── Cobros ──────────────────────────────────────────────
     path('cobros/', views_cobros.GestionCobrosView.as_view(), name='gestion_cobros'),

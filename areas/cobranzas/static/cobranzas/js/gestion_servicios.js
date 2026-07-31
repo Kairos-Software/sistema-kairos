@@ -59,6 +59,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const errorEliminarPrefijo    = document.getElementById('errorEliminarPrefijo');
     const idCodigo                = document.getElementById('id_codigo');
 
+    // Tipo de precio / rango
+    const selectTipoPrecio = document.getElementById('id_tipo_precio');
+    const wrapRangoDesde   = document.getElementById('wrapRangoDesde');
+    const wrapRangoHasta   = document.getElementById('wrapRangoHasta');
+    const inputRangoDesde  = document.getElementById('id_rango_desde');
+    const inputRangoHasta  = document.getElementById('id_rango_hasta');
+
+    function actualizarVisibilidadRango() {
+        const esRango = selectTipoPrecio?.value === 'rango';
+        if (wrapRangoDesde) wrapRangoDesde.style.display = esRango ? '' : 'none';
+        if (wrapRangoHasta) wrapRangoHasta.style.display = esRango ? '' : 'none';
+    }
+
+    if (selectTipoPrecio) {
+        selectTipoPrecio.addEventListener('change', actualizarVisibilidadRango);
+        actualizarVisibilidadRango();
+    }
+
     let pkEliminar = null;
 
     // ─── Último prefijo recordado ────────────────────────────────────────────
@@ -465,6 +483,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('id_descripcion').value = '';
         document.getElementById('id_proveedor').value   = '';
         idCodigo.value = '';
+        if (selectTipoPrecio) selectTipoPrecio.value = 'fijo';
+        if (inputRangoDesde)  inputRangoDesde.value  = '';
+        if (inputRangoHasta)  inputRangoHasta.value  = '';
+        actualizarVisibilidadRango();
 
         // Resetear selector de código: restaurar último prefijo si corresponde
         const ultimoPrefijo = mantenerPrefijo || leerUltimoPrefijo();
@@ -494,6 +516,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('id_proveedor').value       = servicio.proveedor || '';
         document.getElementById('id_activo').checked        = servicio.activo === true;
         document.getElementById('id_monto').value           = parseMonto(servicio.monto);
+        if (selectTipoPrecio) selectTipoPrecio.value = servicio.tipo_precio || 'fijo';
+        if (inputRangoDesde)  inputRangoDesde.value  = servicio.rango_desde != null ? parseMonto(servicio.rango_desde) : '';
+        if (inputRangoHasta)  inputRangoHasta.value  = servicio.rango_hasta != null ? parseMonto(servicio.rango_hasta) : '';
+        actualizarVisibilidadRango();
 
         // En edición el código no cambia: mostrar como badge, ocultar selector
         idCodigo.value = servicio.codigo;
@@ -545,6 +571,9 @@ document.addEventListener('DOMContentLoaded', function () {
         tr.dataset.monto       = montoFmt;
         tr.dataset.proveedor   = servicio.proveedor || '';
         tr.dataset.activo      = servicio.activo ? 'true' : 'false';
+        tr.dataset.tipoPrecio  = servicio.tipo_precio || 'fijo';
+        tr.dataset.rangoDesde  = servicio.rango_desde != null ? servicio.rango_desde : '';
+        tr.dataset.rangoHasta  = servicio.rango_hasta != null ? servicio.rango_hasta : '';
         tr.dataset.search      = `${servicio.codigo.toLowerCase()} ${servicio.descripcion.toLowerCase()} ${(servicio.proveedor || '').toLowerCase()}`;
 
         tr.innerHTML = `
@@ -565,7 +594,9 @@ document.addEventListener('DOMContentLoaded', function () {
             poblarFormulario({
                 id: servicio.id, codigo: servicio.codigo,
                 descripcion: servicio.descripcion, monto: servicio.monto,
-                proveedor: servicio.proveedor, activo: servicio.activo === true
+                proveedor: servicio.proveedor, activo: servicio.activo === true,
+                tipo_precio: servicio.tipo_precio, rango_desde: servicio.rango_desde,
+                rango_hasta: servicio.rango_hasta
             });
             modal?.show();
         });
@@ -615,7 +646,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 descripcion: row.dataset.descripcion,
                 monto:       row.dataset.monto,
                 proveedor:   row.dataset.proveedor,
-                activo:      row.dataset.activo === 'true'
+                activo:      row.dataset.activo === 'true',
+                tipo_precio: row.dataset.tipoPrecio,
+                rango_desde: row.dataset.rangoDesde || null,
+                rango_hasta: row.dataset.rangoHasta || null
             });
             modal?.show();
         });
@@ -773,6 +807,69 @@ document.addEventListener('DOMContentLoaded', function () {
                 mostrarErrorEliminar('Error de conexión. Intentá de nuevo.');
                 confirmarElim.disabled = false;
                 confirmarElim.textContent = 'Eliminar';
+            }
+        });
+    }
+
+    // ─── 10. IMPORTAR CSV ────────────────────────────────────────────────────
+
+    const btnImportarServicios = document.getElementById('btnImportarServicios');
+    const inputImportarCsv     = document.getElementById('inputImportarCsv');
+    const importarModalEl      = document.getElementById('importarModal');
+    const importarModal        = importarModalEl ? new bootstrap.Modal(importarModalEl) : null;
+    const importarResumen      = document.getElementById('importarResumen');
+    const importarErrores      = document.getElementById('importarErrores');
+
+    if (btnImportarServicios && inputImportarCsv) {
+        btnImportarServicios.addEventListener('click', () => inputImportarCsv.click());
+
+        inputImportarCsv.addEventListener('change', async () => {
+            const archivo = inputImportarCsv.files[0];
+            if (!archivo) return;
+
+            if (importarResumen) {
+                importarResumen.style.display = 'block';
+                importarResumen.className = 'alerta-inline';
+                importarResumen.textContent = 'Importando…';
+            }
+            if (importarErrores) {
+                importarErrores.style.display = 'none';
+                importarErrores.innerHTML = '';
+            }
+            importarModal?.show();
+
+            const fd = new FormData();
+            fd.append('archivo', archivo);
+            try {
+                const resp = await postForm(window.servicioImportarUrl, fd);
+                const data = await resp.json();
+
+                if (data.success) {
+                    if (importarResumen) {
+                        importarResumen.className = 'alerta-inline alerta-exito';
+                        importarResumen.textContent =
+                            `✓ ${data.total} servicio(s) procesados: ${data.creados} nuevo(s), ${data.actualizados} actualizado(s).`;
+                    }
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    if (importarResumen) {
+                        importarResumen.className = 'alerta-inline alerta-error';
+                        importarResumen.textContent = data.error || 'Error al importar.';
+                    }
+                    if (data.errores && importarErrores) {
+                        importarErrores.style.display = 'block';
+                        importarErrores.innerHTML = data.errores
+                            .map(e => `<div class="alerta-inline alerta-error" style="margin-bottom:4px;">${e}</div>`)
+                            .join('');
+                    }
+                }
+            } catch {
+                if (importarResumen) {
+                    importarResumen.className = 'alerta-inline alerta-error';
+                    importarResumen.textContent = 'Error de conexión.';
+                }
+            } finally {
+                inputImportarCsv.value = '';
             }
         });
     }

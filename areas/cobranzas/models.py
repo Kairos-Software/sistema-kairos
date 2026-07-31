@@ -8,11 +8,27 @@ from core.models import Usuario
 # ─────────────────────────────────────────────────────────────
 
 class Servicio(models.Model):
+    TIPO_FIJO  = 'fijo'
+    TIPO_RANGO = 'rango'
+    TIPOS_PRECIO = [
+        (TIPO_FIJO,  'Fijo'),
+        (TIPO_RANGO, 'Por rango'),
+    ]
+
     codigo      = models.CharField(max_length=20, unique=True)
     descripcion = models.CharField(max_length=300)
-    monto       = models.DecimalField(max_digits=12, decimal_places=2)
+    monto       = models.DecimalField(max_digits=12, decimal_places=2,
+                                       help_text="Precio fijo, o adicional a cobrar cuando tipo_precio='rango'")
     activo      = models.BooleanField(default=True)
     proveedor   = models.CharField(max_length=100, blank=True)
+
+    familia     = models.CharField(max_length=20, blank=True, db_index=True,
+                                    help_text="Agrupa los tramos de un mismo servicio escalonado (ej: CF, EX, TNBV)")
+    tipo_precio = models.CharField(max_length=10, choices=TIPOS_PRECIO, default=TIPO_FIJO)
+    rango_desde = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+                                       help_text="Solo si tipo_precio='rango': monto mínimo de boleta cubierto por este tramo")
+    rango_hasta = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+                                       help_text="Solo si tipo_precio='rango': monto máximo de boleta cubierto por este tramo")
 
     creado_por       = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True,
                                          related_name='servicios_creados')
@@ -339,6 +355,10 @@ class DepositoBancario(models.Model):
     numero_comprobante = models.CharField(
                              max_length=100, blank=True,
                              help_text="Número de boleta o comprobante bancario")
+    diferencia         = models.DecimalField(
+                             max_digits=12, decimal_places=2, null=True, blank=True,
+                             help_text="monto − pendiente de depositar en ese momento. "
+                                       "Positivo = sobrante, negativo = faltante.")
     observaciones      = models.TextField(blank=True)
     realizado_por      = models.ForeignKey(
                              Usuario, on_delete=models.SET_NULL,

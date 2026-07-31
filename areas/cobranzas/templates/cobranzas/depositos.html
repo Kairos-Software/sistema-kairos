@@ -118,6 +118,7 @@
                     <th>#</th>
                     <th>Fecha</th>
                     <th>Monto</th>
+                    <th>Diferencia</th>
                     <th>Comprobante</th>
                     <th>Observaciones</th>
                     <th>Registrado por</th>
@@ -129,13 +130,20 @@
                     <td><strong>#{{ d.pk }}</strong></td>
                     <td>{{ d.fecha|date:"d/m/Y" }}</td>
                     <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
+                    <td>
+                        {% if d.diferencia is None %}—
+                        {% elif d.diferencia > 0 %}<span class="dep-dif-sobrante">+${{ d.diferencia|floatformat:2 }} (sobrante)</span>
+                        {% elif d.diferencia < 0 %}<span class="dep-dif-faltante">${{ d.diferencia|floatformat:2 }} (faltante)</span>
+                        {% else %}<span class="dep-dif-sindif">$0,00</span>
+                        {% endif %}
+                    </td>
                     <td>{{ d.numero_comprobante|default:"—" }}</td>
                     <td>{{ d.observaciones|default:"—" }}</td>
                     <td>{{ d.realizado_por }}</td>
                 </tr>
                 {% empty %}
                 <tr id="trVacio">
-                    <td colspan="6" class="dep-vacio">
+                    <td colspan="7" class="dep-vacio">
                         No hay depósitos registrados para esta entidad.
                     </td>
                 </tr>
@@ -247,6 +255,11 @@
 /* ── Tabla header ── */
 .dep-table-header { display: flex; align-items: center; justify-content: space-between; }
 .dep-vacio { text-align: center; color: var(--text-muted, #888); padding: 1.5rem 0; }
+
+/* ── Diferencia (sobrante/faltante) ── */
+.dep-dif-sobrante { color: #16a34a; font-weight: 700; }
+.dep-dif-faltante { color: #dc2626; font-weight: 700; }
+.dep-dif-sindif   { color: var(--text-muted, #888); }
 
 @media (max-width: 640px) {
     .dep-entidad-selector { flex-direction: column; }
@@ -451,11 +464,23 @@
             const trVacio = document.getElementById('trVacio');
             if (trVacio) trVacio.remove();
 
+            let difHtml = '—';
+            if (data.diferencia !== null && data.diferencia !== undefined) {
+                if (data.diferencia > 0) {
+                    difHtml = `<span class="dep-dif-sobrante">+${fmt(data.diferencia)} (sobrante)</span>`;
+                } else if (data.diferencia < 0) {
+                    difHtml = `<span class="dep-dif-faltante">${fmt(data.diferencia)} (faltante)</span>`;
+                } else {
+                    difHtml = `<span class="dep-dif-sindif">$0,00</span>`;
+                }
+            }
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><strong>#${data.deposito_id}</strong></td>
                 <td>${data.fecha}</td>
                 <td><strong>${fmt(data.monto)}</strong></td>
+                <td>${difHtml}</td>
                 <td>${data.numero_comprobante || '—'}</td>
                 <td>${data.observaciones || '—'}</td>
                 <td>${data.realizado_por}</td>
@@ -464,9 +489,12 @@
 
             // Mensaje de éxito
             const okEl = document.getElementById('depositoExito');
+            let difMsg = '';
+            if (data.diferencia > 0) difMsg = ` Sobrante: ${fmt(data.diferencia)}.`;
+            else if (data.diferencia < 0) difMsg = ` Faltante: ${fmt(Math.abs(data.diferencia))}.`;
             okEl.textContent =
                 `Depósito de ${fmt(data.monto)} registrado para ${data.entidad_label}. ` +
-                `Total acumulado: ${fmt(data.nuevo_total)}.`;
+                `Total acumulado: ${fmt(data.nuevo_total)}.${difMsg}`;
             okEl.style.display = '';
 
             // Limpiar campos

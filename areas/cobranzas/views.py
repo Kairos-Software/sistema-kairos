@@ -11,22 +11,26 @@ from .models import Servicio
 from .forms import ServicioForm
 
 # ─────────────────────────────────────────────
-# Prefijos almacenados en memoria (JSON-like).
-# Se pueden agregar dinámicamente desde el form.
-# En una instalación nueva empiezan con estos defaults.
+# Prefijos ("familia") de servicios.
+# CAMBIO: antes se guardaban en una lista en memoria de proceso
+# (PREFIJOS_DEFAULT + _prefijos_extra), que se perdía en cada
+# reinicio del server. Ahora se derivan directamente de los
+# valores distintos de Servicio.familia ya persistidos en la DB.
 # ─────────────────────────────────────────────
 PREFIJOS_DEFAULT = ['EX', 'TR']
 
-# Guardamos en módulo para que persista mientras corre el proceso.
-# Para persistencia real entre reinicios usá caché/DB; esto es suficiente
-# para la mayoría de los casos de uso.
-_prefijos_extra: list[str] = []
-
 
 def get_todos_prefijos() -> list[str]:
-    """Devuelve prefijos default + los agregados dinámicamente, sin duplicados, ordenados."""
-    todos = list(dict.fromkeys(PREFIJOS_DEFAULT + _prefijos_extra))
+    """Prefijos default + todas las familias distintas ya usadas en la DB."""
+    en_uso = Servicio.objects.exclude(familia='').values_list('familia', flat=True).distinct()
+    todos = list(dict.fromkeys(PREFIJOS_DEFAULT + list(en_uso)))
     return sorted(todos)
+
+
+def familia_desde_codigo(codigo: str) -> str:
+    """Prefijo alfabético de un código (ej: 'EX12' → 'EX', 'CVDTV3' → 'CVDTV')."""
+    m = re.match(r'^([A-Za-zÁ-Úá-ú]+)', codigo.strip())
+    return m.group(1).upper() if m else ''
 
 
 def get_siguiente_codigo(prefijo: str) -> str:
@@ -126,6 +130,7 @@ class ServicioCrearEditarAjax(LoginRequiredMixin, View):
 
         if form.is_valid():
             servicio = form.save(commit=False)
+            servicio.familia = familia_desde_codigo(servicio.codigo)
             if not pk:
                 servicio.creado_por = request.user
             else:
@@ -138,6 +143,9 @@ class ServicioCrearEditarAjax(LoginRequiredMixin, View):
                 'monto': str(servicio.monto),
                 'activo': servicio.activo,
                 'proveedor': servicio.proveedor,
+                'tipo_precio': servicio.tipo_precio,
+                'rango_desde': str(servicio.rango_desde) if servicio.rango_desde is not None else None,
+                'rango_hasta': str(servicio.rango_hasta) if servicio.rango_hasta is not None else None,
             }})
         return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 

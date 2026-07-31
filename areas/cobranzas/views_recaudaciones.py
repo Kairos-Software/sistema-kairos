@@ -18,6 +18,7 @@ from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views import View
 
 from .models import RecaudacionDiaria, DepositoBancario
@@ -101,6 +102,16 @@ class RecaudacionesView(LoginRequiredMixin, View):
 
         tot_activo = tot_pf if entidad == RecaudacionDiaria.ENTIDAD_PAGOFACIL else tot_rp
 
+        # CAMBIO: los totales se pasan como JSON (via json_script) en vez de
+        # interpolar {{ valor|floatformat:2 }} directo en un <script>. Con
+        # LANGUAGE_CODE=es-es, floatformat usa coma decimal ("50000,00"),
+        # lo que generaba un literal numérico JS inválido y rompía TODO el
+        # script de la página (incluido el botón "Registrar recaudación").
+        totales_json = {
+            'pagofacil': {k: float(v) for k, v in tot_pf.items()},
+            'rapipago':  {k: float(v) for k, v in tot_rp.items()},
+        }
+
         return render(request, 'cobranzas/recaudaciones.html', {
             'entidad':          entidad,
             'entidad_label':    'PagoFácil' if entidad == RecaudacionDiaria.ENTIDAD_PAGOFACIL else 'RapiPago',
@@ -108,6 +119,7 @@ class RecaudacionesView(LoginRequiredMixin, View):
             'tot_pf':           tot_pf,
             'tot_rp':           tot_rp,
             'tot_activo':       tot_activo,
+            'totales_json':     totales_json,
             'cant_pf':          cant_pf,
             'cant_rp':          cant_rp,
             'recaudacion_hoy':  recaudacion_hoy,
@@ -145,9 +157,14 @@ class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
         if entidad not in (RecaudacionDiaria.ENTIDAD_PAGOFACIL, RecaudacionDiaria.ENTIDAD_RAPIPAGO):
             return JsonResponse({'error': 'Entidad inválida.'}, status=400)
 
-        fecha = data.get('fecha', '').strip()
-        if not fecha:
+        fecha_raw = data.get('fecha', '').strip()
+        if not fecha_raw:
             return JsonResponse({'error': 'La fecha es obligatoria.'}, status=400)
+        fecha = parse_date(fecha_raw)
+        if fecha is None:
+            return JsonResponse({'error': 'Fecha inválida. Usá el formato AAAA-MM-DD.'}, status=400)
+        if fecha > timezone.localdate():
+            return JsonResponse({'error': 'La fecha no puede ser futura.'}, status=400)
 
         try:
             monto = Decimal(str(data.get('monto', 0)))

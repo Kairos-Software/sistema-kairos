@@ -22,7 +22,7 @@
     <h2 class="caja-card-titulo" style="margin-bottom:.9rem;">Seleccionar entidad</h2>
     <div class="dep-entidad-selector">
 
-        <a href="?entidad={{ ENTIDAD_PF }}"
+        <a href="?entidad={{ ENTIDAD_PF }}" data-entidad="{{ ENTIDAD_PF }}"
            class="dep-entidad-btn {% if entidad == ENTIDAD_PF %}dep-entidad-activa{% endif %}">
             <span class="dep-entidad-icono">💳</span>
             <span class="dep-entidad-nombre">PagoFácil</span>
@@ -39,7 +39,7 @@
             </span>
         </a>
 
-        <a href="?entidad={{ ENTIDAD_RP }}"
+        <a href="?entidad={{ ENTIDAD_RP }}" data-entidad="{{ ENTIDAD_RP }}"
            class="dep-entidad-btn {% if entidad == ENTIDAD_RP %}dep-entidad-activa{% endif %}">
             <span class="dep-entidad-icono">🏦</span>
             <span class="dep-entidad-nombre">RapiPago</span>
@@ -323,6 +323,7 @@
 }
 </style>
 
+{{ totales_json|json_script:"totalesInitData" }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     'use strict';
@@ -335,18 +336,13 @@ document.addEventListener('DOMContentLoaded', function () {
     let entidadActual = "{{ entidad }}";
     let modalInstance = null;
 
-    // Totales iniciales desde el servidor (para el balance card sin reload)
+    // Totales iniciales desde el servidor (para el balance card sin reload).
+    // Se pasan via json_script (no interpolados directo en el <script>) para
+    // que no rompan con locales donde el separador decimal es una coma.
+    const totalesRaw = JSON.parse(document.getElementById('totalesInitData').textContent);
     const totalesInit = {
-        '{{ ENTIDAD_PF }}': {
-            recaudado:  {{ tot_pf.recaudado|floatformat:2 }},
-            depositado: {{ tot_pf.depositado|floatformat:2 }},
-            pendiente:  {{ tot_pf.pendiente|floatformat:2 }},
-        },
-        '{{ ENTIDAD_RP }}': {
-            recaudado:  {{ tot_rp.recaudado|floatformat:2 }},
-            depositado: {{ tot_rp.depositado|floatformat:2 }},
-            pendiente:  {{ tot_rp.pendiente|floatformat:2 }},
-        },
+        '{{ ENTIDAD_PF }}': totalesRaw.pagofacil,
+        '{{ ENTIDAD_RP }}': totalesRaw.rapipago,
     };
 
     // ── Utilidades ────────────────────────────────────────

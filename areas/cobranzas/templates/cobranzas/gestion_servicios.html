@@ -15,7 +15,14 @@
     </div>
     <div class="page-header-actions">
         <a href="{% url 'core:home' %}" class="btn-volver">← Volver</a>
+        <a href="{% url 'cobranzas:servicio_exportar' %}" class="btn-nuevo" style="background:#444;">
+            Exportar CSV
+        </a>
         {% if puede_crear %}
+        <button class="btn-nuevo" id="btnImportarServicios" style="background:#666;">
+            Importar CSV
+        </button>
+        <input type="file" id="inputImportarCsv" accept=".csv" style="display:none;">
         <button class="btn-nuevo" id="btnNuevoServicio">
             <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
                 <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -25,6 +32,33 @@
         {% endif %}
     </div>
 </div>
+
+{% if puede_crear %}
+<div class="modal fade" id="importarModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">Importar servicios desde CSV</h5>
+                    <p class="modal-subtitle">
+                        Columnas esperadas: codigo, descripcion, monto, activo, proveedor,
+                        tipo_precio, rango_desde, rango_hasta. Se actualiza por código
+                        (si ya existe, se pisa; si no, se crea).
+                    </p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="importarResumen" class="alerta-inline" style="display:none;"></div>
+                <div id="importarErrores" style="display:none;max-height:260px;overflow-y:auto;font-size:.8rem;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% if sin_permiso %}
 <div class="alerta-inline alerta-error">No tenés permiso para ver los servicios.</div>
@@ -117,6 +151,9 @@
                 data-monto="{{ servicio.monto|floatformat:2 }}"
                 data-proveedor="{{ servicio.proveedor }}"
                 data-activo="{{ servicio.activo|yesno:'true,false' }}"
+                data-tipo-precio="{{ servicio.tipo_precio }}"
+                data-rango-desde="{{ servicio.rango_desde|default_if_none:'' }}"
+                data-rango-hasta="{{ servicio.rango_hasta|default_if_none:'' }}"
                 data-search="{{ servicio.codigo|lower }} {{ servicio.descripcion|lower }} {{ servicio.proveedor|lower }}">
                 <td><span class="codigo-badge">{{ servicio.codigo }}</span></td>
                 <td>{{ servicio.descripcion }}</td>
@@ -305,6 +342,7 @@
                         <div class="col-md-4">
                             <label class="form-label">Monto ($) <span class="field-required">*</span></label>
                             <input type="number" class="form-control" name="monto" id="id_monto" step="0.01" placeholder="0.00">
+                            <span class="codigo-hint" id="hintMonto"></span>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Proveedor</label>
@@ -316,6 +354,23 @@
                                 <input class="form-check-input" type="checkbox" name="activo" id="id_activo" checked>
                                 Activo
                             </label>
+                        </div>
+
+                        {# ── TIPO DE PRECIO ── #}
+                        <div class="col-md-4">
+                            <label class="form-label">Tipo de precio <span class="field-required">*</span></label>
+                            <select class="form-control" name="tipo_precio" id="id_tipo_precio">
+                                <option value="fijo">Fijo (costo propio)</option>
+                                <option value="rango">Por rango (adicional según monto de boleta)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4" id="wrapRangoDesde" style="display:none;">
+                            <label class="form-label">Rango desde ($) <span class="field-required">*</span></label>
+                            <input type="number" class="form-control" name="rango_desde" id="id_rango_desde" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="col-md-4" id="wrapRangoHasta" style="display:none;">
+                            <label class="form-label">Rango hasta ($) <span class="field-required">*</span></label>
+                            <input type="number" class="form-control" name="rango_hasta" id="id_rango_hasta" step="0.01" placeholder="0.00">
                         </div>
                     </div>
                     <div id="formError" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
@@ -363,69 +418,34 @@
                         ¿Cómo escribir la Descripción?
                     </h5>
                     <p style="color:#666;font-size:.75rem;margin:0;">
-                        El sistema detecta automáticamente si el servicio tiene precio variable o fijo.
+                        Elegí el tipo de precio del servicio con el campo "Tipo de precio".
                     </p>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" style="padding:1.2rem 1.4rem;">
 
-                <p class="ayuda-seccion-titulo">📌 Servicios con precio variable (por rango de boleta)</p>
+                <p class="ayuda-seccion-titulo">📌 Servicios "Por rango" (adicional según monto de boleta)</p>
                 <p class="ayuda-texto">
-                    Usá alguno de estos formatos en la descripción para que el sistema identifique
-                    el rango automáticamente al cargar un cobro:
+                    Para boletas de terceros (Rapipago/PagoFácil: luz, SUBE, tarjetas, facturas, etc.)
+                    donde el adicional depende de cuánto es la boleta. Cargá varios servicios con el
+                    <strong>mismo prefijo de código</strong> (ej: CF1, CF2, CF3…), cada uno con su
+                    "Rango desde" / "Rango hasta" y el monto del adicional que corresponde a ese tramo.
+                    Al cobrar, el cajero escribe el prefijo (ej. <code class="ayuda-code">CF</code>) y el
+                    monto de la boleta, y el sistema encuentra automáticamente el tramo que corresponde.
                 </p>
 
-                <div class="ayuda-formatos">
-                    <div class="ayuda-formato-fila">
-                        <span class="ayuda-formato-badge">Recomendado</span>
-                        <code class="ayuda-code">RANGO: 1000-5000</code>
-                        <span class="ayuda-formato-desc">Etiqueta explícita, sin ambigüedad</span>
-                    </div>
-                    <div class="ayuda-formato-fila">
-                        <span class="ayuda-formato-badge ayuda-badge-gris">Aceptado</span>
-                        <code class="ayuda-code">desde 1000 hasta 5000</code>
-                        <span class="ayuda-formato-desc">Con palabras "desde" y "hasta"</span>
-                    </div>
-                    <div class="ayuda-formato-fila">
-                        <span class="ayuda-formato-badge ayuda-badge-gris">Aceptado</span>
-                        <code class="ayuda-code">de 1000 a 5000</code>
-                        <span class="ayuda-formato-desc">Con "de… a…"</span>
-                    </div>
-                    <div class="ayuda-formato-fila">
-                        <span class="ayuda-formato-badge ayuda-badge-gris">Aceptado</span>
-                        <code class="ayuda-code">entre 1000 y 5000</code>
-                        <span class="ayuda-formato-desc">Con "entre… y…"</span>
-                    </div>
-                    <div class="ayuda-formato-fila">
-                        <span class="ayuda-formato-badge ayuda-badge-gris">Aceptado</span>
-                        <code class="ayuda-code">1000-5000</code>
-                        <span class="ayuda-formato-desc">Guión entre dos números</span>
-                    </div>
-                </div>
-
-                <p class="ayuda-seccion-titulo" style="margin-top:1rem;">📦 Servicios de precio fijo</p>
+                <p class="ayuda-seccion-titulo" style="margin-top:1rem;">📦 Servicios "Fijo" (costo propio)</p>
                 <p class="ayuda-texto">
-                    Escribí la descripción <strong>sin ninguno de esos patrones</strong>.
-                    El sistema ignorará el valor de la boleta y aplicará siempre el monto del servicio.
+                    Para servicios propios de costo fijo (fotocopias, trámites, gestiones, desarrollo de
+                    software, etc.). El sistema ignora el valor de la boleta y siempre cobra el monto
+                    cargado en el servicio.
                 </p>
-                <div class="ayuda-formatos">
-                    <div class="ayuda-formato-fila">
-                        <span class="ayuda-formato-badge ayuda-badge-verde">Fijo</span>
-                        <code class="ayuda-code">Internet satelital paquete B1</code>
-                        <span class="ayuda-formato-desc">Sin rango → precio fijo</span>
-                    </div>
-                    <div class="ayuda-formato-fila">
-                        <span class="ayuda-formato-badge ayuda-badge-verde">Fijo</span>
-                        <code class="ayuda-code">Netflix mensual stark-link-20</code>
-                        <span class="ayuda-formato-desc">Guión en nombre → no se interpreta como rango</span>
-                    </div>
-                </div>
 
                 <div class="ayuda-advertencia">
-                    ⚠️ <strong>Rangos solapados:</strong> si dos servicios con el mismo prefijo
-                    cubren el mismo valor (ej. EZ1: 100-300 y EZ2: 200-400 ambos cubren 250),
-                    el sistema reportará un conflicto. Revisá que los rangos no se superpongan.
+                    ⚠️ <strong>Rangos solapados:</strong> si dos servicios con el mismo prefijo de código
+                    cubren el mismo valor (ej. EZ1: 100-300 y EZ2: 200-400, ambos cubren 250),
+                    el sistema reportará un conflicto al cobrar. Revisá que los rangos no se superpongan.
                 </div>
 
             </div>
@@ -447,6 +467,7 @@
     window.servicioActivarUrl    = "{% url 'cobranzas:servicio_activar' %}";
     window.servicioSiguienteUrl  = "{% url 'cobranzas:servicio_siguiente_codigo' %}";
     window.servicioPrefijosUrl   = "{% url 'cobranzas:servicio_prefijos' %}";
+    window.servicioImportarUrl   = "{% url 'cobranzas:servicio_importar' %}";
 
     // Botón ayuda descripción
     document.getElementById('btnAyudaDesc')?.addEventListener('click', () => {

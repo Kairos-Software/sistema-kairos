@@ -84,6 +84,7 @@
                 <th>Entidad</th>
                 <th>Fecha depósito</th>
                 <th>Monto</th>
+                <th>Diferencia</th>
                 <th>Comprobante</th>
                 <th>Observaciones</th>
                 <th>Registrado por</th>
@@ -108,6 +109,13 @@
                 </td>
                 <td>{{ d.fecha|date:"d/m/Y" }}</td>
                 <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
+                <td>
+                    {% if d.diferencia is None %}—
+                    {% elif d.diferencia > 0 %}<span class="dep-dif-sobrante">+${{ d.diferencia|floatformat:2 }}</span>
+                    {% elif d.diferencia < 0 %}<span class="dep-dif-faltante">${{ d.diferencia|floatformat:2 }}</span>
+                    {% else %}<span class="dep-dif-sindif">$0,00</span>
+                    {% endif %}
+                </td>
                 <td>{{ d.numero_comprobante|default:"—" }}</td>
                 <td>{{ d.observaciones|default:"—" }}</td>
                 <td>{{ d.realizado_por }}</td>
@@ -139,6 +147,9 @@
 .badge-entidad { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; }
 .badge-entidad-pagofacil { background:#fff3e0; color:#e65100; }
 .badge-entidad-rapipago  { background:#e8f5e9; color:#2e7d32; }
+.dep-dif-sobrante { color: #16a34a; font-weight: 700; }
+.dep-dif-faltante { color: #dc2626; font-weight: 700; }
+.dep-dif-sindif   { color: #888; }
 </style>
 
 {% if user.is_staff or user.is_superuser %}
