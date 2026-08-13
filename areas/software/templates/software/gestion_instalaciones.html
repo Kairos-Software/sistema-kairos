@@ -66,21 +66,21 @@
     <a href="{% url 'software:gestion_instalaciones' %}" class="btn-limpiar">× Limpiar</a>
     {% endif %}
 
-    <select id="selectOrden" class="filtro-select filtro-select-orden" title="Ordenar tabla">
-        <option value="fecha_desc">Más recientes primero</option>
-        <option value="fecha_asc">Más antiguas primero</option>
-        <option value="puerto_asc">Puerto ↑ menor primero</option>
-        <option value="puerto_desc">Puerto ↓ mayor primero</option>
-        <option value="servicio_asc">Servicio A → Z</option>
-        <option value="servicio_desc">Servicio Z → A</option>
-        <option value="vps_asc">VPS A → Z</option>
-        <option value="vps_desc">VPS Z → A</option>
-        <option value="cliente_asc">Cliente A → Z</option>
-        <option value="cliente_desc">Cliente Z → A</option>
-        <option value="dominio_asc">Dominio A → Z</option>
-        <option value="dominio_desc">Dominio Z → A</option>
-        <option value="estado_asc">Estado A → Z</option>
-        <option value="estado_desc">Estado Z → A</option>
+    <select name="orden" class="filtro-select filtro-select-orden" title="Ordenar tabla" onchange="this.form.submit()">
+        <option value="fecha_desc" {% if orden == 'fecha_desc' %}selected{% endif %}>Más recientes primero</option>
+        <option value="fecha_asc" {% if orden == 'fecha_asc' %}selected{% endif %}>Más antiguas primero</option>
+        <option value="puerto_asc" {% if orden == 'puerto_asc' %}selected{% endif %}>Puerto ↑ menor primero</option>
+        <option value="puerto_desc" {% if orden == 'puerto_desc' %}selected{% endif %}>Puerto ↓ mayor primero</option>
+        <option value="servicio_asc" {% if orden == 'servicio_asc' %}selected{% endif %}>Servicio A → Z</option>
+        <option value="servicio_desc" {% if orden == 'servicio_desc' %}selected{% endif %}>Servicio Z → A</option>
+        <option value="vps_asc" {% if orden == 'vps_asc' %}selected{% endif %}>VPS A → Z</option>
+        <option value="vps_desc" {% if orden == 'vps_desc' %}selected{% endif %}>VPS Z → A</option>
+        <option value="cliente_asc" {% if orden == 'cliente_asc' %}selected{% endif %}>Cliente A → Z</option>
+        <option value="cliente_desc" {% if orden == 'cliente_desc' %}selected{% endif %}>Cliente Z → A</option>
+        <option value="dominio_asc" {% if orden == 'dominio_asc' %}selected{% endif %}>Dominio A → Z</option>
+        <option value="dominio_desc" {% if orden == 'dominio_desc' %}selected{% endif %}>Dominio Z → A</option>
+        <option value="estado_asc" {% if orden == 'estado_asc' %}selected{% endif %}>Estado A → Z</option>
+        <option value="estado_desc" {% if orden == 'estado_desc' %}selected{% endif %}>Estado Z → A</option>
     </select>
 </form>
 
@@ -135,9 +135,9 @@
 
 {% if instalaciones.has_other_pages %}
 <div class="paginacion">
-    {% if instalaciones.has_previous %}<a href="?page={{ instalaciones.previous_page_number }}&q={{ q }}&vps={{ filtro_vps }}&servicio={{ filtro_servicio }}&estado={{ filtro_estado }}&puerto={{ filtro_puerto }}" class="pag-btn">← Anterior</a>{% endif %}
+    {% if instalaciones.has_previous %}<a href="?page={{ instalaciones.previous_page_number }}&q={{ q }}&vps={{ filtro_vps }}&servicio={{ filtro_servicio }}&estado={{ filtro_estado }}&puerto={{ filtro_puerto }}&orden={{ orden }}" class="pag-btn">← Anterior</a>{% endif %}
     <span class="pag-info">Página {{ instalaciones.number }} de {{ instalaciones.paginator.num_pages }}</span>
-    {% if instalaciones.has_next %}<a href="?page={{ instalaciones.next_page_number }}&q={{ q }}&vps={{ filtro_vps }}&servicio={{ filtro_servicio }}&estado={{ filtro_estado }}&puerto={{ filtro_puerto }}" class="pag-btn">Siguiente →</a>{% endif %}
+    {% if instalaciones.has_next %}<a href="?page={{ instalaciones.next_page_number }}&q={{ q }}&vps={{ filtro_vps }}&servicio={{ filtro_servicio }}&estado={{ filtro_estado }}&puerto={{ filtro_puerto }}&orden={{ orden }}" class="pag-btn">Siguiente →</a>{% endif %}
 </div>
 {% endif %}
 
@@ -279,23 +279,4 @@
     };
 </script>
 <script src="{% static 'software/js/gestion_instalaciones.js' %}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        SoftwareOrden.setup({
-            selectId: 'selectOrden',
-            tbodyId: 'tbodyInstalaciones',
-            storageKey: 'software_orden_instalaciones',
-            defaultValue: 'fecha_desc',
-            campos: {
-                fecha:    { attr: 'fechaAlta',      tipo: 'numero' },
-                puerto:   { attr: 'puerto',          tipo: 'numero' },
-                servicio: { attr: 'servicioNombre',  tipo: 'texto' },
-                vps:      { attr: 'vpsNombre',       tipo: 'texto' },
-                cliente:  { attr: 'clienteOrden',    tipo: 'texto' },
-                dominio:  { attr: 'dominio',         tipo: 'texto' },
-                estado:   { attr: 'estadoOrden',     tipo: 'texto' },
-            },
-        });
-    });
-</script>
 {% endblock %}

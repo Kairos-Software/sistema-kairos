@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import ProtectedError, Q
+from django.db.models.functions import Lower
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
@@ -8,6 +9,14 @@ from django.views import View
 from core.permisos import chequear_permiso
 from .forms import ServicioSoftwareForm
 from .models import ServicioSoftware
+
+# Ordenamiento resuelto en la DB (ver nota en views_instalaciones.py).
+ORDENES_SERVICIOS = {
+    'nombre_asc':  (Lower('nombre'),),
+    'nombre_desc': (Lower('nombre').desc(),),
+    'estado_asc':  ('activo', Lower('nombre')),
+    'estado_desc': ('-activo', Lower('nombre')),
+}
 
 
 class GestionServiciosSoftwareView(LoginRequiredMixin, View):
@@ -24,6 +33,11 @@ class GestionServiciosSoftwareView(LoginRequiredMixin, View):
         if activo in ('true', 'false'):
             qs = qs.filter(activo=(activo == 'true'))
 
+        orden = request.GET.get('orden') or 'nombre_asc'
+        if orden not in ORDENES_SERVICIOS:
+            orden = 'nombre_asc'
+        qs = qs.order_by(*ORDENES_SERVICIOS[orden])
+
         paginator = Paginator(qs, 10)
         servicios = paginator.get_page(request.GET.get('page', 1))
 
@@ -31,6 +45,7 @@ class GestionServiciosSoftwareView(LoginRequiredMixin, View):
             'servicios':      servicios,
             'q':              q,
             'filtro_activo':  activo,
+            'orden':          orden,
             'puede_crear':    chequear_permiso(request.user, 'crear_servicios_software'),
             'puede_editar':   chequear_permiso(request.user, 'editar_servicios_software'),
             'puede_eliminar': chequear_permiso(request.user, 'eliminar_servicios_software'),

@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
-from django.db.models import ProtectedError, Q
+from django.db.models import F, ProtectedError, Q
+from django.db.models.functions import Lower
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
@@ -8,6 +9,23 @@ from django.views import View
 from core.permisos import chequear_permiso
 from .forms import VPSForm
 from .models import VPS
+
+# Ordenamiento resuelto en la DB (ver nota en views_instalaciones.py: con
+# resultados paginados, un sort en JS solo reordena la página visible).
+ORDENES_VPS = {
+    'nombre_asc':      (Lower('nombre'),),
+    'nombre_desc':     (Lower('nombre').desc(),),
+    'proveedor_asc':   (Lower('proveedor'),),
+    'proveedor_desc':  (Lower('proveedor').desc(),),
+    'ip_asc':          ('ip',),
+    'ip_desc':         ('-ip',),
+    'vencimiento_asc':  (F('fecha_vencimiento').asc(nulls_last=True),),
+    'vencimiento_desc': (F('fecha_vencimiento').desc(nulls_last=True),),
+    'cpu_asc':         (F('nucleos_cpu').asc(nulls_last=True),),
+    'cpu_desc':        (F('nucleos_cpu').desc(nulls_last=True),),
+    'estado_asc':      ('activa', Lower('nombre')),
+    'estado_desc':     ('-activa', Lower('nombre')),
+}
 
 
 class GestionVpsView(LoginRequiredMixin, View):
@@ -24,6 +42,11 @@ class GestionVpsView(LoginRequiredMixin, View):
         if activa in ('true', 'false'):
             qs = qs.filter(activa=(activa == 'true'))
 
+        orden = request.GET.get('orden') or 'nombre_asc'
+        if orden not in ORDENES_VPS:
+            orden = 'nombre_asc'
+        qs = qs.order_by(*ORDENES_VPS[orden])
+
         paginator = Paginator(qs, 10)
         vps_page = paginator.get_page(request.GET.get('page', 1))
 
@@ -31,6 +54,7 @@ class GestionVpsView(LoginRequiredMixin, View):
             'vps_list':       vps_page,
             'q':              q,
             'filtro_activa':  activa,
+            'orden':          orden,
             'puede_crear':    chequear_permiso(request.user, 'crear_vps'),
             'puede_editar':   chequear_permiso(request.user, 'editar_vps'),
             'puede_eliminar': chequear_permiso(request.user, 'eliminar_vps'),

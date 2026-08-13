@@ -50,11 +50,11 @@
     <a href="{% url 'software:gestion_servicios' %}" class="btn-limpiar">× Limpiar</a>
     {% endif %}
 
-    <select id="selectOrden" class="filtro-select" title="Ordenar tabla">
-        <option value="nombre_asc">Nombre A → Z</option>
-        <option value="nombre_desc">Nombre Z → A</option>
-        <option value="estado_asc">Estado A → Z</option>
-        <option value="estado_desc">Estado Z → A</option>
+    <select name="orden" class="filtro-select" title="Ordenar tabla" onchange="this.form.submit()">
+        <option value="nombre_asc" {% if orden == 'nombre_asc' %}selected{% endif %}>Nombre A → Z</option>
+        <option value="nombre_desc" {% if orden == 'nombre_desc' %}selected{% endif %}>Nombre Z → A</option>
+        <option value="estado_asc" {% if orden == 'estado_asc' %}selected{% endif %}>Estado A → Z</option>
+        <option value="estado_desc" {% if orden == 'estado_desc' %}selected{% endif %}>Estado Z → A</option>
     </select>
 </form>
 
@@ -95,9 +95,9 @@
 
 {% if servicios.has_other_pages %}
 <div class="paginacion">
-    {% if servicios.has_previous %}<a href="?page={{ servicios.previous_page_number }}&q={{ q }}&activo={{ filtro_activo }}" class="pag-btn">← Anterior</a>{% endif %}
+    {% if servicios.has_previous %}<a href="?page={{ servicios.previous_page_number }}&q={{ q }}&activo={{ filtro_activo }}&orden={{ orden }}" class="pag-btn">← Anterior</a>{% endif %}
     <span class="pag-info">Página {{ servicios.number }} de {{ servicios.paginator.num_pages }}</span>
-    {% if servicios.has_next %}<a href="?page={{ servicios.next_page_number }}&q={{ q }}&activo={{ filtro_activo }}" class="pag-btn">Siguiente →</a>{% endif %}
+    {% if servicios.has_next %}<a href="?page={{ servicios.next_page_number }}&q={{ q }}&activo={{ filtro_activo }}&orden={{ orden }}" class="pag-btn">Siguiente →</a>{% endif %}
 </div>
 {% endif %}
 
@@ -174,18 +174,4 @@
     };
 </script>
 <script src="{% static 'software/js/gestion_servicios.js' %}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        SoftwareOrden.setup({
-            selectId: 'selectOrden',
-            tbodyId: 'tbodyServicios',
-            storageKey: 'software_orden_servicios',
-            defaultValue: 'nombre_asc',
-            campos: {
-                nombre: { attr: 'nombre',      tipo: 'texto' },
-                estado: { attr: 'estadoOrden', tipo: 'texto' },
-            },
-        });
-    });
-</script>
 {% endblock %}

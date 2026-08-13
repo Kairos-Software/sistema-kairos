@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import F, Q
+from django.db.models.functions import Coalesce, Lower
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
@@ -8,6 +9,39 @@ from django.views import View
 from core.permisos import chequear_permiso
 from .forms import InstalacionForm
 from .models import VPS, ServicioSoftware, Instalacion
+
+# ─────────────────────────────────────────────────────────────
+# Ordenamiento — se resuelve en la base de datos (order_by), NO en
+# el cliente. Es imprescindible porque la lista está paginada: un
+# sort en JS solo reordena las 10 filas de la página visible, así
+# que por ejemplo "puerto ascendente" quedaba roto en cuanto había
+# más de una página (el orden real seguía siendo el de alta, no el
+# de puerto). Los campos numéricos (puerto) no tienen ambigüedad de
+# collation entre motores, así que ordenar en DB es seguro acá.
+# Los blancos siempre quedan al final, sea cual sea la dirección.
+# ─────────────────────────────────────────────────────────────
+
+_CLIENTE_ORDEN = Coalesce(
+    'cliente__nombre_comercial', 'cliente__razon_social',
+    'cliente__nombre', 'cliente_texto',
+)
+
+ORDENES_INSTALACIONES = {
+    'fecha_desc':    ('-fecha_alta',),
+    'fecha_asc':     ('fecha_alta',),
+    'puerto_asc':    (F('puerto').asc(nulls_last=True),),
+    'puerto_desc':   (F('puerto').desc(nulls_last=True),),
+    'servicio_asc':  (Lower('servicio__nombre'),),
+    'servicio_desc': (Lower('servicio__nombre').desc(),),
+    'vps_asc':       (Lower('vps__nombre'),),
+    'vps_desc':      (Lower('vps__nombre').desc(),),
+    'dominio_asc':   (Lower('dominio'),),
+    'dominio_desc':  (Lower('dominio').desc(),),
+    'estado_asc':    ('estado',),
+    'estado_desc':   ('-estado',),
+    'cliente_asc':   (Lower(_CLIENTE_ORDEN),),
+    'cliente_desc':  (Lower(_CLIENTE_ORDEN).desc(),),
+}
 
 
 class GestionInstalacionesView(LoginRequiredMixin, View):
@@ -48,6 +82,11 @@ class GestionInstalacionesView(LoginRequiredMixin, View):
             except ValueError:
                 pass
 
+        orden = request.GET.get('orden') or 'fecha_desc'
+        if orden not in ORDENES_INSTALACIONES:
+            orden = 'fecha_desc'
+        qs = qs.order_by(*ORDENES_INSTALACIONES[orden])
+
         paginator = Paginator(qs, 10)
         instalaciones = paginator.get_page(request.GET.get('page', 1))
 
@@ -58,6 +97,7 @@ class GestionInstalacionesView(LoginRequiredMixin, View):
             'filtro_servicio': servicio_id or '',
             'filtro_estado':   estado or '',
             'filtro_puerto':   puerto,
+            'orden':           orden,
             'todas_vps':       VPS.objects.all(),
             'todos_servicios': ServicioSoftware.objects.all(),
             'estados':         Instalacion.ESTADOS,

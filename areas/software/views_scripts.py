@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
@@ -15,6 +16,19 @@ def get_todas_categorias():
     en_uso = Script.objects.exclude(categoria='').values_list('categoria', flat=True).distinct()
     todas = set(Script.CATEGORIAS_SUGERIDAS) | set(en_uso)
     return sorted(todas)
+
+
+# Ordenamiento resuelto en la DB (ver nota en views_instalaciones.py).
+ORDENES_SCRIPTS = {
+    'nombre_asc':      (Lower('nombre'),),
+    'nombre_desc':     (Lower('nombre').desc(),),
+    'categoria_asc':   (Lower('categoria'), Lower('nombre')),
+    'categoria_desc':  (Lower('categoria').desc(), Lower('nombre')),
+    'servicio_asc':    (Lower('servicio__nombre').asc(nulls_last=True),),
+    'servicio_desc':   (Lower('servicio__nombre').desc(nulls_last=True),),
+    'vps_asc':         (Lower('vps__nombre').asc(nulls_last=True),),
+    'vps_desc':        (Lower('vps__nombre').desc(nulls_last=True),),
+}
 
 
 class GestionScriptsView(LoginRequiredMixin, View):
@@ -39,6 +53,11 @@ class GestionScriptsView(LoginRequiredMixin, View):
         if vps_id:
             qs = qs.filter(vps_id=vps_id)
 
+        orden = request.GET.get('orden') or 'nombre_asc'
+        if orden not in ORDENES_SCRIPTS:
+            orden = 'nombre_asc'
+        qs = qs.order_by(*ORDENES_SCRIPTS[orden])
+
         paginator = Paginator(qs, 10)
         scripts = paginator.get_page(request.GET.get('page', 1))
 
@@ -47,6 +66,7 @@ class GestionScriptsView(LoginRequiredMixin, View):
             'q':                q,
             'filtro_categoria': categoria or '',
             'filtro_vps':       vps_id or '',
+            'orden':            orden,
             'categorias':       get_todas_categorias(),
             'todos_servicios':  ServicioSoftware.objects.all(),
             'todas_vps':        VPS.objects.all(),

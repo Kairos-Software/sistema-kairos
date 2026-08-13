@@ -50,19 +50,19 @@
     <a href="{% url 'software:gestion_vps' %}" class="btn-limpiar">× Limpiar</a>
     {% endif %}
 
-    <select id="selectOrden" class="filtro-select" title="Ordenar tabla">
-        <option value="nombre_asc">Nombre A → Z</option>
-        <option value="nombre_desc">Nombre Z → A</option>
-        <option value="proveedor_asc">Proveedor A → Z</option>
-        <option value="proveedor_desc">Proveedor Z → A</option>
-        <option value="ip_asc">IP ↑</option>
-        <option value="ip_desc">IP ↓</option>
-        <option value="vencimiento_asc">Vencimiento más próximo</option>
-        <option value="vencimiento_desc">Vencimiento más lejano</option>
-        <option value="cpu_desc">Núcleos CPU ↓</option>
-        <option value="cpu_asc">Núcleos CPU ↑</option>
-        <option value="estado_asc">Estado A → Z</option>
-        <option value="estado_desc">Estado Z → A</option>
+    <select name="orden" class="filtro-select" title="Ordenar tabla" onchange="this.form.submit()">
+        <option value="nombre_asc" {% if orden == 'nombre_asc' %}selected{% endif %}>Nombre A → Z</option>
+        <option value="nombre_desc" {% if orden == 'nombre_desc' %}selected{% endif %}>Nombre Z → A</option>
+        <option value="proveedor_asc" {% if orden == 'proveedor_asc' %}selected{% endif %}>Proveedor A → Z</option>
+        <option value="proveedor_desc" {% if orden == 'proveedor_desc' %}selected{% endif %}>Proveedor Z → A</option>
+        <option value="ip_asc" {% if orden == 'ip_asc' %}selected{% endif %}>IP ↑</option>
+        <option value="ip_desc" {% if orden == 'ip_desc' %}selected{% endif %}>IP ↓</option>
+        <option value="vencimiento_asc" {% if orden == 'vencimiento_asc' %}selected{% endif %}>Vencimiento más próximo</option>
+        <option value="vencimiento_desc" {% if orden == 'vencimiento_desc' %}selected{% endif %}>Vencimiento más lejano</option>
+        <option value="cpu_desc" {% if orden == 'cpu_desc' %}selected{% endif %}>Núcleos CPU ↓</option>
+        <option value="cpu_asc" {% if orden == 'cpu_asc' %}selected{% endif %}>Núcleos CPU ↑</option>
+        <option value="estado_asc" {% if orden == 'estado_asc' %}selected{% endif %}>Estado A → Z</option>
+        <option value="estado_desc" {% if orden == 'estado_desc' %}selected{% endif %}>Estado Z → A</option>
     </select>
 </form>
 
@@ -122,9 +122,9 @@
 
 {% if vps_list.has_other_pages %}
 <div class="paginacion">
-    {% if vps_list.has_previous %}<a href="?page={{ vps_list.previous_page_number }}&q={{ q }}&activa={{ filtro_activa }}" class="pag-btn">← Anterior</a>{% endif %}
+    {% if vps_list.has_previous %}<a href="?page={{ vps_list.previous_page_number }}&q={{ q }}&activa={{ filtro_activa }}&orden={{ orden }}" class="pag-btn">← Anterior</a>{% endif %}
     <span class="pag-info">Página {{ vps_list.number }} de {{ vps_list.paginator.num_pages }}</span>
-    {% if vps_list.has_next %}<a href="?page={{ vps_list.next_page_number }}&q={{ q }}&activa={{ filtro_activa }}" class="pag-btn">Siguiente →</a>{% endif %}
+    {% if vps_list.has_next %}<a href="?page={{ vps_list.next_page_number }}&q={{ q }}&activa={{ filtro_activa }}&orden={{ orden }}" class="pag-btn">Siguiente →</a>{% endif %}
 </div>
 {% endif %}
 
@@ -260,22 +260,4 @@
     };
 </script>
 <script src="{% static 'software/js/gestion_vps.js' %}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        SoftwareOrden.setup({
-            selectId: 'selectOrden',
-            tbodyId: 'tbodyVps',
-            storageKey: 'software_orden_vps',
-            defaultValue: 'nombre_asc',
-            campos: {
-                nombre:       { attr: 'nombre',                 tipo: 'texto' },
-                proveedor:    { attr: 'proveedor',               tipo: 'texto' },
-                ip:           { attr: 'ip',                      tipo: 'texto' },
-                vencimiento:  { attr: 'fechaVencimientoEpoch',    tipo: 'numero' },
-                cpu:          { attr: 'nucleosCpu',               tipo: 'numero' },
-                estado:       { attr: 'estadoOrden',              tipo: 'texto' },
-            },
-        });
-    });
-</script>
 {% endblock %}

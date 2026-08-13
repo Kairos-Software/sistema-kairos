@@ -57,15 +57,15 @@
     <a href="{% url 'software:gestion_scripts' %}" class="btn-limpiar">× Limpiar</a>
     {% endif %}
 
-    <select id="selectOrden" class="filtro-select" title="Ordenar tabla">
-        <option value="nombre_asc">Nombre A → Z</option>
-        <option value="nombre_desc">Nombre Z → A</option>
-        <option value="categoria_asc">Categoría A → Z</option>
-        <option value="categoria_desc">Categoría Z → A</option>
-        <option value="servicio_asc">Servicio A → Z</option>
-        <option value="servicio_desc">Servicio Z → A</option>
-        <option value="vps_asc">VPS A → Z</option>
-        <option value="vps_desc">VPS Z → A</option>
+    <select name="orden" class="filtro-select" title="Ordenar tabla" onchange="this.form.submit()">
+        <option value="nombre_asc" {% if orden == 'nombre_asc' %}selected{% endif %}>Nombre A → Z</option>
+        <option value="nombre_desc" {% if orden == 'nombre_desc' %}selected{% endif %}>Nombre Z → A</option>
+        <option value="categoria_asc" {% if orden == 'categoria_asc' %}selected{% endif %}>Categoría A → Z</option>
+        <option value="categoria_desc" {% if orden == 'categoria_desc' %}selected{% endif %}>Categoría Z → A</option>
+        <option value="servicio_asc" {% if orden == 'servicio_asc' %}selected{% endif %}>Servicio A → Z</option>
+        <option value="servicio_desc" {% if orden == 'servicio_desc' %}selected{% endif %}>Servicio Z → A</option>
+        <option value="vps_asc" {% if orden == 'vps_asc' %}selected{% endif %}>VPS A → Z</option>
+        <option value="vps_desc" {% if orden == 'vps_desc' %}selected{% endif %}>VPS Z → A</option>
     </select>
 </form>
 
@@ -113,9 +113,9 @@
 
 {% if scripts.has_other_pages %}
 <div class="paginacion">
-    {% if scripts.has_previous %}<a href="?page={{ scripts.previous_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}&vps={{ filtro_vps }}" class="pag-btn">← Anterior</a>{% endif %}
+    {% if scripts.has_previous %}<a href="?page={{ scripts.previous_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}&vps={{ filtro_vps }}&orden={{ orden }}" class="pag-btn">← Anterior</a>{% endif %}
     <span class="pag-info">Página {{ scripts.number }} de {{ scripts.paginator.num_pages }}</span>
-    {% if scripts.has_next %}<a href="?page={{ scripts.next_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}&vps={{ filtro_vps }}" class="pag-btn">Siguiente →</a>{% endif %}
+    {% if scripts.has_next %}<a href="?page={{ scripts.next_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}&vps={{ filtro_vps }}&orden={{ orden }}" class="pag-btn">Siguiente →</a>{% endif %}
 </div>
 {% endif %}
 
@@ -256,20 +256,4 @@
     };
 </script>
 <script src="{% static 'software/js/gestion_scripts.js' %}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        SoftwareOrden.setup({
-            selectId: 'selectOrden',
-            tbodyId: 'tbodyScripts',
-            storageKey: 'software_orden_scripts',
-            defaultValue: 'nombre_asc',
-            campos: {
-                nombre:    { attr: 'nombre',         tipo: 'texto' },
-                categoria: { attr: 'categoria',      tipo: 'texto' },
-                servicio:  { attr: 'servicioNombre', tipo: 'texto' },
-                vps:       { attr: 'vpsNombre',      tipo: 'texto' },
-            },
-        });
-    });
-</script>
 {% endblock %}
