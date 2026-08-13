@@ -136,6 +136,7 @@
                 <th class="th-sortable" data-col="monto">
                     Monto <span class="th-sort-arrow" data-col="monto"></span>
                 </th>
+                <th>Rango</th>
                 <th>Proveedor</th>
                 <th class="th-sortable" data-col="activo">
                     Estado <span class="th-sort-arrow" data-col="activo"></span>
@@ -158,6 +159,13 @@
                 <td><span class="codigo-badge">{{ servicio.codigo }}</span></td>
                 <td>{{ servicio.descripcion }}</td>
                 <td><strong>${{ servicio.monto|floatformat:2 }}</strong></td>
+                <td>
+                    {% if servicio.tipo_precio == 'rango' %}
+                        <span class="rango-badge">${{ servicio.rango_desde|floatformat:0 }} – ${{ servicio.rango_hasta|floatformat:0 }}</span>
+                    {% else %}
+                        <span class="rango-badge rango-badge-fijo">Fijo</span>
+                    {% endif %}
+                </td>
                 <td>{{ servicio.proveedor|default:'—' }}</td>
                 <td>
                     <span class="estado-badge {% if servicio.activo %}estado-activo{% else %}estado-inactivo{% endif %}">
@@ -186,7 +194,7 @@
             </tr>
             {% empty %}
             <tr id="rowEmpty">
-                <td colspan="6" class="empty-state">No hay servicios registrados.</td>
+                <td colspan="7" class="empty-state">No hay servicios registrados.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -196,7 +204,7 @@
 {# Fila "sin resultados" para el filtro en vivo (oculta por defecto) #}
 <template id="tmplSinResultados">
     <tr id="rowLiveEmpty">
-        <td colspan="6" class="empty-state">Sin resultados para "<span id="terminoBusqueda"></span>".</td>
+        <td colspan="7" class="empty-state">Sin resultados para "<span id="terminoBusqueda"></span>".</td>
     </tr>
 </template>
 

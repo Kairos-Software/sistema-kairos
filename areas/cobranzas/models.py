@@ -1,6 +1,70 @@
+import re
+from decimal import Decimal
+
 from django.db import models
 from django.utils import timezone
 from core.models import Usuario
+
+
+# ─────────────────────────────────────────────────────────────
+# SINCRONIZACIÓN descripcion <-> rango_desde/rango_hasta
+#
+# La descripcion de los servicios "por rango" suele traer el rango
+# escrito en prosa (ej: "Extracciones/Retiro de Efectivo Desde
+# $600.001/Hasta $700.000"), heredado del Excel de origen. Si alguien
+# edita rango_desde/rango_hasta a mano (formulario o CSV) sin tocar
+# ese texto, quedan desincronizados y el usuario ve un número en la
+# descripción que ya no es el que usa el sistema para cobrar — muy
+# confuso. Server.save() reescribe automáticamente los números
+# encontrados en la descripción para que siempre coincidan.
+# ─────────────────────────────────────────────────────────────
+
+_PATRON_DESDE_HASTA_ABIERTO = re.compile(
+    r'desde\s*\$?\s*([\d.,]+)\s*/\s*en\s*adelante', re.IGNORECASE)
+_PATRON_DESDE_HASTA = re.compile(
+    r'desde\s*\$?\s*([\d.,]+)\s*/\s*hasta\s*\$?\s*([\d.,]+)', re.IGNORECASE)
+_PATRON_DE_A_ABIERTO = re.compile(
+    r'\bde\s*\$?\s*([\d.,]+)\s*en\s*adelante', re.IGNORECASE)
+_PATRON_DE_A = re.compile(
+    r'\bde\s*\$?\s*([\d.,]+)\s*a\s*\$?\s*([\d.,]+)', re.IGNORECASE)
+
+
+def _formato_monto_ar(valor: Decimal) -> str:
+    """2400 -> '2.400' ; 600001 -> '600.001' (formato de miles con punto, sin decimales)."""
+    return f"{int(valor):,}".replace(',', '.')
+
+
+def sincronizar_rango_en_descripcion(descripcion: str, rango_desde, rango_hasta) -> str:
+    """
+    Reescribe los números de rango dentro de descripcion para que
+    coincidan con rango_desde/rango_hasta, preservando el resto del
+    texto (prefijo, "$", "/", etc). Si no reconoce ningún patrón de
+    rango en el texto, lo deja intacto (no fuerza nada).
+    """
+    if descripcion is None or rango_desde is None or rango_hasta is None:
+        return descripcion
+
+    desde_fmt = _formato_monto_ar(rango_desde)
+    hasta_fmt = _formato_monto_ar(rango_hasta)
+
+    for patron, con_hasta in (
+        (_PATRON_DESDE_HASTA_ABIERTO, False),
+        (_PATRON_DESDE_HASTA,         True),
+        (_PATRON_DE_A_ABIERTO,        False),
+        (_PATRON_DE_A,                True),
+    ):
+        m = patron.search(descripcion)
+        if not m:
+            continue
+        if con_hasta:
+            return (
+                descripcion[:m.start(1)] + desde_fmt +
+                descripcion[m.end(1):m.start(2)] + hasta_fmt +
+                descripcion[m.end(2):]
+            )
+        return descripcion[:m.start(1)] + desde_fmt + descripcion[m.end(1):]
+
+    return descripcion
 
 
 # ─────────────────────────────────────────────────────────────
@@ -42,6 +106,13 @@ class Servicio(models.Model):
 
     def __str__(self):
         return f"{self.codigo} - {self.descripcion[:40]}"
+
+    def save(self, *args, **kwargs):
+        if self.tipo_precio == self.TIPO_RANGO:
+            self.descripcion = sincronizar_rango_en_descripcion(
+                self.descripcion, self.rango_desde, self.rango_hasta
+            )
+        super().save(*args, **kwargs)
 
 
 # ─────────────────────────────────────────────────────────────

@@ -91,10 +91,21 @@ class ImportarServiciosCsvAjax(LoginRequiredMixin, View):
         if not archivo:
             return JsonResponse({'error': 'No se recibió ningún archivo.'}, status=400)
 
-        try:
-            texto = archivo.read().decode('utf-8-sig')
-        except UnicodeDecodeError:
-            return JsonResponse({'error': 'El archivo debe estar en UTF-8 (o UTF-8 con BOM).'}, status=400)
+        contenido = archivo.read()
+        texto = None
+        # Excel en configuración regional es-AR/es-ES guarda "CSV" por defecto
+        # en Windows-1252 (ANSI), no UTF-8, salvo que el usuario elija
+        # explícitamente "CSV UTF-8". Probamos los encodings más comunes.
+        for encoding in ('utf-8-sig', 'cp1252', 'latin-1'):
+            try:
+                texto = contenido.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        if texto is None:
+            return JsonResponse({
+                'error': 'No se pudo leer el archivo. Probá exportarlo de nuevo o guardarlo como "CSV UTF-8" desde Excel.'
+            }, status=400)
 
         # Tolerar el "sep=," que agrega nuestro propio export (hint para Excel)
         # si el usuario reimporta el archivo tal cual lo exportó.
