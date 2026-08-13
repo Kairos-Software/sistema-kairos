@@ -1068,6 +1068,38 @@
     color: #ccc;
 }
 
+/* ── Dropdown de sugerencias de prefijo ── */
+.cobro-prefijo-dropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    z-index: 20;
+    min-width: 78px;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1.5px solid #E85C0D;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.12);
+}
+.cobro-prefijo-item {
+    padding: .4rem .65rem;
+    font-size: .85rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #333;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.cobro-prefijo-item:hover,
+.cobro-prefijo-item.cobro-prefijo-item-activo {
+    background: #fff3ec;
+    color: #E85C0D;
+}
+.cobro-prefijo-item + .cobro-prefijo-item {
+    border-top: 1px solid #f0f0f0;
+}
+
 /* ── Texto de ayuda / hint ── */
 .cobro-hint-texto {
     font-size: .71rem;

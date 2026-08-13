@@ -63,7 +63,7 @@
         <div id="panelTabInteligente" class="cobro-tab-panel">
 
             <div class="cobro-smart-fields">
-                <div class="cobro-smart-field">
+                <div class="cobro-smart-field" style="position:relative;">
                     <label class="cobro-label-secundario">Prefijo/Codigo</label>
                     <input type="text" id="smartPrefijo"
                            placeholder="Ej: EX"
@@ -71,6 +71,7 @@
                            maxlength="10"
                            autocomplete="off"
                            style="text-transform:uppercase">
+                    <div id="smartPrefijoDropdown" class="cobro-prefijo-dropdown" style="display:none;"></div>
                 </div>
                 <div class="cobro-smart-field cobro-smart-field-importe">
                     <label class="cobro-label-secundario">Importe de la factura</label>
@@ -410,5 +411,6 @@
 <script>
     window.cobroBuscarUrl    = "{% url 'cobranzas:cobro_buscar_servicio' %}";
     window.cobroConfirmarUrl = "{% url 'cobranzas:cobro_confirmar' %}";
+    window.cobroPrefijosUrl  = "{% url 'cobranzas:servicio_prefijos' %}";
 </script>
 {% endblock %}

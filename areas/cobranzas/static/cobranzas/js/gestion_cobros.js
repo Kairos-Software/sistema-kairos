@@ -107,6 +107,70 @@ const elSmartError         = document.getElementById('smartError');
 const elSmartResultado     = document.getElementById('smartResultado');
 const elSmartImporteConfirm = document.getElementById('smartImporteConfirm');
 
+// ── Autocompletado de prefijos ──────────────────────────────────
+const elPrefijoDropdown = document.getElementById('smartPrefijoDropdown');
+let prefijosDisponibles = [];
+let prefijoActivoIdx    = -1;
+
+async function cargarPrefijosDisponibles() {
+    if (!window.cobroPrefijosUrl) return;
+    try {
+        const res  = await fetch(window.cobroPrefijosUrl);
+        const data = await res.json();
+        prefijosDisponibles = data.prefijos || [];
+    } catch {
+        prefijosDisponibles = [];
+    }
+}
+// El <script> que define window.cobroPrefijosUrl se carga DESPUÉS de este
+// archivo (ver extra_js en gestion_cobros.html), así que no se puede leer
+// en el top-level: hay que esperar a que termine de parsearse el documento.
+document.addEventListener('DOMContentLoaded', cargarPrefijosDisponibles);
+
+function ocultarDropdownPrefijos() {
+    elPrefijoDropdown.style.display = 'none';
+    elPrefijoDropdown.innerHTML     = '';
+    prefijoActivoIdx = -1;
+}
+
+function marcarPrefijoActivo() {
+    [...elPrefijoDropdown.children].forEach((el, i) => {
+        el.classList.toggle('cobro-prefijo-item-activo', i === prefijoActivoIdx);
+    });
+    const activo = elPrefijoDropdown.children[prefijoActivoIdx];
+    if (activo) activo.scrollIntoView({ block: 'nearest' });
+}
+
+function seleccionarPrefijo(prefijo) {
+    elSmartPrefijo.value = prefijo;
+    ocultarDropdownPrefijos();
+    smartOcultarError();
+    smartLimpiarResultado();
+    elSmartImporte.focus();
+}
+
+function mostrarDropdownPrefijos() {
+    const texto = elSmartPrefijo.value.trim().toUpperCase();
+    if (!texto) { ocultarDropdownPrefijos(); return; }
+
+    const coincidencias = prefijosDisponibles.filter(p => p.startsWith(texto));
+    if (coincidencias.length === 0) { ocultarDropdownPrefijos(); return; }
+
+    elPrefijoDropdown.innerHTML = coincidencias
+        .map(p => `<div class="cobro-prefijo-item" data-prefijo="${esc(p)}">${esc(p)}</div>`)
+        .join('');
+    elPrefijoDropdown.style.display = '';
+    prefijoActivoIdx = -1;
+
+    elPrefijoDropdown.querySelectorAll('.cobro-prefijo-item').forEach(el => {
+        // mousedown (no click) para que dispare ANTES del blur del input
+        el.addEventListener('mousedown', e => {
+            e.preventDefault();
+            seleccionarPrefijo(el.dataset.prefijo);
+        });
+    });
+}
+
 function smartMostrarError(msg) {
     elSmartError.textContent   = msg;
     elSmartError.style.display = '';
@@ -121,9 +185,35 @@ function smartLimpiarResultado() {
     estado.smartImporte            = 0;
 }
 
-// Enter en prefijo → foco a importe
+// Navegación del dropdown de prefijos + Enter en prefijo → foco a importe
 elSmartPrefijo.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); elSmartImporte.focus(); }
+    const hayDropdown = elPrefijoDropdown.style.display !== 'none' && elPrefijoDropdown.children.length > 0;
+
+    if (hayDropdown && e.key === 'ArrowDown') {
+        e.preventDefault();
+        prefijoActivoIdx = Math.min(prefijoActivoIdx + 1, elPrefijoDropdown.children.length - 1);
+        marcarPrefijoActivo();
+        return;
+    }
+    if (hayDropdown && e.key === 'ArrowUp') {
+        e.preventDefault();
+        prefijoActivoIdx = Math.max(prefijoActivoIdx - 1, 0);
+        marcarPrefijoActivo();
+        return;
+    }
+    if (e.key === 'Escape') {
+        ocultarDropdownPrefijos();
+        return;
+    }
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        if (hayDropdown && prefijoActivoIdx >= 0) {
+            seleccionarPrefijo(elPrefijoDropdown.children[prefijoActivoIdx].dataset.prefijo);
+        } else {
+            ocultarDropdownPrefijos();
+            elSmartImporte.focus();
+        }
+    }
 });
 
 // Enter en importe → buscar
@@ -131,11 +221,16 @@ elSmartImporte.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btnSmartBuscar').click(); }
 });
 
-// Limpiar resultado al editar los campos de búsqueda
+// Mostrar sugerencias + limpiar resultado al editar los campos de búsqueda
 elSmartPrefijo.addEventListener('input', () => {
     smartOcultarError();
     smartLimpiarResultado();
+    mostrarDropdownPrefijos();
 });
+elSmartPrefijo.addEventListener('focus', () => {
+    if (elSmartPrefijo.value.trim()) mostrarDropdownPrefijos();
+});
+elSmartPrefijo.addEventListener('blur', () => ocultarDropdownPrefijos());
 elSmartImporte.addEventListener('input', () => {
     smartOcultarError();
     smartLimpiarResultado();
