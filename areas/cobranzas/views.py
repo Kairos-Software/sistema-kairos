@@ -7,23 +7,26 @@ from django.db.models import Q, ProtectedError
 import re
 
 from core.permisos import chequear_permiso
-from .models import Servicio
+from .models import Servicio, PrefijoServicio
 from .forms import ServicioForm
 
 # ─────────────────────────────────────────────
 # Prefijos ("familia") de servicios.
 # CAMBIO: antes se guardaban en una lista en memoria de proceso
 # (PREFIJOS_DEFAULT + _prefijos_extra), que se perdía en cada
-# reinicio del server. Ahora se derivan directamente de los
-# valores distintos de Servicio.familia ya persistidos en la DB.
+# reinicio del server y era inconsistente entre workers en
+# producción. Ahora se derivan de los valores distintos de
+# Servicio.familia ya persistidos en la DB, más los prefijos
+# reservados sin servicios todavía (modelo PrefijoServicio).
 # ─────────────────────────────────────────────
 PREFIJOS_DEFAULT = ['EX', 'TR']
 
 
 def get_todos_prefijos() -> list[str]:
-    """Prefijos default + todas las familias distintas ya usadas en la DB."""
+    """Prefijos default + familias en uso + prefijos reservados sin servicios aún."""
     en_uso = Servicio.objects.exclude(familia='').values_list('familia', flat=True).distinct()
-    todos = list(dict.fromkeys(PREFIJOS_DEFAULT + list(en_uso)))
+    reservados = PrefijoServicio.objects.values_list('codigo', flat=True)
+    todos = set(PREFIJOS_DEFAULT) | set(en_uso) | set(reservados)
     return sorted(todos)
 
 
@@ -209,8 +212,11 @@ class PrefijosAjax(LoginRequiredMixin, View):
                 return JsonResponse({'error': 'Prefijo vacío'}, status=400)
             if prefijo in PREFIJOS_DEFAULT:
                 return JsonResponse({'error': f'El prefijo {prefijo} es predeterminado y no se puede eliminar.'}, status=400)
-            if prefijo in _prefijos_extra:
-                _prefijos_extra.remove(prefijo)
+            if Servicio.objects.filter(familia=prefijo).exists():
+                return JsonResponse({
+                    'error': f'El prefijo {prefijo} tiene servicios cargados y no se puede eliminar.'
+                }, status=400)
+            PrefijoServicio.objects.filter(codigo=prefijo).delete()
             return JsonResponse({'prefijos': get_todos_prefijos()})
 
         # accion == 'agregar' (default)
@@ -219,6 +225,6 @@ class PrefijosAjax(LoginRequiredMixin, View):
             return JsonResponse({'error': 'Prefijo vacío'}, status=400)
         if not re.match(r'^[A-Z]{1,10}$', nuevo):
             return JsonResponse({'error': 'El prefijo solo puede contener letras (máx. 10)'}, status=400)
-        if nuevo not in _prefijos_extra and nuevo not in PREFIJOS_DEFAULT:
-            _prefijos_extra.append(nuevo)
+        if nuevo not in PREFIJOS_DEFAULT:
+            PrefijoServicio.objects.get_or_create(codigo=nuevo)
         return JsonResponse({'prefijos': get_todos_prefijos()})

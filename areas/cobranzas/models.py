@@ -45,6 +45,27 @@ class Servicio(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────
+# PREFIJO SERVICIO
+# Prefijos ("familia") reservados desde la UI de Servicios antes de
+# tener ningún Servicio cargado todavía con ese código (ej: se crea
+# el prefijo "TR" para empezar a cargar trámites). Persistido en DB
+# para sobrevivir reinicios y ser consistente entre todos los
+# workers en producción (antes era una lista en memoria de proceso).
+# ─────────────────────────────────────────────────────────────
+
+class PrefijoServicio(models.Model):
+    codigo = models.CharField(max_length=10, unique=True)
+
+    class Meta:
+        ordering = ['codigo']
+        verbose_name        = 'Prefijo de servicio'
+        verbose_name_plural = 'Prefijos de servicio'
+
+    def __str__(self):
+        return self.codigo
+
+
+# ─────────────────────────────────────────────────────────────
 # TURNO
 # Representa una sesión de caja abierta por un cajero.
 # Puede haber varios turnos por día.

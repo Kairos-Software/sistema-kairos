@@ -8,6 +8,7 @@ todo el upsert corre dentro de una única transacción atómica.
 """
 import csv
 import io
+import re
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -24,6 +25,21 @@ COLUMNAS_CSV = [
     'familia', 'tipo_precio', 'rango_desde', 'rango_hasta',
 ]
 
+_PATRON_CODIGO_NATURAL = re.compile(r'^([A-Za-zÁ-Úá-ú]*)(\d*)$')
+
+
+def _clave_orden_natural(codigo: str):
+    """
+    Orden natural por prefijo alfabético + número (EX1, EX2, ..., EX10),
+    en vez del orden alfabético puro de la DB (EX1, EX10, EX2, ...).
+    Mismo criterio que cmpAlfaNum en gestion_servicios.js.
+    """
+    m = _PATRON_CODIGO_NATURAL.match(codigo or '')
+    if not m:
+        return (codigo or '', 0)
+    letras, numero = m.groups()
+    return (letras.upper(), int(numero) if numero else -1)
+
 
 class ExportarServiciosCsvAjax(LoginRequiredMixin, View):
     def get(self, request):
@@ -32,12 +48,16 @@ class ExportarServiciosCsvAjax(LoginRequiredMixin, View):
 
         response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = 'attachment; filename="servicios.csv"'
-        # BOM para que Excel abra el UTF-8 sin romper acentos
-        response.write('﻿')
+        # BOM + "sep=," → Excel (incluso en configuración regional es-AR/es-ES,
+        # donde el separador de listas por defecto es ";") abre el archivo
+        # respetando la coma como delimitador y separa bien las columnas.
+        response.write('﻿sep=,\r\n')
 
         writer = csv.writer(response)
         writer.writerow(COLUMNAS_CSV)
-        for s in Servicio.objects.all().order_by('codigo'):
+
+        servicios = sorted(Servicio.objects.all(), key=lambda s: _clave_orden_natural(s.codigo))
+        for s in servicios:
             writer.writerow([
                 s.codigo, s.descripcion, s.monto, 'SI' if s.activo else 'NO',
                 s.proveedor, s.familia, s.tipo_precio,
@@ -76,7 +96,20 @@ class ImportarServiciosCsvAjax(LoginRequiredMixin, View):
         except UnicodeDecodeError:
             return JsonResponse({'error': 'El archivo debe estar en UTF-8 (o UTF-8 con BOM).'}, status=400)
 
-        reader = csv.DictReader(io.StringIO(texto))
+        # Tolerar el "sep=," que agrega nuestro propio export (hint para Excel)
+        # si el usuario reimporta el archivo tal cual lo exportó.
+        if texto.lstrip().startswith('sep='):
+            texto = texto.lstrip().split('\n', 1)[1] if '\n' in texto else ''
+
+        # Detectar delimitador: Excel en configuración regional es-AR/es-ES
+        # guarda CSV con ";" cuando el usuario edita y vuelve a guardar el
+        # archivo, aunque nosotros exportemos con ",". Probamos ambos.
+        try:
+            delimitador = csv.Sniffer().sniff(texto.splitlines()[0], delimiters=',;').delimiter
+        except (csv.Error, IndexError):
+            delimitador = ','
+
+        reader = csv.DictReader(io.StringIO(texto), delimiter=delimitador)
         columnas_faltantes = {'codigo', 'descripcion', 'monto'} - set(
             (reader.fieldnames or [])
         )
@@ -138,6 +171,7 @@ class ImportarServiciosCsvAjax(LoginRequiredMixin, View):
             familia = (fila.get('familia') or '').strip().upper() or familia_desde_codigo(codigo)
 
             filas_validas.append({
+                'codigo': codigo,
                 'descripcion': descripcion,
                 'monto': monto,
                 'activo': _parse_bool(fila.get('activo', 'SI')),
