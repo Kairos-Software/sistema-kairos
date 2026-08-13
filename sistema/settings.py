@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'core',  # tu aplicación core
     'areas.cobranzas.apps.CobranzasConfig',
+    'areas.software.apps.SoftwareConfig',
 ]
 
 MIDDLEWARE = [

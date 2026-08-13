@@ -1,0 +1,246 @@
+{% extends 'software/base_software.html' %}
+
+{% block title %}VPS - Software{% endblock %}
+
+{% block software_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Gestión de <span>VPS</span></h1>
+        <p class="page-subtitle" id="contadorVps">
+            {{ vps_list.paginator.count|default:0 }} VPS registrada{{ vps_list.paginator.count|pluralize }}
+        </p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'software:index' %}" class="btn-volver">← Volver</a>
+        {% if puede_crear %}
+        <button class="btn-nuevo" id="btnNuevoVps">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nueva VPS
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% if sin_permiso %}
+<div class="alerta-inline alerta-error">No tenés permiso para ver las VPS.</div>
+{% else %}
+
+<form method="get" class="filtros-bar" id="formFiltros">
+    <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
+            <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, proveedor o IP..."
+               class="search-input" autocomplete="off">
+        {% if q %}
+        <button type="button" class="search-clear"
+                onclick="document.querySelector('[name=q]').value='';document.getElementById('formFiltros').submit()">×</button>
+        {% endif %}
+    </div>
+    <select name="activa" class="filtro-select" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        <option value="true" {% if filtro_activa == 'true' %}selected{% endif %}>Activas</option>
+        <option value="false" {% if filtro_activa == 'false' %}selected{% endif %}>Inactivas</option>
+    </select>
+    {% if q or filtro_activa %}
+    <a href="{% url 'software:gestion_vps' %}" class="btn-limpiar">× Limpiar</a>
+    {% endif %}
+</form>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Proveedor</th>
+                <th>IP</th>
+                <th>Plan</th>
+                <th>Vencimiento</th>
+                <th>Estado</th>
+                {% if puede_editar or puede_eliminar %}<th>Acciones</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for vps in vps_list %}
+            <tr data-id="{{ vps.pk }}"
+                data-nombre="{{ vps.nombre }}" data-proveedor="{{ vps.proveedor }}"
+                data-ip="{{ vps.ip }}" data-notas="{{ vps.notas }}"
+                data-plan="{{ vps.plan }}" data-fecha-vencimiento="{{ vps.fecha_vencimiento|date:'Y-m-d' }}"
+                data-nucleos-cpu="{{ vps.nucleos_cpu|default:'' }}" data-memoria="{{ vps.memoria }}"
+                data-espacio-disco="{{ vps.espacio_disco }}" data-ancho-banda="{{ vps.ancho_banda }}"
+                data-sistema-operativo="{{ vps.sistema_operativo }}"
+                data-usuario-ssh="{{ vps.usuario_ssh }}" data-acceso-ssh="{{ vps.acceso_ssh }}"
+                data-activa="{{ vps.activa|yesno:'true,false' }}">
+                <td><strong>{{ vps.nombre }}</strong></td>
+                <td>{{ vps.proveedor }}</td>
+                <td><span class="codigo-badge">{{ vps.ip }}</span></td>
+                <td>{{ vps.plan|default:'—' }}</td>
+                <td>
+                    {% if vps.fecha_vencimiento %}
+                        {{ vps.fecha_vencimiento|date:'d/m/Y' }}
+                        {% if vps.vencida %}<span class="estado-badge estado-false">Vencida</span>
+                        {% elif vps.proxima_a_vencer %}<span class="estado-badge estado-mantenimiento">Por vencer</span>{% endif %}
+                    {% else %}—{% endif %}
+                </td>
+                <td><span class="estado-badge estado-{{ vps.activa|yesno:'true,false' }}">{% if vps.activa %}Activa{% else %}Inactiva{% endif %}</span></td>
+                {% if puede_editar or puede_eliminar %}
+                <td>
+                    <div class="acciones-cell">
+                        {% if puede_editar %}<button class="btn-accion btn-editar" data-id="{{ vps.pk }}">Editar</button>{% endif %}
+                        {% if puede_eliminar %}<button class="btn-accion btn-eliminar" data-id="{{ vps.pk }}" data-nombre="{{ vps.nombre }}">Eliminar</button>{% endif %}
+                    </div>
+                </td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="empty-state">{% if q %}Sin resultados para "{{ q }}"{% else %}No hay VPS registradas.{% endif %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if vps_list.has_other_pages %}
+<div class="paginacion">
+    {% if vps_list.has_previous %}<a href="?page={{ vps_list.previous_page_number }}&q={{ q }}&activa={{ filtro_activa }}" class="pag-btn">← Anterior</a>{% endif %}
+    <span class="pag-info">Página {{ vps_list.number }} de {{ vps_list.paginator.num_pages }}</span>
+    {% if vps_list.has_next %}<a href="?page={{ vps_list.next_page_number }}&q={{ q }}&activa={{ filtro_activa }}" class="pag-btn">Siguiente →</a>{% endif %}
+</div>
+{% endif %}
+
+{% if puede_crear or puede_editar %}
+<div class="modal fade" id="vpsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="formVps">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="vpsModalTitulo">Nueva VPS</h5>
+                        <p class="modal-subtitle">Datos de acceso y proveedor</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body modal-body-compact">
+                    <input type="hidden" name="pk" id="vpsPk">
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Nombre / alias <span class="field-required">*</span></label>
+                            <input type="text" name="nombre" id="vpsNombre" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Proveedor <span class="field-required">*</span></label>
+                            <input type="text" name="proveedor" id="vpsProveedor" class="form-control" placeholder="Ej: Hostinger" required>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">IP <span class="field-required">*</span></label>
+                            <input type="text" name="ip" id="vpsIp" class="form-control" placeholder="Ej: 85.120.32.5" required>
+                        </div>
+                    </div>
+
+                    <p class="form-section-title">Plan contratado</p>
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Plan</label>
+                            <input type="text" name="plan" id="vpsPlan" class="form-control" placeholder="Ej: KVM 1">
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label">Vencimiento</label>
+                            <input type="date" name="fecha_vencimiento" id="vpsFechaVencimiento" class="form-control">
+                        </div>
+                        <div class="col-md-5 mb-2">
+                            <label class="form-label">Sistema operativo</label>
+                            <input type="text" name="sistema_operativo" id="vpsSistemaOperativo" class="form-control" placeholder="Ej: Ubuntu 24.04 LTS">
+                        </div>
+                    </div>
+
+                    <p class="form-section-title">Recursos</p>
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label">Núcleos CPU</label>
+                            <input type="number" name="nucleos_cpu" id="vpsNucleosCpu" class="form-control" placeholder="Ej: 1">
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label">Memoria</label>
+                            <input type="text" name="memoria" id="vpsMemoria" class="form-control" placeholder="Ej: 4 GB">
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label">Disco</label>
+                            <input type="text" name="espacio_disco" id="vpsEspacioDisco" class="form-control" placeholder="Ej: 50 GB">
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label">Ancho de banda</label>
+                            <input type="text" name="ancho_banda" id="vpsAnchoBanda" class="form-control" placeholder="Ej: 4 TB">
+                        </div>
+                    </div>
+
+                    <p class="form-section-title">Acceso</p>
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Usuario SSH</label>
+                            <input type="text" name="usuario_ssh" id="vpsUsuarioSsh" class="form-control" placeholder="root">
+                        </div>
+                        <div class="col-md-8 mb-2">
+                            <label class="form-label">Comando de acceso</label>
+                            <input type="text" name="acceso_ssh" id="vpsAccesoSsh" class="form-control" placeholder="Ej: ssh root@85.209.92.238">
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Notas</label>
+                        <textarea name="notas" id="vpsNotas" class="form-control" rows="2"></textarea>
+                    </div>
+                    <label class="check-label">
+                        <input type="checkbox" name="activa" id="vpsActiva" class="form-check-input" checked>
+                        Activa
+                    </label>
+                    <div id="vpsErrores" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-nuevo">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if puede_eliminar %}
+<div class="modal fade" id="eliminarVpsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">Eliminar VPS</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Confirmás eliminar <strong id="eliminarVpsNombre"></strong>?</p>
+                <p class="eliminar-warning">Esta acción no se puede deshacer.</p>
+                <div id="eliminarVpsError" class="alerta-inline alerta-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn-nuevo" style="background:#c0392b;" id="btnConfirmarEliminarVps">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% load static %}
+<script>
+    window.softwareUrls = {
+        vpsAcciones:  "{% url 'software:vps_acciones' %}",
+        vpsEliminar:  "{% url 'software:vps_eliminar' %}",
+    };
+</script>
+<script src="{% static 'software/js/gestion_vps.js' %}"></script>
+{% endblock %}

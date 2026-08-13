@@ -439,8 +439,23 @@ class DepositoBancario(models.Model):
         (ENTIDAD_RAPIPAGO,  'RapiPago'),
     ]
 
+    TIPO_EFECTIVO_FISICO  = 'efectivo_fisico'
+    TIPO_YA_EN_BANCO      = 'ya_en_banco'
+    TIPO_SALDO_PLATAFORMA = 'saldo_plataforma'
+    TIPOS_DEPOSITO = [
+        (TIPO_EFECTIVO_FISICO,  'Efectivo físico'),
+        (TIPO_YA_EN_BANCO,      'Ya estaba en el banco'),
+        (TIPO_SALDO_PLATAFORMA, 'Saldo a favor en la plataforma'),
+    ]
+
     entidad            = models.CharField(max_length=20, choices=ENTIDADES)
     fecha              = models.DateField(help_text="Fecha en que se realizó el depósito")
+    tipo_deposito      = models.CharField(
+                             max_length=20, choices=TIPOS_DEPOSITO,
+                             blank=True,
+                             help_text="Efectivo físico depositado, dinero que ya estaba en el "
+                                       "banco (ej. transferencias directas), o saldo a favor "
+                                       "reconocido en la propia plataforma (Rapipago/PagoFácil).")
     monto              = models.DecimalField(
                              max_digits=12, decimal_places=2,
                              help_text="Monto depositado en el banco")
@@ -471,7 +486,60 @@ class DepositoBancario(models.Model):
             f"Depósito {self.get_entidad_display()} "
             f"${self.monto} — {self.fecha:%d/%m/%Y}"
         )
-    
+
+
+def _ticket_deposito_path(instance, filename):
+    return f'cobranzas/tickets_depositos/{instance.deposito_id}/{filename}'
+
+
+class DepositoTicket(models.Model):
+    """
+    Comprobante (transferencia o depósito en efectivo) asociado a un
+    DepositoBancario. Se carga por separado, después de registrar el
+    depósito, vía el botón "Ver/editar ticket".
+    """
+    deposito           = models.OneToOneField(
+                             DepositoBancario, on_delete=models.CASCADE,
+                             related_name='ticket')
+    imagen              = models.ImageField(
+                             upload_to=_ticket_deposito_path, blank=True, null=True,
+                             help_text="Foto o captura del comprobante")
+    fecha_hora_ticket   = models.DateTimeField(
+                             null=True, blank=True,
+                             help_text="Fecha y hora que figura en el comprobante")
+    monto_ticket        = models.DecimalField(
+                             max_digits=12, decimal_places=2, null=True, blank=True,
+                             help_text="Monto que figura en el comprobante (puede diferir del "
+                                       "monto cargado en el depósito)")
+    numero_operacion    = models.CharField(max_length=100, blank=True)
+    banco               = models.CharField(max_length=100, blank=True)
+    titular_nombre      = models.CharField(max_length=150, blank=True)
+    titular_cuit        = models.CharField(max_length=30, blank=True)
+    cuenta_origen       = models.CharField(
+                             max_length=150, blank=True,
+                             help_text="Ej: CA$ N° 4085782-3 071-4")
+    destinatario        = models.CharField(
+                             max_length=150, blank=True,
+                             help_text="Solo transferencias: razón social/nombre del destinatario")
+    cuenta_destino      = models.CharField(
+                             max_length=150, blank=True,
+                             help_text="Solo transferencias: CBU/cuenta destino")
+    sucursal            = models.CharField(
+                             max_length=150, blank=True,
+                             help_text="Solo depósitos en efectivo: sucursal/terminal/dirección")
+    concepto            = models.CharField(max_length=150, blank=True)
+    estado              = models.CharField(
+                             max_length=100, blank=True,
+                             help_text="Ej: 'Depósito confirmado'")
+    observaciones       = models.TextField(blank=True)
+    cargado_por         = models.ForeignKey(
+                             Usuario, on_delete=models.SET_NULL,
+                             null=True, related_name='tickets_depositos')
+    fecha_carga         = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Ticket depósito #{self.deposito_id}"
+
 
 class RecaudacionDiaria(models.Model):
     ENTIDAD_PAGOFACIL = 'pagofacil'

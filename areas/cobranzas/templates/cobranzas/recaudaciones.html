@@ -30,9 +30,11 @@
             <span class="dep-entidad-sub">
                 recaudado · {{ cant_pf }} día{{ cant_pf|pluralize }}
             </span>
-            <span class="dep-pendiente-pill {% if tot_pf.pendiente > 0 %}pill-alerta{% else %}pill-ok{% endif %}">
+            <span class="dep-pendiente-pill {% if tot_pf.pendiente > 0 %}pill-alerta{% elif tot_pf.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
                 {% if tot_pf.pendiente > 0 %}
-                    Pendiente ${{ tot_pf.pendiente|floatformat:2 }}
+                    Pendiente ${{ tot_pf.pendiente_mostrar|floatformat:2 }}
+                {% elif tot_pf.pendiente < 0 %}
+                    A favor ${{ tot_pf.a_favor|floatformat:2 }}
                 {% else %}
                     Sin pendiente
                 {% endif %}
@@ -47,9 +49,11 @@
             <span class="dep-entidad-sub">
                 recaudado · {{ cant_rp }} día{{ cant_rp|pluralize }}
             </span>
-            <span class="dep-pendiente-pill {% if tot_rp.pendiente > 0 %}pill-alerta{% else %}pill-ok{% endif %}">
+            <span class="dep-pendiente-pill {% if tot_rp.pendiente > 0 %}pill-alerta{% elif tot_rp.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
                 {% if tot_rp.pendiente > 0 %}
-                    Pendiente ${{ tot_rp.pendiente|floatformat:2 }}
+                    Pendiente ${{ tot_rp.pendiente_mostrar|floatformat:2 }}
+                {% elif tot_rp.pendiente < 0 %}
+                    A favor ${{ tot_rp.a_favor|floatformat:2 }}
                 {% else %}
                     Sin pendiente
                 {% endif %}
@@ -81,13 +85,20 @@
         <div class="rec-balance-item rec-balance-pendiente">
             <span class="rec-balance-label">Pendiente de depositar</span>
             <span class="rec-balance-valor" id="balPendiente">
-                ${{ tot_activo.pendiente|floatformat:2 }}
+                ${{ tot_activo.pendiente_mostrar|floatformat:2 }}
+            </span>
+        </div>
+        <div class="rec-balance-item rec-balance-favor {% if tot_activo.a_favor == 0 %}rec-balance-favor-vacio{% endif %}" id="itemAFavor">
+            <span class="rec-balance-label">A favor en la plataforma</span>
+            <span class="rec-balance-valor" id="balAFavor">
+                ${{ tot_activo.a_favor|floatformat:2 }}
             </span>
         </div>
     </div>
     <p class="rec-balance-hint">
         El pendiente se reduce automáticamente al registrar un depósito bancario en la sección
-        <a href="{% url 'cobranzas:depositos' %}">Depósitos</a>.
+        <a href="{% url 'cobranzas:depositos' %}">Depósitos</a>. Si se depositó de más, la diferencia
+        pasa a mostrarse como "a favor" en vez de un pendiente negativo.
     </p>
 </div>
 
@@ -266,11 +277,12 @@
 }
 .pill-alerta { background: #fff3cd; color: #856404; }
 .pill-ok     { background: #d1fae5; color: #065f46; }
+.pill-favor  { background: #dbeafe; color: #1e40af; }
 
 /* ── Balance card ── */
 .rec-balance-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: .8rem 1.4rem;
     margin-top: .8rem;
 }
@@ -279,6 +291,8 @@
 .rec-balance-valor { font-size: 1.3rem; font-weight: 700; color: var(--text-primary, #111); }
 .rec-depositado    { color: #16a34a; }
 .rec-balance-pendiente .rec-balance-valor { color: var(--accent, #E85C0D); }
+.rec-balance-favor .rec-balance-valor { color: #1e40af; }
+.rec-balance-favor-vacio .rec-balance-valor { color: var(--text-muted, #888); }
 .rec-balance-hint {
     margin-top: .8rem; font-size: .8rem;
     color: var(--text-muted, #888);
@@ -316,6 +330,9 @@
     padding: .6rem .9rem; font-size: .87rem;
 }
 
+@media (max-width: 900px) {
+    .rec-balance-grid { grid-template-columns: 1fr 1fr; }
+}
 @media (max-width: 640px) {
     .dep-entidad-selector { flex-direction: column; }
     .dep-form-grid        { grid-template-columns: 1fr; }
@@ -360,10 +377,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ── Actualizar balance card ───────────────────────────
+    // 'pendiente' viene con signo (positivo = falta depositar, negativo =
+    // se depositó de más). En pantalla se separa en dos valores siempre
+    // positivos: "Pendiente de depositar" y "A favor en la plataforma".
     function actualizarBalance(totales) {
+        const pendienteMostrar = Math.max(0, totales.pendiente);
+        const aFavor           = Math.max(0, -totales.pendiente);
         document.getElementById('balRecaudado').textContent  = fmt(totales.recaudado);
         document.getElementById('balDepositado').textContent = fmt(totales.depositado);
-        document.getElementById('balPendiente').textContent  = fmt(totales.pendiente);
+        document.getElementById('balPendiente').textContent  = fmt(pendienteMostrar);
+        document.getElementById('balAFavor').textContent     = fmt(aFavor);
+        const itemAFavor = document.getElementById('itemAFavor');
+        if (itemAFavor) itemAFavor.classList.toggle('rec-balance-favor-vacio', aFavor === 0);
     }
 
     // ── Actualizar pills en los botones de entidad ────────
@@ -375,6 +400,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (totales.pendiente > 0) {
             pill.textContent = `Pendiente ${fmt(totales.pendiente)}`;
             pill.className   = 'dep-pendiente-pill pill-alerta';
+        } else if (totales.pendiente < 0) {
+            pill.textContent = `A favor ${fmt(-totales.pendiente)}`;
+            pill.className   = 'dep-pendiente-pill pill-favor';
         } else {
             pill.textContent = 'Sin pendiente';
             pill.className   = 'dep-pendiente-pill pill-ok';
@@ -585,8 +613,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Refrescar balance
                     const est = await fetch(`${urlEstado}?entidad=${entidadActual}`);
                     const ed  = await est.json();
-                    actualizarBalance(ed);
-                    actualizarPill(entidadActual, ed);
+                    const totalesEd = {
+                        recaudado:  ed.total_recaudado,
+                        depositado: ed.total_depositado,
+                        pendiente:  ed.pendiente,
+                    };
+                    actualizarBalance(totalesEd);
+                    actualizarPill(entidadActual, totalesEd);
                 } else {
                     alert(d.error || 'Error al eliminar.');
                 }

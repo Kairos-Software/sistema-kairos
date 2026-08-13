@@ -1,0 +1,32 @@
+{% extends 'software/base_software.html' %}
+
+{% block title %}Software{% endblock %}
+
+{% block software_content %}
+<div class="page-header">
+    <div>
+        <h1>Área de <span>Software</span></h1>
+        <p class="page-subtitle">VPS, servicios, instalaciones y scripts de automatización</p>
+    </div>
+    <a href="{% url 'core:home' %}" class="btn-volver">← Volver</a>
+</div>
+
+<div class="software-home-cards">
+    <a href="{% url 'software:gestion_vps' %}" class="software-home-card">
+        <strong>{{ cant_vps }}</strong>
+        <span>VPS registradas</span>
+    </a>
+    <a href="{% url 'software:gestion_servicios' %}" class="software-home-card">
+        <strong>{{ cant_servicios }}</strong>
+        <span>Servicios en catálogo</span>
+    </a>
+    <a href="{% url 'software:gestion_instalaciones' %}" class="software-home-card">
+        <strong>{{ cant_instalaciones }}</strong>
+        <span>Instalaciones activas</span>
+    </a>
+    <a href="{% url 'software:gestion_scripts' %}" class="software-home-card">
+        <strong>{{ cant_scripts }}</strong>
+        <span>Scripts guardados</span>
+    </a>
+</div>
+{% endblock %}

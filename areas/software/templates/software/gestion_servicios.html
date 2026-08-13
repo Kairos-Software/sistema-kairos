@@ -1,0 +1,169 @@
+{% extends 'software/base_software.html' %}
+
+{% block title %}Servicios - Software{% endblock %}
+
+{% block software_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Catálogo de <span>Servicios</span></h1>
+        <p class="page-subtitle">
+            {{ servicios.paginator.count|default:0 }} servicio{{ servicios.paginator.count|pluralize }} en el catálogo
+        </p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'software:index' %}" class="btn-volver">← Volver</a>
+        {% if puede_crear %}
+        <button class="btn-nuevo" id="btnNuevoServicio">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nuevo servicio
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% if sin_permiso %}
+<div class="alerta-inline alerta-error">No tenés permiso para ver el catálogo de servicios.</div>
+{% else %}
+
+<form method="get" class="filtros-bar" id="formFiltros">
+    <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
+            <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre o descripción..."
+               class="search-input" autocomplete="off">
+        {% if q %}
+        <button type="button" class="search-clear"
+                onclick="document.querySelector('[name=q]').value='';document.getElementById('formFiltros').submit()">×</button>
+        {% endif %}
+    </div>
+    <select name="activo" class="filtro-select" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        <option value="true" {% if filtro_activo == 'true' %}selected{% endif %}>Activos</option>
+        <option value="false" {% if filtro_activo == 'false' %}selected{% endif %}>Inactivos</option>
+    </select>
+    {% if q or filtro_activo %}
+    <a href="{% url 'software:gestion_servicios' %}" class="btn-limpiar">× Limpiar</a>
+    {% endif %}
+</form>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Estado</th>
+                {% if puede_editar or puede_eliminar %}<th>Acciones</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for servicio in servicios %}
+            <tr data-id="{{ servicio.pk }}"
+                data-nombre="{{ servicio.nombre }}" data-descripcion="{{ servicio.descripcion }}"
+                data-activo="{{ servicio.activo|yesno:'true,false' }}">
+                <td><strong>{{ servicio.nombre }}</strong></td>
+                <td>{{ servicio.descripcion|default:'—'|truncatechars:80 }}</td>
+                <td><span class="estado-badge estado-{{ servicio.activo|yesno:'true,false' }}">{% if servicio.activo %}Activo{% else %}Inactivo{% endif %}</span></td>
+                {% if puede_editar or puede_eliminar %}
+                <td>
+                    <div class="acciones-cell">
+                        {% if puede_editar %}<button class="btn-accion btn-editar" data-id="{{ servicio.pk }}">Editar</button>{% endif %}
+                        {% if puede_eliminar %}<button class="btn-accion btn-eliminar" data-id="{{ servicio.pk }}" data-nombre="{{ servicio.nombre }}">Eliminar</button>{% endif %}
+                    </div>
+                </td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="empty-state">{% if q %}Sin resultados para "{{ q }}"{% else %}No hay servicios en el catálogo.{% endif %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if servicios.has_other_pages %}
+<div class="paginacion">
+    {% if servicios.has_previous %}<a href="?page={{ servicios.previous_page_number }}&q={{ q }}&activo={{ filtro_activo }}" class="pag-btn">← Anterior</a>{% endif %}
+    <span class="pag-info">Página {{ servicios.number }} de {{ servicios.paginator.num_pages }}</span>
+    {% if servicios.has_next %}<a href="?page={{ servicios.next_page_number }}&q={{ q }}&activo={{ filtro_activo }}" class="pag-btn">Siguiente →</a>{% endif %}
+</div>
+{% endif %}
+
+{% if puede_crear or puede_editar %}
+<div class="modal fade" id="servicioModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="formServicio">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="servicioModalTitulo">Nuevo servicio</h5>
+                        <p class="modal-subtitle">Software propio desplegable en las VPS</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body modal-body-compact">
+                    <input type="hidden" name="pk" id="servicioPk">
+                    <div class="mb-2">
+                        <label class="form-label">Nombre <span class="field-required">*</span></label>
+                        <input type="text" name="nombre" id="servicioNombre" class="form-control" placeholder="Ej: Kai-Cart" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="descripcion" id="servicioDescripcion" class="form-control" rows="2"></textarea>
+                    </div>
+                    <label class="check-label">
+                        <input type="checkbox" name="activo" id="servicioActivo" class="form-check-input" checked>
+                        Activo
+                    </label>
+                    <div id="servicioErrores" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-nuevo">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if puede_eliminar %}
+<div class="modal fade" id="eliminarServicioModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">Eliminar servicio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Confirmás eliminar <strong id="eliminarServicioNombre"></strong>?</p>
+                <p class="eliminar-warning">Esta acción no se puede deshacer.</p>
+                <div id="eliminarServicioError" class="alerta-inline alerta-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn-nuevo" style="background:#c0392b;" id="btnConfirmarEliminarServicio">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% load static %}
+<script>
+    window.softwareUrls = {
+        servicioAcciones: "{% url 'software:servicio_acciones' %}",
+        servicioEliminar: "{% url 'software:servicio_eliminar' %}",
+    };
+</script>
+<script src="{% static 'software/js/gestion_servicios.js' %}"></script>
+{% endblock %}

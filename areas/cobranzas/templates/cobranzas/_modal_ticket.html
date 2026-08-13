@@ -1,0 +1,168 @@
+{# ── Modal Ticket de depósito (compartido por depositos.html e historial_depositos.html) ── #}
+<div class="modal fade" id="modalTicket" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content caja-modal">
+            <div class="modal-body p-3">
+                <div class="ticket-modal-header">
+                    <span class="ticket-modal-icono">🧾</span>
+                    <h5 class="ticket-modal-titulo">Ticket del depósito <span id="ticketDepositoNum"></span></h5>
+                </div>
+
+                <div class="ticket-form-grid">
+                    <div class="caja-field">
+                        <label class="caja-label">Fecha y hora del ticket</label>
+                        <input type="datetime-local" id="ticketFechaHora" class="dep-input">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Monto del ticket</label>
+                        <div class="dep-input-money">
+                            <span class="dep-signo">$</span>
+                            <input type="number" id="ticketMonto" class="dep-input dep-input-num" min="0" step="0.01">
+                        </div>
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">N° de operación</label>
+                        <input type="text" id="ticketNumeroOperacion" class="dep-input">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Banco</label>
+                        <input type="text" id="ticketBanco" class="dep-input" placeholder="Ej: Banco Galicia">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Titular</label>
+                        <input type="text" id="ticketTitularNombre" class="dep-input">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">CUIT titular</label>
+                        <input type="text" id="ticketTitularCuit" class="dep-input" placeholder="20-12345678-9">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Cuenta origen</label>
+                        <input type="text" id="ticketCuentaOrigen" class="dep-input" placeholder="Ej: CA$ N° 4085782-3 071-4">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Sucursal / terminal <span class="caja-hint">(efvo.)</span></label>
+                        <input type="text" id="ticketSucursal" class="dep-input">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Destinatario <span class="caja-hint">(transf.)</span></label>
+                        <input type="text" id="ticketDestinatario" class="dep-input">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Cuenta destino / CBU <span class="caja-hint">(transf.)</span></label>
+                        <input type="text" id="ticketCuentaDestino" class="dep-input">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Concepto</label>
+                        <input type="text" id="ticketConcepto" class="dep-input">
+                    </div>
+                    <div class="caja-field">
+                        <label class="caja-label">Estado</label>
+                        <input type="text" id="ticketEstado" class="dep-input" placeholder="Ej: Depósito confirmado">
+                    </div>
+
+                    <div class="caja-field ticket-campo-ancho">
+                        <label class="caja-label">Observaciones <span class="caja-hint">(opcional)</span></label>
+                        <textarea id="ticketObservaciones" class="dep-input dep-textarea"></textarea>
+                    </div>
+                    <div class="caja-field ticket-campo-ancho">
+                        <label class="caja-label">Foto / captura del comprobante <span class="caja-hint">(opcional)</span></label>
+                        <input type="file" id="ticketImagen" class="dep-input" accept="image/*">
+                        <a id="ticketImagenActualLink" href="#" target="_blank">Ver imagen cargada actualmente →</a>
+                    </div>
+                </div>
+
+                <div id="ticketError" class="caja-error-msg mt-2" style="display:none;"></div>
+                <div id="ticketExito" class="alerta-inline alerta-exito mt-2" style="display:none;"></div>
+
+                <div class="d-flex gap-2 mt-3 justify-content-end">
+                    <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn-caja-principal" id="btnGuardarTicket">Guardar ticket</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ── Self-contained: no depende del CSS de la página que lo incluya ── */
+#modalTicket .ticket-modal-header {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .6rem;
+}
+#modalTicket .ticket-modal-icono { font-size: 1.3rem; }
+#modalTicket .ticket-modal-titulo { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary, #111); }
+
+#modalTicket .ticket-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .5rem .9rem;
+}
+#modalTicket .ticket-campo-ancho { grid-column: span 3; }
+
+#modalTicket .caja-field  { margin-bottom: 0; }
+#modalTicket .caja-label  { display: block; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; color: var(--text-muted, #6b7280); margin-bottom: .2rem; }
+#modalTicket .caja-hint   { text-transform: none; font-weight: 400; }
+
+#modalTicket .dep-input {
+    width: 100%;
+    padding: .35rem .6rem;
+    border: 1.5px solid var(--border, #d1d5db);
+    border-radius: 6px;
+    background: var(--surface, #fff);
+    color: var(--text-primary, #111);
+    font-size: .84rem;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+#modalTicket .dep-input:focus {
+    border-color: var(--accent, #E85C0D);
+    box-shadow: 0 0 0 3px rgba(232,92,13,.12);
+}
+#modalTicket .dep-textarea { resize: vertical; min-height: 40px; }
+#modalTicket .dep-input-money {
+    display: flex; align-items: center;
+    border: 1.5px solid var(--border, #d1d5db); border-radius: 6px;
+    background: var(--surface, #fff); overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
+}
+#modalTicket .dep-input-money:focus-within { border-color: var(--accent, #E85C0D); box-shadow: 0 0 0 3px rgba(232,92,13,.12); }
+#modalTicket .dep-signo    { padding: 0 0 0 .6rem; color: var(--text-muted, #6b7280); font-weight: 600; font-size: .84rem; }
+#modalTicket .dep-input-num { border: none !important; box-shadow: none !important; padding-left: .25rem; }
+#modalTicket .dep-input-num:focus { border: none !important; box-shadow: none !important; }
+
+#modalTicket #ticketImagenActualLink {
+    display: block;
+    font-size: .78rem;
+    margin-top: .3rem;
+}
+
+.btn-ver-ticket {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .25rem .6rem;
+    border-radius: 20px;
+    border: 1.5px solid var(--border, #d1d5db);
+    background: var(--surface, #fff);
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn-ver-ticket:hover { border-color: var(--accent, #E85C0D); color: var(--accent, #E85C0D); }
+.btn-ver-ticket-cargado { border-color: #16a34a; color: #16a34a; background: #f0fdf4; }
+
+@media (max-width: 900px) {
+    #modalTicket .ticket-form-grid { grid-template-columns: 1fr 1fr; }
+    #modalTicket .ticket-campo-ancho { grid-column: span 2; }
+}
+@media (max-width: 560px) {
+    #modalTicket .ticket-form-grid { grid-template-columns: 1fr; }
+    #modalTicket .ticket-campo-ancho { grid-column: span 1; }
+}
+</style>

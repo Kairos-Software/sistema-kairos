@@ -75,6 +75,14 @@
             </label>
             <input type="text" id="inputComprobante" class="dep-input" placeholder="Ej: 00123456">
         </div>
+        <div class="caja-field">
+            <label class="caja-label">Tipo de depósito</label>
+            <select id="inputTipoDeposito" class="dep-input">
+                <option value="efectivo_fisico">Efectivo físico</option>
+                <option value="ya_en_banco">Ya estaba en el banco</option>
+                <option value="saldo_plataforma">Saldo a favor en la plataforma</option>
+            </select>
+        </div>
     </div>
 
     <div class="caja-field" style="margin-top:.6rem;">
@@ -118,10 +126,12 @@
                     <th>#</th>
                     <th>Fecha</th>
                     <th>Monto</th>
+                    <th>Tipo</th>
                     <th>Diferencia</th>
                     <th>Comprobante</th>
                     <th>Observaciones</th>
                     <th>Registrado por</th>
+                    <th>Ticket</th>
                 </tr>
             </thead>
             <tbody id="tbodyDepositos">
@@ -130,6 +140,10 @@
                     <td><strong>#{{ d.pk }}</strong></td>
                     <td>{{ d.fecha|date:"d/m/Y" }}</td>
                     <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
+                    <td>
+                        {% if d.tipo_deposito %}<span class="badge-tipo-deposito badge-tipo-{{ d.tipo_deposito }}">{{ d.get_tipo_deposito_display }}</span>
+                        {% else %}—{% endif %}
+                    </td>
                     <td>
                         {% if d.diferencia is None %}—
                         {% elif d.diferencia > 0 %}<span class="dep-dif-sobrante">+${{ d.diferencia|floatformat:2 }} (sobrante)</span>
@@ -140,10 +154,15 @@
                     <td>{{ d.numero_comprobante|default:"—" }}</td>
                     <td>{{ d.observaciones|default:"—" }}</td>
                     <td>{{ d.realizado_por }}</td>
+                    <td>
+                        <button type="button" class="btn-ver-ticket {% if d.ticket %}btn-ver-ticket-cargado{% endif %}" data-deposito-id="{{ d.pk }}">
+                            {% if d.ticket %}🧾 Ticket cargado{% else %}🧾 Ver/editar ticket{% endif %}
+                        </button>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr id="trVacio">
-                    <td colspan="7" class="dep-vacio">
+                    <td colspan="9" class="dep-vacio">
                         No hay depósitos registrados para esta entidad.
                     </td>
                 </tr>
@@ -152,6 +171,8 @@
         </table>
     </div>
 </div>
+
+{% include 'cobranzas/_modal_ticket.html' %}
 
 {# ── Modal confirmación ── #}
 <div class="modal fade" id="modalConfirmar" tabindex="-1" aria-hidden="true">
@@ -172,6 +193,10 @@
                 <div class="caja-modal-fila">
                     <span>Monto</span>
                     <strong id="modalMonto">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span>Tipo</span>
+                    <strong id="modalTipoDeposito">—</strong>
                 </div>
                 <div class="caja-modal-fila" id="modalFilaComprobante" style="display:none;">
                     <span>Comprobante</span>
@@ -261,6 +286,12 @@
 .dep-dif-faltante { color: #dc2626; font-weight: 700; }
 .dep-dif-sindif   { color: var(--text-muted, #888); }
 
+/* ── Tipo de depósito ── */
+.badge-tipo-deposito { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; white-space:nowrap; }
+.badge-tipo-efectivo_fisico  { background:#e8f5e9; color:#2e7d32; }
+.badge-tipo-ya_en_banco      { background:#e3f2fd; color:#1565c0; }
+.badge-tipo-saldo_plataforma { background:#fff3e0; color:#e65100; }
+
 @media (max-width: 640px) {
     .dep-entidad-selector { flex-direction: column; }
     .dep-form-grid        { grid-template-columns: 1fr; }
@@ -270,6 +301,8 @@
 <script>
 (function () {
     'use strict';
+
+    window.ticketDepositoUrl = "{% url 'cobranzas:depositos_ticket' %}";
 
     const urlRegistrar = "{% url 'cobranzas:depositos_registrar' %}";
     const urlHistorial = "{% url 'cobranzas:depositos_historial' %}";
@@ -289,6 +322,12 @@
             minimumFractionDigits: 2, maximumFractionDigits: 2,
         });
     }
+
+    const tipoDepositoLabels = {
+        'efectivo_fisico':  'Efectivo físico',
+        'ya_en_banco':      'Ya estaba en el banco',
+        'saldo_plataforma': 'Saldo a favor en la plataforma',
+    };
 
     // Fecha de hoy por defecto
     const inputFecha = document.getElementById('inputFecha');
@@ -326,6 +365,7 @@
         const monto  = parseFloat(document.getElementById('inputMonto').value);
         const comp   = document.getElementById('inputComprobante').value.trim();
         const obs    = document.getElementById('inputObservaciones').value.trim();
+        const tipo   = document.getElementById('inputTipoDeposito').value;
         const errEl  = document.getElementById('depositoError');
         const okEl   = document.getElementById('depositoExito');
 
@@ -353,6 +393,7 @@
         const [y, m, d] = fecha.split('-');
         document.getElementById('modalFecha').textContent = `${d}/${m}/${y}`;
         document.getElementById('modalMonto').textContent = fmt(monto);
+        document.getElementById('modalTipoDeposito').textContent = tipoDepositoLabels[tipo] || tipo;
 
         const filaCom = document.getElementById('modalFilaComprobante');
         if (comp) {
@@ -385,6 +426,7 @@
         const monto = parseFloat(document.getElementById('inputMonto').value);
         const comp  = document.getElementById('inputComprobante').value.trim();
         const obs   = document.getElementById('inputObservaciones').value.trim();
+        const tipo  = document.getElementById('inputTipoDeposito').value;
         const errEl = document.getElementById('modalError');
         const btn   = this;
 
@@ -405,6 +447,7 @@
                     entidad:            entidadActual,
                     fecha,
                     monto,
+                    tipo_deposito:      tipo,
                     numero_comprobante: comp,
                     observaciones:      obs,
                 }),
@@ -475,15 +518,21 @@
                 }
             }
 
+            const tipoHtml = data.tipo_deposito
+                ? `<span class="badge-tipo-deposito badge-tipo-${data.tipo_deposito}">${data.tipo_deposito_label}</span>`
+                : '—';
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><strong>#${data.deposito_id}</strong></td>
                 <td>${data.fecha}</td>
                 <td><strong>${fmt(data.monto)}</strong></td>
+                <td>${tipoHtml}</td>
                 <td>${difHtml}</td>
                 <td>${data.numero_comprobante || '—'}</td>
                 <td>${data.observaciones || '—'}</td>
                 <td>${data.realizado_por}</td>
+                <td><button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}">🧾 Ver/editar ticket</button></td>
             `;
             tbody.prepend(tr);
 
@@ -498,9 +547,10 @@
             okEl.style.display = '';
 
             // Limpiar campos
-            document.getElementById('inputMonto').value         = '';
-            document.getElementById('inputComprobante').value   = '';
-            document.getElementById('inputObservaciones').value = '';
+            document.getElementById('inputMonto').value          = '';
+            document.getElementById('inputComprobante').value    = '';
+            document.getElementById('inputObservaciones').value  = '';
+            document.getElementById('inputTipoDeposito').value   = 'efectivo_fisico';
 
         } else {
             errEl.textContent = data.error || 'Error al registrar el depósito.';
@@ -513,4 +563,9 @@
 })();
 </script>
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'cobranzas/js/ticket_deposito.js' %}"></script>
 {% endblock %}

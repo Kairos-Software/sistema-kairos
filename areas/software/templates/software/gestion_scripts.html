@@ -1,0 +1,246 @@
+{% extends 'software/base_software.html' %}
+
+{% block title %}Scripts - Software{% endblock %}
+
+{% block software_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Biblioteca de <span>Scripts</span></h1>
+        <p class="page-subtitle">
+            {{ scripts.paginator.count|default:0 }} script{{ scripts.paginator.count|pluralize }} guardado{{ scripts.paginator.count|pluralize }}
+        </p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'software:index' %}" class="btn-volver">← Volver</a>
+        {% if puede_crear %}
+        <button class="btn-nuevo" id="btnNuevoScript">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nuevo script
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% if sin_permiso %}
+<div class="alerta-inline alerta-error">No tenés permiso para ver los scripts.</div>
+{% else %}
+
+<form method="get" class="filtros-bar" id="formFiltros">
+    <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
+            <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, descripción o servicio..."
+               class="search-input" autocomplete="off">
+        {% if q %}
+        <button type="button" class="search-clear"
+                onclick="document.querySelector('[name=q]').value='';document.getElementById('formFiltros').submit()">×</button>
+        {% endif %}
+    </div>
+    <select name="categoria" class="filtro-select" onchange="this.form.submit()">
+        <option value="">Todas las categorías</option>
+        {% for cat in categorias %}
+        <option value="{{ cat }}" {% if filtro_categoria == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+    </select>
+    <select name="vps" class="filtro-select" onchange="this.form.submit()">
+        <option value="">Todas las VPS</option>
+        {% for v in todas_vps %}
+        <option value="{{ v.pk }}" {% if filtro_vps == v.pk|stringformat:'s' %}selected{% endif %}>{{ v.nombre }}</option>
+        {% endfor %}
+    </select>
+    {% if q or filtro_categoria or filtro_vps %}
+    <a href="{% url 'software:gestion_scripts' %}" class="btn-limpiar">× Limpiar</a>
+    {% endif %}
+</form>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Categoría</th>
+                <th>Servicio</th>
+                <th>VPS</th>
+                <th>Descripción</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for script in scripts %}
+            <tr data-id="{{ script.pk }}"
+                data-nombre="{{ script.nombre }}" data-categoria="{{ script.categoria }}"
+                data-servicio="{{ script.servicio_id|default:'' }}" data-vps="{{ script.vps_id|default:'' }}"
+                data-descripcion="{{ script.descripcion }}" data-contenido="{{ script.contenido }}"
+                data-archivo="{{ script.archivo.name|default:'' }}">
+                <td><strong>{{ script.nombre }}</strong></td>
+                <td><span class="categoria-badge">{{ script.categoria }}</span></td>
+                <td>{{ script.servicio.nombre|default:'—' }}</td>
+                <td>{{ script.vps.nombre|default:'Todas / cualquiera' }}</td>
+                <td>{{ script.descripcion|default:'—'|truncatechars:60 }}</td>
+                <td>
+                    <div class="acciones-cell">
+                        <button class="btn-accion btn-ver" data-id="{{ script.pk }}">Ver</button>
+                        <a class="btn-accion" href="{% url 'software:script_descargar' script.pk %}">Descargar</a>
+                        {% if puede_editar %}<button class="btn-accion btn-editar" data-id="{{ script.pk }}">Editar</button>{% endif %}
+                        {% if puede_eliminar %}<button class="btn-accion btn-eliminar" data-id="{{ script.pk }}" data-nombre="{{ script.nombre }}">Eliminar</button>{% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="empty-state">{% if q %}Sin resultados para "{{ q }}"{% else %}No hay scripts guardados.{% endif %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if scripts.has_other_pages %}
+<div class="paginacion">
+    {% if scripts.has_previous %}<a href="?page={{ scripts.previous_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}" class="pag-btn">← Anterior</a>{% endif %}
+    <span class="pag-info">Página {{ scripts.number }} de {{ scripts.paginator.num_pages }}</span>
+    {% if scripts.has_next %}<a href="?page={{ scripts.next_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}" class="pag-btn">Siguiente →</a>{% endif %}
+</div>
+{% endif %}
+
+{# ── Modal ver contenido (solo lectura) ── #}
+<div class="modal fade" id="verScriptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="verScriptTitulo"></h5>
+                    <p class="modal-subtitle" id="verScriptSubtitulo"></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre class="script-contenido-view" id="verScriptContenido"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnCopiarScript">Copiar contenido</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if puede_crear or puede_editar %}
+<div class="modal fade" id="scriptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="formScript">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="scriptModalTitulo">Nuevo script</h5>
+                        <p class="modal-subtitle">Herramienta de automatización — ejecución manual en la VPS</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body modal-body-compact">
+                    <input type="hidden" name="pk" id="scriptPk">
+                    <input type="hidden" name="categoria" id="scriptCategoria">
+
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Nombre <span class="field-required">*</span></label>
+                            <input type="text" name="nombre" id="scriptNombre" class="form-control" placeholder="Ej: Abrir puertos 9000 y 5432" required>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label">Categoría</label>
+                            <select id="scriptCategoriaSelect" class="form-select">
+                                {% for cat in categorias %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
+                                <option value="__nueva__">+ Nueva categoría…</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label">&nbsp;</label>
+                            <input type="text" id="scriptCategoriaNueva" class="form-control" placeholder="Nombre de la categoría" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Servicio asociado</label>
+                            <select name="servicio" id="scriptServicio" class="form-select">
+                                <option value="">— Sin asociar —</option>
+                                {% for s in todos_servicios %}<option value="{{ s.pk }}">{{ s.nombre }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">VPS</label>
+                            <select name="vps" id="scriptVps" class="form-select">
+                                <option value="">— Todas / cualquiera —</option>
+                                {% for v in todas_vps %}<option value="{{ v.pk }}">{{ v.nombre }}</option>{% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="descripcion" id="scriptDescripcion" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Contenido del script</label>
+                        <textarea name="contenido" id="scriptContenido" class="form-control code-textarea"
+                                  placeholder="#!/bin/bash&#10;..."></textarea>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label">Archivo (opcional)</label>
+                        <input type="file" name="archivo" id="scriptArchivo" class="form-control">
+                        <p class="field-hint" id="scriptArchivoActual"></p>
+                    </div>
+
+                    <div id="scriptErrores" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-nuevo">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if puede_eliminar %}
+<div class="modal fade" id="eliminarScriptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">Eliminar script</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Confirmás eliminar <strong id="eliminarScriptNombre"></strong>?</p>
+                <p class="eliminar-warning">Esta acción no se puede deshacer.</p>
+                <div id="eliminarScriptError" class="alerta-inline alerta-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn-nuevo" style="background:#c0392b;" id="btnConfirmarEliminarScript">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% load static %}
+<script>
+    window.softwareUrls = {
+        scriptAcciones: "{% url 'software:script_acciones' %}",
+        scriptEliminar: "{% url 'software:script_eliminar' %}",
+    };
+</script>
+<script src="{% static 'software/js/gestion_scripts.js' %}"></script>
+{% endblock %}

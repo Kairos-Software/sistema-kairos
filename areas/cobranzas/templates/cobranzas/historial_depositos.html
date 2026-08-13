@@ -48,6 +48,15 @@
             <option value="{{ ENTIDAD_RP }}" {% if entidad == ENTIDAD_RP %}selected{% endif %}>RapiPago</option>
         </select>
     </div>
+    <div class="filtro-fecha-wrap">
+        <label>Tipo</label>
+        <select name="tipo_deposito" class="filtro-input">
+            <option value="">Todos</option>
+            {% for valor, etiqueta in TIPOS_DEPOSITO %}
+            <option value="{{ valor }}" {% if tipo_deposito == valor %}selected{% endif %}>{{ etiqueta }}</option>
+            {% endfor %}
+        </select>
+    </div>
     <button type="submit" class="btn-filtrar">Filtrar</button>
     <a href="{% url 'cobranzas:depositos_historial' %}" class="btn-volver">Limpiar</a>
 </form>
@@ -84,11 +93,13 @@
                 <th>Entidad</th>
                 <th>Fecha depósito</th>
                 <th>Monto</th>
+                <th>Tipo</th>
                 <th>Diferencia</th>
                 <th>Comprobante</th>
                 <th>Observaciones</th>
                 <th>Registrado por</th>
                 <th>Registrado el</th>
+                <th>Ticket</th>
                 {% if user.is_staff or user.is_superuser %}<th style="width:44px;"></th>{% endif %}
             </tr>
         </thead>
@@ -110,6 +121,10 @@
                 <td>{{ d.fecha|date:"d/m/Y" }}</td>
                 <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
                 <td>
+                    {% if d.tipo_deposito %}<span class="badge-tipo-deposito badge-tipo-{{ d.tipo_deposito }}">{{ d.get_tipo_deposito_display }}</span>
+                    {% else %}—{% endif %}
+                </td>
+                <td>
                     {% if d.diferencia is None %}—
                     {% elif d.diferencia > 0 %}<span class="dep-dif-sobrante">+${{ d.diferencia|floatformat:2 }}</span>
                     {% elif d.diferencia < 0 %}<span class="dep-dif-faltante">${{ d.diferencia|floatformat:2 }}</span>
@@ -120,6 +135,11 @@
                 <td>{{ d.observaciones|default:"—" }}</td>
                 <td>{{ d.realizado_por }}</td>
                 <td>{{ d.fecha_registro|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <button type="button" class="btn-ver-ticket {% if d.ticket %}btn-ver-ticket-cargado{% endif %}" data-deposito-id="{{ d.pk }}">
+                        {% if d.ticket %}🧾 Ticket cargado{% else %}🧾 Ver/editar ticket{% endif %}
+                    </button>
+                </td>
                 {% if user.is_staff or user.is_superuser %}
                 <td>
                     <button class="btn-eliminar-fila" data-id="{{ d.pk }}"
@@ -150,7 +170,13 @@
 .dep-dif-sobrante { color: #16a34a; font-weight: 700; }
 .dep-dif-faltante { color: #dc2626; font-weight: 700; }
 .dep-dif-sindif   { color: #888; }
+.badge-tipo-deposito { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; white-space:nowrap; }
+.badge-tipo-efectivo_fisico  { background:#e8f5e9; color:#2e7d32; }
+.badge-tipo-ya_en_banco      { background:#e3f2fd; color:#1565c0; }
+.badge-tipo-saldo_plataforma { background:#fff3e0; color:#e65100; }
 </style>
+
+{% include 'cobranzas/_modal_ticket.html' %}
 
 {% if user.is_staff or user.is_superuser %}
 
@@ -195,6 +221,8 @@
 
 {% block extra_js %}
 {{ block.super }}
+<script>window.ticketDepositoUrl = "{% url 'cobranzas:depositos_ticket' %}";</script>
+<script src="{% static 'cobranzas/js/ticket_deposito.js' %}"></script>
 {% if user.is_staff or user.is_superuser %}
 <script src="{% static 'cobranzas/js/historial_eliminar.js' %}"></script>
 {% endif %}

@@ -8,12 +8,13 @@ from decimal import Decimal, InvalidOperation
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views import View
 from django.db import transaction
-from .models import DepositoBancario
+from django.utils.dateparse import parse_datetime
+from .models import DepositoBancario, DepositoTicket
 from .views_recaudaciones import _totales_por_entidad
 
 
@@ -26,7 +27,7 @@ class DepositosView(LoginRequiredMixin, View):
         ultimos = (
             DepositoBancario.objects
             .filter(entidad=entidad)
-            .select_related('realizado_por')[:10]
+            .select_related('realizado_por', 'ticket')[:10]
         )
 
         total_pf = (
@@ -83,6 +84,10 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
         except (ValueError, InvalidOperation):
             return JsonResponse({'error': 'El monto debe ser mayor a cero.'}, status=400)
 
+        tipo_deposito = data.get('tipo_deposito', '').strip()
+        if tipo_deposito and tipo_deposito not in dict(DepositoBancario.TIPOS_DEPOSITO):
+            return JsonResponse({'error': 'Tipo de depósito inválido.'}, status=400)
+
         numero_comprobante = data.get('numero_comprobante', '').strip()
         observaciones      = data.get('observaciones', '').strip()
 
@@ -97,6 +102,7 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
                 deposito = DepositoBancario.objects.create(
                     entidad=entidad,
                     fecha=fecha,
+                    tipo_deposito=tipo_deposito,
                     monto=monto,
                     numero_comprobante=numero_comprobante,
                     diferencia=diferencia,
@@ -126,6 +132,8 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
             'entidad':            entidad,
             'entidad_label':      deposito.get_entidad_display(),
             'fecha':              fecha_display,
+            'tipo_deposito':      deposito.tipo_deposito,
+            'tipo_deposito_label': deposito.get_tipo_deposito_display() if deposito.tipo_deposito else '',
             'monto':              float(deposito.monto),
             'numero_comprobante': deposito.numero_comprobante or '',
             'diferencia':         float(deposito.diferencia) if deposito.diferencia is not None else None,
@@ -137,11 +145,12 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
 
 class HistorialDepositosView(LoginRequiredMixin, View):
     def get(self, request):
-        desde   = request.GET.get('desde',   '').strip()
-        hasta   = request.GET.get('hasta',   '').strip()
-        entidad = request.GET.get('entidad', '').strip()
+        desde         = request.GET.get('desde',   '').strip()
+        hasta         = request.GET.get('hasta',   '').strip()
+        entidad       = request.GET.get('entidad', '').strip()
+        tipo_deposito = request.GET.get('tipo_deposito', '').strip()
 
-        qs = DepositoBancario.objects.select_related('realizado_por').all()
+        qs = DepositoBancario.objects.select_related('realizado_por', 'ticket').all()
 
         if desde:
             qs = qs.filter(fecha__gte=desde)
@@ -149,6 +158,8 @@ class HistorialDepositosView(LoginRequiredMixin, View):
             qs = qs.filter(fecha__lte=hasta)
         if entidad in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
             qs = qs.filter(entidad=entidad)
+        if tipo_deposito in dict(DepositoBancario.TIPOS_DEPOSITO):
+            qs = qs.filter(tipo_deposito=tipo_deposito)
 
         total_filtrado    = qs.aggregate(t=Sum('monto'))['t'] or Decimal('0')
         total_pf_filtrado = (
@@ -165,13 +176,83 @@ class HistorialDepositosView(LoginRequiredMixin, View):
             'desde':              desde,
             'hasta':              hasta,
             'entidad':            entidad,
+            'tipo_deposito':      tipo_deposito,
             'total_filtrado':     total_filtrado,
             'total_pf_filtrado':  total_pf_filtrado,
             'total_rp_filtrado':  total_rp_filtrado,
             'ENTIDAD_PF':         DepositoBancario.ENTIDAD_PAGOFACIL,
             'ENTIDAD_RP':         DepositoBancario.ENTIDAD_RAPIPAGO,
+            'TIPOS_DEPOSITO':     DepositoBancario.TIPOS_DEPOSITO,
         })
     
+
+class TicketDepositoAjax(LoginRequiredMixin, View):
+    """Ver/editar el comprobante (ticket) asociado a un DepositoBancario."""
+
+    CAMPOS_TEXTO = [
+        'numero_operacion', 'banco', 'titular_nombre', 'titular_cuit',
+        'cuenta_origen', 'destinatario', 'cuenta_destino', 'sucursal',
+        'concepto', 'estado', 'observaciones',
+    ]
+
+    def get(self, request):
+        deposito_id = request.GET.get('deposito_id')
+        deposito = get_object_or_404(DepositoBancario, pk=deposito_id)
+        ticket = getattr(deposito, 'ticket', None)
+
+        if ticket is None:
+            return JsonResponse({'existe': False})
+
+        data = {campo: getattr(ticket, campo) for campo in self.CAMPOS_TEXTO}
+        fecha_hora_local = (
+            timezone.localtime(ticket.fecha_hora_ticket) if ticket.fecha_hora_ticket else None
+        )
+        data.update({
+            'existe':            True,
+            'fecha_hora_ticket': fecha_hora_local.isoformat() if fecha_hora_local else '',
+            'monto_ticket':      float(ticket.monto_ticket) if ticket.monto_ticket is not None else None,
+            'imagen_url':        ticket.imagen.url if ticket.imagen else '',
+        })
+        return JsonResponse(data)
+
+    def post(self, request):
+        deposito_id = request.POST.get('deposito_id')
+        deposito = get_object_or_404(DepositoBancario, pk=deposito_id)
+
+        ticket, _ = DepositoTicket.objects.get_or_create(deposito=deposito)
+
+        for campo in self.CAMPOS_TEXTO:
+            setattr(ticket, campo, request.POST.get(campo, '').strip())
+
+        fecha_hora_raw = request.POST.get('fecha_hora_ticket', '').strip()
+        fecha_hora_parsed = parse_datetime(fecha_hora_raw) if fecha_hora_raw else None
+        if fecha_hora_parsed and timezone.is_naive(fecha_hora_parsed):
+            # El <input type="datetime-local"> manda un valor sin timezone,
+            # que representa la hora local (America/Argentina/Buenos_Aires).
+            fecha_hora_parsed = timezone.make_aware(fecha_hora_parsed)
+        ticket.fecha_hora_ticket = fecha_hora_parsed
+
+        monto_raw = request.POST.get('monto_ticket', '').strip()
+        if monto_raw:
+            try:
+                ticket.monto_ticket = Decimal(monto_raw)
+            except InvalidOperation:
+                return JsonResponse({'error': 'El monto del ticket es inválido.'}, status=400)
+        else:
+            ticket.monto_ticket = None
+
+        if 'imagen' in request.FILES:
+            ticket.imagen = request.FILES['imagen']
+
+        ticket.cargado_por = request.user
+        ticket.save()
+
+        return JsonResponse({
+            'success':     True,
+            'deposito_id': deposito.pk,
+            'imagen_url':  ticket.imagen.url if ticket.imagen else '',
+        })
+
 
 class EliminarDepositosAjax(LoginRequiredMixin, View):
     """Elimina uno o varios DepositoBancario por ID. Solo staff/superuser."""

@@ -1,0 +1,259 @@
+{% extends 'software/base_software.html' %}
+
+{% block title %}Instalaciones - Software{% endblock %}
+
+{% block software_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Gestión de <span>Instalaciones</span></h1>
+        <p class="page-subtitle">
+            {{ instalaciones.paginator.count|default:0 }} instalación{{ instalaciones.paginator.count|pluralize:"es" }} registrada{{ instalaciones.paginator.count|pluralize }}
+        </p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'software:index' %}" class="btn-volver">← Volver</a>
+        {% if puede_crear %}
+        <button class="btn-nuevo" id="btnNuevaInstalacion">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nueva instalación
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% if sin_permiso %}
+<div class="alerta-inline alerta-error">No tenés permiso para ver las instalaciones.</div>
+{% else %}
+
+<form method="get" class="filtros-bar" id="formFiltros">
+    <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
+            <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por dominio, cliente, VPS o servicio..."
+               class="search-input" autocomplete="off">
+        {% if q %}
+        <button type="button" class="search-clear"
+                onclick="document.querySelector('[name=q]').value='';document.getElementById('formFiltros').submit()">×</button>
+        {% endif %}
+    </div>
+    <select name="vps" class="filtro-select" onchange="this.form.submit()">
+        <option value="">Todas las VPS</option>
+        {% for v in todas_vps %}
+        <option value="{{ v.pk }}" {% if filtro_vps == v.pk|stringformat:'s' %}selected{% endif %}>{{ v.nombre }}</option>
+        {% endfor %}
+    </select>
+    <select name="servicio" class="filtro-select" onchange="this.form.submit()">
+        <option value="">Todos los servicios</option>
+        {% for s in todos_servicios %}
+        <option value="{{ s.pk }}" {% if filtro_servicio == s.pk|stringformat:'s' %}selected{% endif %}>{{ s.nombre }}</option>
+        {% endfor %}
+    </select>
+    <select name="estado" class="filtro-select" onchange="this.form.submit()">
+        <option value="">Todos los estados</option>
+        {% for val, label in estados %}
+        <option value="{{ val }}" {% if filtro_estado == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    {% if q or filtro_vps or filtro_servicio or filtro_estado %}
+    <a href="{% url 'software:gestion_instalaciones' %}" class="btn-limpiar">× Limpiar</a>
+    {% endif %}
+</form>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Servicio</th>
+                <th>VPS</th>
+                <th>Cliente</th>
+                <th>Dominio</th>
+                <th>Puerto</th>
+                <th>Estado</th>
+                {% if puede_editar or puede_eliminar %}<th>Acciones</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for inst in instalaciones %}
+            <tr data-id="{{ inst.pk }}"
+                data-vps="{{ inst.vps_id }}" data-servicio="{{ inst.servicio_id }}"
+                data-cliente-id="{{ inst.cliente_id|default:'' }}"
+                data-cliente-nombre="{{ inst.cliente.get_nombre_display|default:'' }}"
+                data-cliente-texto="{{ inst.cliente_texto }}"
+                data-dominio="{{ inst.dominio }}" data-puerto="{{ inst.puerto|default:'' }}"
+                data-ruta-proyecto="{{ inst.ruta_proyecto }}" data-ruta-service="{{ inst.ruta_service }}"
+                data-ruta-conf="{{ inst.ruta_conf }}" data-estado="{{ inst.estado }}"
+                data-descripcion="{{ inst.descripcion }}">
+                <td><strong>{{ inst.servicio.nombre }}</strong></td>
+                <td>{{ inst.vps.nombre }}</td>
+                <td>{{ inst.get_cliente_display }}</td>
+                <td>{{ inst.dominio|default:'—' }}</td>
+                <td>{{ inst.puerto|default:'—' }}</td>
+                <td><span class="estado-badge estado-{{ inst.estado }}">{{ inst.get_estado_display }}</span></td>
+                {% if puede_editar or puede_eliminar %}
+                <td>
+                    <div class="acciones-cell">
+                        {% if puede_editar %}<button class="btn-accion btn-editar" data-id="{{ inst.pk }}">Editar</button>{% endif %}
+                        {% if puede_eliminar %}<button class="btn-accion btn-eliminar" data-id="{{ inst.pk }}" data-nombre="{{ inst.servicio.nombre }} — {{ inst.vps.nombre }}">Eliminar</button>{% endif %}
+                    </div>
+                </td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="empty-state">{% if q %}Sin resultados para "{{ q }}"{% else %}No hay instalaciones registradas.{% endif %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if instalaciones.has_other_pages %}
+<div class="paginacion">
+    {% if instalaciones.has_previous %}<a href="?page={{ instalaciones.previous_page_number }}&q={{ q }}" class="pag-btn">← Anterior</a>{% endif %}
+    <span class="pag-info">Página {{ instalaciones.number }} de {{ instalaciones.paginator.num_pages }}</span>
+    {% if instalaciones.has_next %}<a href="?page={{ instalaciones.next_page_number }}&q={{ q }}" class="pag-btn">Siguiente →</a>{% endif %}
+</div>
+{% endif %}
+
+{% if puede_crear or puede_editar %}
+<div class="modal fade" id="instalacionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="formInstalacion">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="instalacionModalTitulo">Nueva instalación</h5>
+                        <p class="modal-subtitle">Servicio corriendo en una VPS para un cliente</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body modal-body-compact">
+                    <input type="hidden" name="pk" id="instPk">
+                    <input type="hidden" name="cliente" id="instClienteId">
+
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">VPS <span class="field-required">*</span></label>
+                            <select name="vps" id="instVps" class="form-select" required>
+                                <option value="">— Seleccionar —</option>
+                                {% for v in todas_vps %}<option value="{{ v.pk }}">{{ v.nombre }} ({{ v.ip }})</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Servicio <span class="field-required">*</span></label>
+                            <select name="servicio" id="instServicio" class="form-select" required>
+                                <option value="">— Seleccionar —</option>
+                                {% for s in todos_servicios %}<option value="{{ s.pk }}">{{ s.nombre }}</option>{% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-2 autocomplete-wrap">
+                            <label class="form-label">Cliente</label>
+                            <input type="text" id="instClienteBuscar" class="form-control"
+                                   placeholder="Buscar cliente cargado..." autocomplete="off">
+                            <div id="instClienteLista" class="autocomplete-list"></div>
+                            <div id="instClienteChip" style="display:none;">
+                                <span class="cliente-chip-seleccionado">
+                                    <span id="instClienteChipTexto"></span>
+                                    <button type="button" id="instClienteChipQuitar">×</button>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Cliente (texto libre)</label>
+                            <input type="text" name="cliente_texto" id="instClienteTexto" class="form-control"
+                                   placeholder="Si no está cargado en el sistema">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-5 mb-2">
+                            <label class="form-label">Dominio</label>
+                            <input type="text" name="dominio" id="instDominio" class="form-control" placeholder="Ej: cliente.miapp.com">
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label">Puerto</label>
+                            <input type="number" name="puerto" id="instPuerto" class="form-control" placeholder="Ej: 8000">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Estado</label>
+                            <select name="estado" id="instEstado" class="form-select">
+                                {% for val, label in estados %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Ruta del proyecto</label>
+                            <input type="text" name="ruta_proyecto" id="instRutaProyecto" class="form-control" placeholder="/home/deploy/proyecto">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Ruta del .service</label>
+                            <input type="text" name="ruta_service" id="instRutaService" class="form-control" placeholder="/etc/systemd/system/proyecto.service">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Ruta del .conf</label>
+                            <input type="text" name="ruta_conf" id="instRutaConf" class="form-control" placeholder="/etc/nginx/sites-available/proyecto.conf">
+                        </div>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="descripcion" id="instDescripcion" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <div id="instErrores" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-nuevo">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if puede_eliminar %}
+<div class="modal fade" id="eliminarInstalacionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">Eliminar instalación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Confirmás eliminar <strong id="eliminarInstalacionNombre"></strong>?</p>
+                <p class="eliminar-warning">Esta acción no se puede deshacer.</p>
+                <div id="eliminarInstalacionError" class="alerta-inline alerta-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn-nuevo" style="background:#c0392b;" id="btnConfirmarEliminarInstalacion">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% load static %}
+<script>
+    window.softwareUrls = {
+        instalacionAcciones: "{% url 'software:instalacion_acciones' %}",
+        instalacionEliminar: "{% url 'software:instalacion_eliminar' %}",
+        clienteBuscar:       "{% url 'core:cliente_buscar' %}",
+    };
+</script>
+<script src="{% static 'software/js/gestion_instalaciones.js' %}"></script>
+{% endblock %}

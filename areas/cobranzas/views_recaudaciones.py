@@ -43,10 +43,17 @@ def _totales_por_entidad(entidad: str) -> dict:
         .filter(entidad=entidad)
         .aggregate(t=Sum('monto'))['t'] or Decimal('0')
     )
+    pendiente = recaudado - depositado
     return {
-        'recaudado':  recaudado,
-        'depositado': depositado,
-        'pendiente':  recaudado - depositado,
+        'recaudado':         recaudado,
+        'depositado':        depositado,
+        'pendiente':         pendiente,
+        # 'pendiente' se mantiene con signo (lo usa el cálculo de 'diferencia'
+        # en views_depositos.py). Para mostrar en pantalla conviene separarlo
+        # en dos valores siempre positivos: lo que falta depositar, o —si se
+        # depositó de más— el saldo a favor.
+        'pendiente_mostrar': max(pendiente, Decimal('0')),
+        'a_favor':           max(-pendiente, Decimal('0')),
     }
 
 

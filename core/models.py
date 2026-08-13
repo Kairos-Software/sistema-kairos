@@ -31,6 +31,30 @@ PERMISOS_CHOICES = [
     ('crear_servicios',    'Crear servicios'),
     ('editar_servicios',   'Editar servicios'),
     ('eliminar_servicios', 'Eliminar servicios'),
+
+    # ── Módulo: Software (VPS) ──────────────────────────────────────
+    ('ver_vps',      'Ver VPS'),
+    ('crear_vps',    'Crear VPS'),
+    ('editar_vps',   'Editar VPS'),
+    ('eliminar_vps', 'Eliminar VPS'),
+
+    # ── Módulo: Software (catálogo de servicios) ─────────────────────
+    ('ver_servicios_software',      'Ver catálogo de software'),
+    ('crear_servicios_software',    'Crear servicios de software'),
+    ('editar_servicios_software',   'Editar servicios de software'),
+    ('eliminar_servicios_software', 'Eliminar servicios de software'),
+
+    # ── Módulo: Software (instalaciones) ─────────────────────────────
+    ('ver_instalaciones',      'Ver instalaciones'),
+    ('crear_instalaciones',    'Crear instalaciones'),
+    ('editar_instalaciones',   'Editar instalaciones'),
+    ('eliminar_instalaciones', 'Eliminar instalaciones'),
+
+    # ── Módulo: Software (scripts) ────────────────────────────────────
+    ('ver_scripts',      'Ver scripts'),
+    ('crear_scripts',    'Crear scripts'),
+    ('editar_scripts',   'Editar scripts'),
+    ('eliminar_scripts', 'Eliminar scripts'),
 ]
 
 CODIGOS_PERMISOS = {codigo for codigo, _ in PERMISOS_CHOICES}
