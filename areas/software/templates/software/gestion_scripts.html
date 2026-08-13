@@ -56,6 +56,17 @@
     {% if q or filtro_categoria or filtro_vps %}
     <a href="{% url 'software:gestion_scripts' %}" class="btn-limpiar">× Limpiar</a>
     {% endif %}
+
+    <select id="selectOrden" class="filtro-select" title="Ordenar tabla">
+        <option value="nombre_asc">Nombre A → Z</option>
+        <option value="nombre_desc">Nombre Z → A</option>
+        <option value="categoria_asc">Categoría A → Z</option>
+        <option value="categoria_desc">Categoría Z → A</option>
+        <option value="servicio_asc">Servicio A → Z</option>
+        <option value="servicio_desc">Servicio Z → A</option>
+        <option value="vps_asc">VPS A → Z</option>
+        <option value="vps_desc">VPS Z → A</option>
+    </select>
 </form>
 
 <div class="table-card">
@@ -70,11 +81,13 @@
                 <th>Acciones</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="tbodyScripts">
             {% for script in scripts %}
             <tr data-id="{{ script.pk }}"
                 data-nombre="{{ script.nombre }}" data-categoria="{{ script.categoria }}"
                 data-servicio="{{ script.servicio_id|default:'' }}" data-vps="{{ script.vps_id|default:'' }}"
+                data-servicio-nombre="{{ script.servicio.nombre|default:'' }}"
+                data-vps-nombre="{{ script.vps.nombre|default:'Todas / cualquiera' }}"
                 data-descripcion="{{ script.descripcion }}" data-contenido="{{ script.contenido }}"
                 data-archivo="{{ script.archivo.name|default:'' }}">
                 <td><strong>{{ script.nombre }}</strong></td>
@@ -100,9 +113,9 @@
 
 {% if scripts.has_other_pages %}
 <div class="paginacion">
-    {% if scripts.has_previous %}<a href="?page={{ scripts.previous_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}" class="pag-btn">← Anterior</a>{% endif %}
+    {% if scripts.has_previous %}<a href="?page={{ scripts.previous_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}&vps={{ filtro_vps }}" class="pag-btn">← Anterior</a>{% endif %}
     <span class="pag-info">Página {{ scripts.number }} de {{ scripts.paginator.num_pages }}</span>
-    {% if scripts.has_next %}<a href="?page={{ scripts.next_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}" class="pag-btn">Siguiente →</a>{% endif %}
+    {% if scripts.has_next %}<a href="?page={{ scripts.next_page_number }}&q={{ q }}&categoria={{ filtro_categoria }}&vps={{ filtro_vps }}" class="pag-btn">Siguiente →</a>{% endif %}
 </div>
 {% endif %}
 
@@ -243,4 +256,20 @@
     };
 </script>
 <script src="{% static 'software/js/gestion_scripts.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        SoftwareOrden.setup({
+            selectId: 'selectOrden',
+            tbodyId: 'tbodyScripts',
+            storageKey: 'software_orden_scripts',
+            defaultValue: 'nombre_asc',
+            campos: {
+                nombre:    { attr: 'nombre',         tipo: 'texto' },
+                categoria: { attr: 'categoria',      tipo: 'texto' },
+                servicio:  { attr: 'servicioNombre', tipo: 'texto' },
+                vps:       { attr: 'vpsNombre',      tipo: 'texto' },
+            },
+        });
+    });
+</script>
 {% endblock %}

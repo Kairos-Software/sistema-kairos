@@ -41,6 +41,13 @@ class GestionInstalacionesView(LoginRequiredMixin, View):
         if estado:
             qs = qs.filter(estado=estado)
 
+        puerto = request.GET.get('puerto', '').strip()
+        if puerto:
+            try:
+                qs = qs.filter(puerto=int(puerto))
+            except ValueError:
+                pass
+
         paginator = Paginator(qs, 10)
         instalaciones = paginator.get_page(request.GET.get('page', 1))
 
@@ -50,6 +57,7 @@ class GestionInstalacionesView(LoginRequiredMixin, View):
             'filtro_vps':      vps_id or '',
             'filtro_servicio': servicio_id or '',
             'filtro_estado':   estado or '',
+            'filtro_puerto':   puerto,
             'todas_vps':       VPS.objects.all(),
             'todos_servicios': ServicioSoftware.objects.all(),
             'estados':         Instalacion.ESTADOS,

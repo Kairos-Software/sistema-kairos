@@ -49,6 +49,13 @@
     {% if q or filtro_activo %}
     <a href="{% url 'software:gestion_servicios' %}" class="btn-limpiar">× Limpiar</a>
     {% endif %}
+
+    <select id="selectOrden" class="filtro-select" title="Ordenar tabla">
+        <option value="nombre_asc">Nombre A → Z</option>
+        <option value="nombre_desc">Nombre Z → A</option>
+        <option value="estado_asc">Estado A → Z</option>
+        <option value="estado_desc">Estado Z → A</option>
+    </select>
 </form>
 
 <div class="table-card">
@@ -61,11 +68,12 @@
                 {% if puede_editar or puede_eliminar %}<th>Acciones</th>{% endif %}
             </tr>
         </thead>
-        <tbody>
+        <tbody id="tbodyServicios">
             {% for servicio in servicios %}
             <tr data-id="{{ servicio.pk }}"
                 data-nombre="{{ servicio.nombre }}" data-descripcion="{{ servicio.descripcion }}"
-                data-activo="{{ servicio.activo|yesno:'true,false' }}">
+                data-activo="{{ servicio.activo|yesno:'true,false' }}"
+                data-estado-orden="{% if servicio.activo %}Activo{% else %}Inactivo{% endif %}">
                 <td><strong>{{ servicio.nombre }}</strong></td>
                 <td>{{ servicio.descripcion|default:'—'|truncatechars:80 }}</td>
                 <td><span class="estado-badge estado-{{ servicio.activo|yesno:'true,false' }}">{% if servicio.activo %}Activo{% else %}Inactivo{% endif %}</span></td>
@@ -166,4 +174,18 @@
     };
 </script>
 <script src="{% static 'software/js/gestion_servicios.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        SoftwareOrden.setup({
+            selectId: 'selectOrden',
+            tbodyId: 'tbodyServicios',
+            storageKey: 'software_orden_servicios',
+            defaultValue: 'nombre_asc',
+            campos: {
+                nombre: { attr: 'nombre',      tipo: 'texto' },
+                estado: { attr: 'estadoOrden', tipo: 'texto' },
+            },
+        });
+    });
+</script>
 {% endblock %}

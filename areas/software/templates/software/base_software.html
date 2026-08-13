@@ -6,6 +6,11 @@
 <link rel="stylesheet" href="{% static 'software/css/software.css' %}">
 {% endblock %}
 
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'software/js/software_orden.js' %}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="software-layout">
 

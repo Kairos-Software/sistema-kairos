@@ -49,6 +49,21 @@
     {% if q or filtro_activa %}
     <a href="{% url 'software:gestion_vps' %}" class="btn-limpiar">× Limpiar</a>
     {% endif %}
+
+    <select id="selectOrden" class="filtro-select" title="Ordenar tabla">
+        <option value="nombre_asc">Nombre A → Z</option>
+        <option value="nombre_desc">Nombre Z → A</option>
+        <option value="proveedor_asc">Proveedor A → Z</option>
+        <option value="proveedor_desc">Proveedor Z → A</option>
+        <option value="ip_asc">IP ↑</option>
+        <option value="ip_desc">IP ↓</option>
+        <option value="vencimiento_asc">Vencimiento más próximo</option>
+        <option value="vencimiento_desc">Vencimiento más lejano</option>
+        <option value="cpu_desc">Núcleos CPU ↓</option>
+        <option value="cpu_asc">Núcleos CPU ↑</option>
+        <option value="estado_asc">Estado A → Z</option>
+        <option value="estado_desc">Estado Z → A</option>
+    </select>
 </form>
 
 <div class="table-card">
@@ -64,17 +79,19 @@
                 {% if puede_editar or puede_eliminar %}<th>Acciones</th>{% endif %}
             </tr>
         </thead>
-        <tbody>
+        <tbody id="tbodyVps">
             {% for vps in vps_list %}
             <tr data-id="{{ vps.pk }}"
                 data-nombre="{{ vps.nombre }}" data-proveedor="{{ vps.proveedor }}"
                 data-ip="{{ vps.ip }}" data-notas="{{ vps.notas }}"
                 data-plan="{{ vps.plan }}" data-fecha-vencimiento="{{ vps.fecha_vencimiento|date:'Y-m-d' }}"
+                data-fecha-vencimiento-epoch="{{ vps.fecha_vencimiento|date:'U' }}"
                 data-nucleos-cpu="{{ vps.nucleos_cpu|default:'' }}" data-memoria="{{ vps.memoria }}"
                 data-espacio-disco="{{ vps.espacio_disco }}" data-ancho-banda="{{ vps.ancho_banda }}"
                 data-sistema-operativo="{{ vps.sistema_operativo }}"
                 data-usuario-ssh="{{ vps.usuario_ssh }}" data-acceso-ssh="{{ vps.acceso_ssh }}"
-                data-activa="{{ vps.activa|yesno:'true,false' }}">
+                data-activa="{{ vps.activa|yesno:'true,false' }}"
+                data-estado-orden="{% if vps.activa %}Activa{% else %}Inactiva{% endif %}">
                 <td><strong>{{ vps.nombre }}</strong></td>
                 <td>{{ vps.proveedor }}</td>
                 <td><span class="codigo-badge">{{ vps.ip }}</span></td>
@@ -243,4 +260,22 @@
     };
 </script>
 <script src="{% static 'software/js/gestion_vps.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        SoftwareOrden.setup({
+            selectId: 'selectOrden',
+            tbodyId: 'tbodyVps',
+            storageKey: 'software_orden_vps',
+            defaultValue: 'nombre_asc',
+            campos: {
+                nombre:       { attr: 'nombre',                 tipo: 'texto' },
+                proveedor:    { attr: 'proveedor',               tipo: 'texto' },
+                ip:           { attr: 'ip',                      tipo: 'texto' },
+                vencimiento:  { attr: 'fechaVencimientoEpoch',    tipo: 'numero' },
+                cpu:          { attr: 'nucleosCpu',               tipo: 'numero' },
+                estado:       { attr: 'estadoOrden',              tipo: 'texto' },
+            },
+        });
+    });
+</script>
 {% endblock %}
