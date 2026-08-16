@@ -185,4 +185,43 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // ─── QR (ver / imprimir / descargar) ─────────────────────────────────
+
+    const qrModalEl = document.getElementById('qrModal');
+    const qrModal   = qrModalEl ? new bootstrap.Modal(qrModalEl) : null;
+
+    function urlQrPara(id) {
+        return window.softwareUrls.instalacionQrBase.replace(/\/0\/qr\/$/, `/${id}/qr/`);
+    }
+
+    document.querySelectorAll('.btn-qr').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const url = urlQrPara(btn.dataset.id);
+            document.getElementById('qrDominio').textContent = btn.dataset.dominio;
+            document.getElementById('qrImagen').src = url;
+            const btnDescargar = document.getElementById('btnDescargarQr');
+            btnDescargar.href = url;
+            btnDescargar.setAttribute('download', `qr-${btn.dataset.dominio.replace(/[^a-z0-9.-]+/gi, '_')}.svg`);
+            qrModal.show();
+        });
+    });
+
+    document.getElementById('btnImprimirQr')?.addEventListener('click', () => {
+        const src    = document.getElementById('qrImagen').src;
+        const titulo = document.getElementById('qrDominio').textContent;
+        const ventana = window.open('', '_blank', 'width=420,height=520');
+        if (!ventana) return;
+        ventana.document.write(`
+            <html>
+                <head><title>QR — ${titulo}</title></head>
+                <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                             height:100vh;margin:0;font-family:sans-serif;">
+                    <img src="${src}" style="width:300px;height:300px;" onload="window.print();">
+                    <p style="margin-top:1rem;">${titulo}</p>
+                </body>
+            </html>
+        `);
+        ventana.document.close();
+    });
+
 });

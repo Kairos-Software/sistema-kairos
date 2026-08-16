@@ -25,6 +25,7 @@ urlpatterns = [
     path('instalaciones/', views_instalaciones.GestionInstalacionesView.as_view(), name='gestion_instalaciones'),
     path('instalaciones/acciones/', views_instalaciones.InstalacionCrearEditarAjax.as_view(), name='instalacion_acciones'),
     path('instalaciones/eliminar/', views_instalaciones.InstalacionEliminarAjax.as_view(), name='instalacion_eliminar'),
+    path('instalaciones/<int:pk>/qr/', views_instalaciones.InstalacionQrView.as_view(), name='instalacion_qr'),
 
     # ── Scripts ──────────────────────────────────────────────────
     path('scripts/', views_scripts.GestionScriptsView.as_view(), name='gestion_scripts'),

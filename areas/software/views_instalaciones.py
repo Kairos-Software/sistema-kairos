@@ -1,8 +1,11 @@
+import qrcode
+import qrcode.image.svg
+
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import F, Q
 from django.db.models.functions import Coalesce, Lower
-from django.http import JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
 
@@ -155,3 +158,23 @@ class InstalacionEliminarAjax(LoginRequiredMixin, View):
         instalacion = get_object_or_404(Instalacion, pk=pk)
         instalacion.delete()
         return JsonResponse({'success': True})
+
+
+class InstalacionQrView(LoginRequiredMixin, View):
+    """
+    QR (SVG) que apunta directo al dominio guardado en la instalación.
+    Se genera al vuelo a partir de `dominio` — no se persiste como imagen,
+    así nunca queda desactualizado si el dominio cambia.
+    """
+    def get(self, request, pk):
+        if not chequear_permiso(request.user, 'ver_instalaciones'):
+            return JsonResponse({'error': 'Sin permiso'}, status=403)
+        instalacion = get_object_or_404(Instalacion, pk=pk)
+        url = instalacion.get_url_dominio()
+        if not url:
+            raise Http404('Esta instalación no tiene dominio cargado.')
+
+        imagen = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, box_size=10)
+        response = HttpResponse(content_type='image/svg+xml')
+        imagen.save(response)
+        return response

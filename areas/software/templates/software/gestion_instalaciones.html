@@ -94,7 +94,7 @@
                 <th>Dominio</th>
                 <th>Puerto</th>
                 <th>Estado</th>
-                {% if puede_editar or puede_eliminar %}<th>Acciones</th>{% endif %}
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody id="tbodyInstalaciones">
@@ -117,14 +117,13 @@
                 <td>{{ inst.dominio|default:'—' }}</td>
                 <td>{{ inst.puerto|default:'—' }}</td>
                 <td><span class="estado-badge estado-{{ inst.estado }}">{{ inst.get_estado_display }}</span></td>
-                {% if puede_editar or puede_eliminar %}
                 <td>
                     <div class="acciones-cell">
+                        {% if inst.dominio %}<button class="btn-accion btn-qr" data-id="{{ inst.pk }}" data-dominio="{{ inst.dominio }}">QR</button>{% endif %}
                         {% if puede_editar %}<button class="btn-accion btn-editar" data-id="{{ inst.pk }}">Editar</button>{% endif %}
                         {% if puede_eliminar %}<button class="btn-accion btn-eliminar" data-id="{{ inst.pk }}" data-nombre="{{ inst.servicio.nombre }} — {{ inst.vps.nombre }}">Eliminar</button>{% endif %}
                     </div>
                 </td>
-                {% endif %}
             </tr>
             {% empty %}
             <tr><td colspan="7" class="empty-state">{% if q %}Sin resultados para "{{ q }}"{% else %}No hay instalaciones registradas.{% endif %}</td></tr>
@@ -265,6 +264,28 @@
 </div>
 {% endif %}
 
+{# ── Modal QR ── #}
+<div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">Código QR</h5>
+                    <p class="modal-subtitle" id="qrDominio"></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="qrImagen" src="" alt="QR" class="qr-imagen">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnImprimirQr">Imprimir</button>
+                <a id="btnDescargarQr" href="#" class="btn-nuevo">Descargar</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endif %}
 {% endblock %}
 
@@ -276,6 +297,7 @@
         instalacionAcciones: "{% url 'software:instalacion_acciones' %}",
         instalacionEliminar: "{% url 'software:instalacion_eliminar' %}",
         clienteBuscar:       "{% url 'core:cliente_buscar' %}",
+        instalacionQrBase:   "{% url 'software:instalacion_qr' 0 %}",
     };
 </script>
 <script src="{% static 'software/js/gestion_instalaciones.js' %}"></script>

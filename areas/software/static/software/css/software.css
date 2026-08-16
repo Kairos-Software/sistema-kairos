@@ -324,6 +324,9 @@ textarea.form-control { resize: vertical; min-height: 90px; }
 }
 .cliente-chip-seleccionado button { background: none; border: none; color: inherit; cursor: pointer; font-weight: 700; }
 
+/* ── QR de instalación ── */
+.qr-imagen { width: 220px; height: 220px; }
+
 /* ── Contenido de script (solo lectura) ── */
 .script-contenido-view {
     background: #16171b; color: #d8dbe0; border-radius: 10px; padding: 1rem;

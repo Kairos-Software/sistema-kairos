@@ -146,6 +146,15 @@ class Instalacion(models.Model):
             return self.cliente.get_nombre_display()
         return self.cliente_texto or 'Sin cliente'
 
+    def get_url_dominio(self):
+        """Dominio normalizado a URL completa (para el QR y links directos)."""
+        dominio = self.dominio.strip()
+        if not dominio:
+            return ''
+        if dominio.startswith(('http://', 'https://')):
+            return dominio
+        return f'https://{dominio}'
+
     def clean(self):
         # El FK a Cliente, si está cargado, tiene prioridad: evitamos
         # que quede texto libre "colgado" que nunca se muestra.
