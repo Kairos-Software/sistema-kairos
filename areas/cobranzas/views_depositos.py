@@ -6,7 +6,7 @@ import json
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum
+from django.db.models import Sum, Min, Max
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
@@ -14,8 +14,20 @@ from django.utils.dateparse import parse_date
 from django.views import View
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
-from .models import DepositoBancario, DepositoTicket
-from .views_recaudaciones import _totales_por_entidad
+from .models import DepositoBancario, DepositoTicket, RecaudacionDiaria
+from .views_recaudaciones import _totales_por_entidad, _ultima_diferencia, _recaudado_pendiente
+
+
+def _periodo_pendiente(entidad: str):
+    """Rango de fechas (min, max) de la recaudación todavía no cubierta, o None."""
+    agregado = (
+        RecaudacionDiaria.objects
+        .filter(entidad=entidad, cubierta_por__isnull=True)
+        .aggregate(desde=Min('fecha'), hasta=Max('fecha'))
+    )
+    if agregado['desde'] is None:
+        return None
+    return agregado['desde'], agregado['hasta']
 
 
 class DepositosView(LoginRequiredMixin, View):
@@ -30,28 +42,70 @@ class DepositosView(LoginRequiredMixin, View):
             .select_related('realizado_por', 'ticket')[:10]
         )
 
-        total_pf = (
-            DepositoBancario.objects.filter(entidad=DepositoBancario.ENTIDAD_PAGOFACIL)
-            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        )
-        total_rp = (
-            DepositoBancario.objects.filter(entidad=DepositoBancario.ENTIDAD_RAPIPAGO)
-            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        )
         cant_pf = DepositoBancario.objects.filter(entidad=DepositoBancario.ENTIDAD_PAGOFACIL).count()
         cant_rp = DepositoBancario.objects.filter(entidad=DepositoBancario.ENTIDAD_RAPIPAGO).count()
 
+        # Pendiente/a-favor de cada entidad, para el pill del selector (igual
+        # que en recaudaciones.html) — 'pendiente' se mantiene con signo para
+        # otros cálculos, pero en pantalla siempre se separa en dos valores
+        # no-negativos (pendiente_mostrar / a_favor).
+        tot_pf = _totales_por_entidad(DepositoBancario.ENTIDAD_PAGOFACIL)
+        tot_rp = _totales_por_entidad(DepositoBancario.ENTIDAD_RAPIPAGO)
+
+        # ── Mensajes clave (igual que FrmDeposito del Excel de referencia) ──
+        # 'Neto a depositar' nunca debe mostrarse negativo: si ya se depositó
+        # de más, lo que "falta depositar" es $0 (el sobrante se ve aparte en
+        # 'Última diferencia').
+        neto_a_depositar    = (tot_pf if entidad == DepositoBancario.ENTIDAD_PAGOFACIL else tot_rp)['pendiente_mostrar']
+        saldo_anterior      = _ultima_diferencia(entidad)
+        recaudado_pendiente = _recaudado_pendiente(entidad)
+        periodo             = _periodo_pendiente(entidad)
+
         return render(request, 'cobranzas/depositos.html', {
-            'entidad':       entidad,
-            'entidad_label': 'PagoFácil' if entidad == DepositoBancario.ENTIDAD_PAGOFACIL else 'RapiPago',
-            'ultimos':       ultimos,
-            'total_pf':      total_pf,
-            'total_rp':      total_rp,
-            'cant_pf':       cant_pf,
-            'cant_rp':       cant_rp,
-            'ENTIDAD_PF':    DepositoBancario.ENTIDAD_PAGOFACIL,
-            'ENTIDAD_RP':    DepositoBancario.ENTIDAD_RAPIPAGO,
-            'hoy':           timezone.localdate(),
+            'entidad':             entidad,
+            'entidad_label':       'PagoFácil' if entidad == DepositoBancario.ENTIDAD_PAGOFACIL else 'RapiPago',
+            'ultimos':             ultimos,
+            'cant_pf':             cant_pf,
+            'cant_rp':             cant_rp,
+            'tot_pf':              tot_pf,
+            'tot_rp':              tot_rp,
+            'neto_a_depositar':    neto_a_depositar,
+            'saldo_anterior':      saldo_anterior,
+            'recaudado_pendiente': recaudado_pendiente,
+            'periodo_desde':       periodo[0] if periodo else None,
+            'periodo_hasta':       periodo[1] if periodo else None,
+            'ENTIDAD_PF':          DepositoBancario.ENTIDAD_PAGOFACIL,
+            'ENTIDAD_RP':          DepositoBancario.ENTIDAD_RAPIPAGO,
+            'hoy':                 timezone.localdate(),
+        })
+
+
+class PendientesRecaudacionAjax(LoginRequiredMixin, View):
+    """
+    GET ?entidad=pagofacil|rapipago
+    Devuelve las recaudaciones sin cubrir de esa entidad, para el selector de
+    días al registrar un depósito.
+    """
+    def get(self, request):
+        entidad = request.GET.get('entidad', '').strip()
+        if entidad not in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
+            return JsonResponse({'error': 'Entidad inválida.'}, status=400)
+
+        pendientes = (
+            RecaudacionDiaria.objects
+            .filter(entidad=entidad, cubierta_por__isnull=True)
+            .order_by('fecha')
+        )
+        return JsonResponse({
+            'pendientes': [
+                {
+                    'id':            r.pk,
+                    'fecha':         str(r.fecha),
+                    'fecha_display': r.fecha.strftime('%d/%m/%Y'),
+                    'monto':         float(r.monto),
+                }
+                for r in pendientes
+            ],
         })
 
 
@@ -77,37 +131,86 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
         if fecha > timezone.localdate():
             return JsonResponse({'error': 'La fecha no puede ser futura.'}, status=400)
 
-        try:
-            monto = Decimal(str(data.get('monto', 0)))
-            if monto <= 0:
-                raise ValueError
-        except (ValueError, InvalidOperation):
-            return JsonResponse({'error': 'El monto debe ser mayor a cero.'}, status=400)
+        def _parse_componente(nombre):
+            try:
+                valor = Decimal(str(data.get(nombre, 0) or 0))
+            except InvalidOperation:
+                return None
+            if valor < 0:
+                return None
+            return valor
 
-        tipo_deposito = data.get('tipo_deposito', '').strip()
-        if tipo_deposito and tipo_deposito not in dict(DepositoBancario.TIPOS_DEPOSITO):
-            return JsonResponse({'error': 'Tipo de depósito inválido.'}, status=400)
+        monto_efectivo_fisico  = _parse_componente('monto_efectivo_fisico')
+        monto_ya_en_banco      = _parse_componente('monto_ya_en_banco')
+        monto_saldo_plataforma = _parse_componente('monto_saldo_plataforma')
+        if None in (monto_efectivo_fisico, monto_ya_en_banco, monto_saldo_plataforma):
+            return JsonResponse({'error': 'Los montos deben ser números válidos, no negativos.'}, status=400)
+
+        monto = monto_efectivo_fisico + monto_ya_en_banco + monto_saldo_plataforma
+        if monto <= 0:
+            return JsonResponse({'error': 'El monto total debe ser mayor a cero.'}, status=400)
 
         numero_comprobante = data.get('numero_comprobante', '').strip()
         observaciones      = data.get('observaciones', '').strip()
 
         try:
+            recaudaciones_ids = [int(i) for i in data.get('recaudaciones_ids', [])]
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'IDs de recaudación inválidos.'}, status=400)
+
+        try:
             with transaction.atomic():
-                # Pendiente ANTES de este depósito → así 'diferencia' refleja
-                # sobrante/faltante de este depósito puntual, igual que en
-                # ModDepositos.bas::RegistrarRecaudacion del Excel de referencia.
-                pendiente_al_momento = _totales_por_entidad(entidad)['pendiente']
+                # Recaudaciones seleccionadas para este depósito: se valida
+                # que sean de esta entidad y sigan sin cubrir (protege contra
+                # dos personas depositando casi al mismo tiempo).
+                seleccionadas = list(
+                    RecaudacionDiaria.objects
+                    .filter(pk__in=recaudaciones_ids, entidad=entidad, cubierta_por__isnull=True)
+                )
+                if len(seleccionadas) != len(set(recaudaciones_ids)):
+                    return JsonResponse({
+                        'error': 'Alguna recaudación seleccionada ya no está disponible '
+                                 '(puede que otra persona ya la haya cubierto). Recargá la página.'
+                    }, status=409)
+
+                # Snapshot del cálculo ANTES de este depósito → 'diferencia'
+                # (y el resto de los campos) reflejan el cálculo tal como
+                # estaba en ese momento, igual que
+                # ModDepositos.bas::RegistrarRecaudacion del Excel de
+                # referencia, pero guardado para que el historial quede
+                # auditable (no solo el resultado final).
+                saldo_anterior_momento = _ultima_diferencia(entidad)  # None = sin depósito previo
+                recaudado_pendiente_momento = sum((r.monto for r in seleccionadas), Decimal('0'))
+                pendiente_al_momento = recaudado_pendiente_momento - (saldo_anterior_momento or Decimal('0'))
+                neto_a_depositar_momento = max(pendiente_al_momento, Decimal('0'))
                 diferencia = monto - pendiente_al_momento
+
+                if seleccionadas:
+                    periodo_desde_momento = min(r.fecha for r in seleccionadas)
+                    periodo_hasta_momento = max(r.fecha for r in seleccionadas)
+                else:
+                    periodo_desde_momento = periodo_hasta_momento = None
 
                 deposito = DepositoBancario.objects.create(
                     entidad=entidad,
                     fecha=fecha,
-                    tipo_deposito=tipo_deposito,
+                    monto_efectivo_fisico=monto_efectivo_fisico,
+                    monto_ya_en_banco=monto_ya_en_banco,
+                    monto_saldo_plataforma=monto_saldo_plataforma,
                     monto=monto,
                     numero_comprobante=numero_comprobante,
                     diferencia=diferencia,
+                    recaudado_pendiente_momento=recaudado_pendiente_momento,
+                    saldo_anterior_momento=saldo_anterior_momento,
+                    neto_a_depositar_momento=neto_a_depositar_momento,
+                    periodo_desde_momento=periodo_desde_momento,
+                    periodo_hasta_momento=periodo_hasta_momento,
                     observaciones=observaciones,
                     realizado_por=request.user,
+                )
+
+                RecaudacionDiaria.objects.filter(pk__in=[r.pk for r in seleccionadas]).update(
+                    cubierta_por=deposito
                 )
         except Exception as e:
             import traceback
@@ -126,17 +229,30 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
         except Exception:
             realizado_por_str = str(request.user.pk)
 
+        periodo_str = None
+        if deposito.periodo_desde_momento:
+            periodo_str = (
+                f"{deposito.periodo_desde_momento.strftime('%d/%m/%Y')} al "
+                f"{deposito.periodo_hasta_momento.strftime('%d/%m/%Y')}"
+            )
+
         return JsonResponse({
             'success':            True,
             'deposito_id':        deposito.pk,
             'entidad':            entidad,
             'entidad_label':      deposito.get_entidad_display(),
             'fecha':              fecha_display,
-            'tipo_deposito':      deposito.tipo_deposito,
-            'tipo_deposito_label': deposito.get_tipo_deposito_display() if deposito.tipo_deposito else '',
+            'monto_efectivo_fisico':  float(deposito.monto_efectivo_fisico),
+            'monto_ya_en_banco':      float(deposito.monto_ya_en_banco),
+            'monto_saldo_plataforma': float(deposito.monto_saldo_plataforma),
             'monto':              float(deposito.monto),
             'numero_comprobante': deposito.numero_comprobante or '',
             'diferencia':         float(deposito.diferencia) if deposito.diferencia is not None else None,
+            'recaudado_pendiente_momento': float(deposito.recaudado_pendiente_momento) if deposito.recaudado_pendiente_momento is not None else None,
+            'saldo_anterior_momento':      float(deposito.saldo_anterior_momento) if deposito.saldo_anterior_momento is not None else None,
+            'neto_a_depositar_momento':    float(deposito.neto_a_depositar_momento) if deposito.neto_a_depositar_momento is not None else None,
+            'periodo_momento':    periodo_str,
+            'recaudaciones_cubiertas_ids': [r.pk for r in seleccionadas],
             'observaciones':      deposito.observaciones or '',
             'realizado_por':      realizado_por_str,
             'nuevo_total':        float(nuevo_total),
@@ -148,9 +264,13 @@ class HistorialDepositosView(LoginRequiredMixin, View):
         desde         = request.GET.get('desde',   '').strip()
         hasta         = request.GET.get('hasta',   '').strip()
         entidad       = request.GET.get('entidad', '').strip()
-        tipo_deposito = request.GET.get('tipo_deposito', '').strip()
 
-        qs = DepositoBancario.objects.select_related('realizado_por', 'ticket').all()
+        qs = (
+            DepositoBancario.objects
+            .select_related('realizado_por', 'ticket')
+            .prefetch_related('recaudaciones_cubiertas')
+            .all()
+        )
 
         if desde:
             qs = qs.filter(fecha__gte=desde)
@@ -158,8 +278,6 @@ class HistorialDepositosView(LoginRequiredMixin, View):
             qs = qs.filter(fecha__lte=hasta)
         if entidad in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
             qs = qs.filter(entidad=entidad)
-        if tipo_deposito in dict(DepositoBancario.TIPOS_DEPOSITO):
-            qs = qs.filter(tipo_deposito=tipo_deposito)
 
         total_filtrado    = qs.aggregate(t=Sum('monto'))['t'] or Decimal('0')
         total_pf_filtrado = (
@@ -176,13 +294,11 @@ class HistorialDepositosView(LoginRequiredMixin, View):
             'desde':              desde,
             'hasta':              hasta,
             'entidad':            entidad,
-            'tipo_deposito':      tipo_deposito,
             'total_filtrado':     total_filtrado,
             'total_pf_filtrado':  total_pf_filtrado,
             'total_rp_filtrado':  total_rp_filtrado,
             'ENTIDAD_PF':         DepositoBancario.ENTIDAD_PAGOFACIL,
             'ENTIDAD_RP':         DepositoBancario.ENTIDAD_RAPIPAGO,
-            'TIPOS_DEPOSITO':     DepositoBancario.TIPOS_DEPOSITO,
         })
     
 

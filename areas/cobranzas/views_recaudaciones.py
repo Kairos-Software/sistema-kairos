@@ -28,10 +28,43 @@ from .models import RecaudacionDiaria, DepositoBancario
 # HELPERS
 # ─────────────────────────────────────────────────────────────
 
+def _ultima_diferencia(entidad: str):
+    """Diferencia del último depósito registrado para esa entidad (o None)."""
+    ultimo = (
+        DepositoBancario.objects
+        .filter(entidad=entidad)
+        .order_by('-fecha', '-fecha_registro')
+        .first()
+    )
+    return ultimo.diferencia if ultimo else None
+
+
+def _recaudado_pendiente(entidad: str) -> Decimal:
+    """
+    Suma exacta de RecaudacionDiaria todavía no cubierta por ningún depósito
+    (cubierta_por__isnull=True). Reemplaza la vieja aproximación por rango de
+    fechas: cada recaudación queda marcada por el depósito que la cubrió al
+    registrarse (ver RegistrarDepositoAjax en views_depositos.py), así que
+    esto es exacto sin importar si depósito y recaudación caen el mismo día.
+    """
+    return (
+        RecaudacionDiaria.objects
+        .filter(entidad=entidad, cubierta_por__isnull=True)
+        .aggregate(t=Sum('monto'))['t'] or Decimal('0')
+    )
+
+
 def _totales_por_entidad(entidad: str) -> dict:
     """
-    Devuelve el total recaudado, total depositado y pendiente para una entidad.
-    Todos como Decimal.
+    Devuelve recaudado/depositado (totales informativos, todo el historial)
+    y pendiente (el número accionable) para una entidad.
+
+    'pendiente' = Recaudado pendiente (exacto, día por día) − Saldo anterior
+    (diferencia del último depósito). Es la misma fórmula que usa
+    FrmDeposito en el Excel de referencia para "Neto a depositar" — ya no es
+    recaudado_total − depositado_total acumulado, porque con selección
+    exacta de días esas dos cuentas pueden divergir (ej. si un depósito no
+    cubre absolutamente todo lo pendiente).
     """
     recaudado  = (
         RecaudacionDiaria.objects
@@ -43,7 +76,8 @@ def _totales_por_entidad(entidad: str) -> dict:
         .filter(entidad=entidad)
         .aggregate(t=Sum('monto'))['t'] or Decimal('0')
     )
-    pendiente = recaudado - depositado
+    saldo_anterior = _ultima_diferencia(entidad) or Decimal('0')
+    pendiente = _recaudado_pendiente(entidad) - saldo_anterior
     return {
         'recaudado':         recaudado,
         'depositado':        depositado,
@@ -186,6 +220,12 @@ class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
         with transaction.atomic():
             existente = RecaudacionDiaria.objects.filter(entidad=entidad, fecha=fecha).first()
 
+            if existente and existente.cubierta_por_id:
+                return JsonResponse({
+                    'error': f'Esta recaudación ya fue cubierta por el depósito '
+                             f'#{existente.cubierta_por_id}, no se puede modificar.'
+                }, status=400)
+
             if existente:
                 if modo == 'sumar':
                     existente.monto += monto
@@ -241,6 +281,17 @@ class EliminarRecaudacionAjax(LoginRequiredMixin, View):
             ids = [int(i) for i in ids]
         except (ValueError, TypeError):
             return JsonResponse({'error': 'IDs inválidos.'}, status=400)
+
+        cubiertas = list(
+            RecaudacionDiaria.objects
+            .filter(pk__in=ids, cubierta_por__isnull=False)
+            .values_list('pk', flat=True)
+        )
+        if cubiertas:
+            return JsonResponse({
+                'error': f'La(s) recaudación(es) #{", #".join(map(str, cubiertas))} '
+                         f'ya fueron cubiertas por un depósito, no se pueden eliminar.'
+            }, status=400)
 
         with transaction.atomic():
             eliminados, _ = RecaudacionDiaria.objects.filter(pk__in=ids).delete()

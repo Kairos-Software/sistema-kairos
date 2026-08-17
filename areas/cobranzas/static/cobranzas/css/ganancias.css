@@ -1,0 +1,167 @@
+/* ============================================================
+   ganancias.css
+   Estilos específicos para el módulo de Ganancias (adicionales)
+   ============================================================ */
+
+/* ── Stat cards (balance general) ─────────────────────────── */
+.gan-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: .9rem;
+}
+.gan-stat-card {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    border: 1px solid #e8e8ee;
+    background: #fafafa;
+}
+.gan-stat-icono {
+    width: 42px; height: 42px; flex-shrink: 0;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+}
+.gan-stat-ganado  .gan-stat-icono { background: rgba(22,163,74,.1);  color: #16a34a; }
+.gan-stat-gastado .gan-stat-icono { background: rgba(220,38,38,.1);  color: #dc2626; }
+.gan-stat-saldo   .gan-stat-icono { background: rgba(99,102,241,.1); color: #6366f1; }
+
+.gan-stat-textos { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.gan-stat-label {
+    font-size: .68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: #999;
+}
+.gan-stat-valor {
+    font-family: 'Rajdhani', sans-serif; font-size: 1.55rem; font-weight: 700; color: #111;
+}
+.gan-stat-valor.gan-positivo { color: #16a34a; }
+.gan-stat-valor.gan-negativo { color: #dc2626; }
+
+.gan-hint { margin-top: 1rem; font-size: .8rem; color: #999; line-height: 1.5; }
+
+/* ── Ranking por persona ──────────────────────────────────── */
+.gan-persona-hint { font-size: .8rem; color: #999; margin: -.3rem 0 .9rem; }
+.gan-ranking { display: flex; flex-direction: column; gap: .5rem; }
+
+.gan-rank-row {
+    display: grid;
+    grid-template-columns: 34px minmax(90px, 170px) 1fr auto;
+    align-items: center;
+    gap: .9rem;
+    width: 100%;
+    padding: .55rem .75rem;
+    border-radius: 10px;
+    border: 1.5px solid transparent;
+    background: #fafafa;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: background .15s, border-color .15s;
+}
+.gan-rank-row:hover        { background: #fff; border-color: #e8e8ee; }
+.gan-rank-row.gan-persona-activa { background: #fff5ee; border-color: #E85C0D; }
+
+.gan-rank-avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #E85C0D, #c94e0a);
+    color: #fff; font-weight: 700; font-size: .84rem;
+    display: flex; align-items: center; justify-content: center;
+}
+.gan-rank-nombre {
+    font-weight: 700; font-size: .85rem; color: #222;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gan-rank-bar-track { height: 8px; border-radius: 6px; background: #ececf2; overflow: hidden; }
+.gan-rank-bar-fill {
+    height: 100%; border-radius: 6px;
+    background: linear-gradient(90deg, #E85C0D, #f2874a);
+    transition: width .3s ease;
+}
+.gan-rank-datos { display: flex; align-items: baseline; gap: .5rem; justify-self: end; }
+.gan-rank-monto { font-weight: 700; font-size: .92rem; color: #111; white-space: nowrap; }
+.gan-rank-cant  { font-size: .72rem; color: #aaa; white-space: nowrap; }
+
+/* ── Formulario ────────────────────────────────────────────── */
+.gan-form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .9rem 1.2rem; }
+
+.gan-label {
+    display: block; font-size: .7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: #999; margin-bottom: .35rem;
+}
+.gan-hint-inline { font-weight: 400; color: #bbb; font-size: .78rem; text-transform: none; letter-spacing: 0; }
+
+.gan-input {
+    width: 100%; padding: .55rem .75rem; box-sizing: border-box;
+    border: 1.5px solid #e8e8ee; border-radius: 8px;
+    background: #fafafa; color: #111;
+    font-size: .9rem; font-family: 'Nunito', sans-serif; font-weight: 600;
+    outline: none; transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.gan-input:focus {
+    border-color: rgba(232,92,13,.5); box-shadow: 0 0 0 3px rgba(232,92,13,.1); background: #fff;
+}
+.gan-input-money {
+    display: flex; align-items: center;
+    border: 1.5px solid #e8e8ee; border-radius: 8px;
+    background: #fafafa; overflow: hidden;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.gan-input-money:focus-within {
+    border-color: rgba(232,92,13,.5); box-shadow: 0 0 0 3px rgba(232,92,13,.1); background: #fff;
+}
+.gan-signo { padding: 0 .5rem 0 .75rem; color: #999; font-weight: 700; }
+.gan-input-money .gan-input { border: none; box-shadow: none !important; background: transparent; padding-left: 0; }
+
+/* ── Alertas (variantes sobre .alerta-inline de cobranzas.css) ── */
+.gan-alerta-exito { background: rgba(22,163,74,.08);  border: 1px solid rgba(22,163,74,.25);  color: #15803d; }
+.gan-alerta-warn  { background: rgba(217,119,6,.08);  border: 1px solid rgba(217,119,6,.28);   color: #92400e; }
+
+/* ── Tabla: filtros ────────────────────────────────────────── */
+.gan-table-header { display: flex; align-items: center; justify-content: space-between; }
+
+.gan-filtros {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1rem;
+    margin: 1rem 0 .3rem;
+    padding: 1rem 1.1rem;
+    background: #fafafa;
+    border: 1px solid #e8e8ee;
+    border-radius: 12px;
+}
+.gan-filtros-campo { min-width: 150px; }
+.gan-filtros-acciones { margin-left: auto; }
+
+.gan-resumen-filtro { font-size: .8rem; color: #999; margin: .8rem .1rem .2rem; }
+
+/* ── Tabla: contenido ──────────────────────────────────────── */
+.gan-vacio { text-align: center; color: #bbb; padding: 1.8rem 0; font-size: .88rem; }
+
+.gan-persona-pill {
+    display: inline-flex; align-items: center;
+    padding: .18rem .65rem; border-radius: 20px;
+    background: #eef2ff; color: #4f46e5;
+    font-size: .78rem; font-weight: 700; white-space: nowrap;
+}
+.gan-monto-tabla { color: #c2410c; font-weight: 700; }
+
+/* ── Ícono del modal de confirmación ───────────────────────── */
+.gan-modal-icono {
+    width: 52px; height: 52px; margin: 0 auto .7rem;
+    border-radius: 50%;
+    background: rgba(220,38,38,.1); color: #dc2626;
+    display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .gan-stats { grid-template-columns: 1fr 1fr; }
+    .gan-rank-row { grid-template-columns: 32px 1fr auto; }
+    .gan-rank-bar-track { display: none; }
+}
+@media (max-width: 640px) {
+    .gan-stats { grid-template-columns: 1fr; }
+    .gan-form-grid { grid-template-columns: 1fr; }
+    .gan-filtros { flex-direction: column; align-items: stretch; }
+    .gan-filtros-acciones { margin-left: 0; }
+}

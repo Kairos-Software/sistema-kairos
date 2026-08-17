@@ -439,26 +439,27 @@ class DepositoBancario(models.Model):
         (ENTIDAD_RAPIPAGO,  'RapiPago'),
     ]
 
-    TIPO_EFECTIVO_FISICO  = 'efectivo_fisico'
-    TIPO_YA_EN_BANCO      = 'ya_en_banco'
-    TIPO_SALDO_PLATAFORMA = 'saldo_plataforma'
-    TIPOS_DEPOSITO = [
-        (TIPO_EFECTIVO_FISICO,  'Efectivo físico'),
-        (TIPO_YA_EN_BANCO,      'Ya estaba en el banco'),
-        (TIPO_SALDO_PLATAFORMA, 'Saldo a favor en la plataforma'),
-    ]
-
     entidad            = models.CharField(max_length=20, choices=ENTIDADES)
     fecha              = models.DateField(help_text="Fecha en que se realizó el depósito")
-    tipo_deposito      = models.CharField(
-                             max_length=20, choices=TIPOS_DEPOSITO,
-                             blank=True,
-                             help_text="Efectivo físico depositado, dinero que ya estaba en el "
-                                       "banco (ej. transferencias directas), o saldo a favor "
-                                       "reconocido en la propia plataforma (Rapipago/PagoFácil).")
+
+    # ── Composición del depósito (un cierre real suele mezclar los 3 orígenes
+    # a la vez: parte efectivo, parte transferencia directa al banco, y a
+    # veces una corrección de saldo a favor) ──
+    monto_efectivo_fisico  = models.DecimalField(
+                                 max_digits=12, decimal_places=2, default=Decimal('0'),
+                                 help_text="Efectivo físico depositado en este registro")
+    monto_ya_en_banco      = models.DecimalField(
+                                 max_digits=12, decimal_places=2, default=Decimal('0'),
+                                 help_text="Dinero que ya estaba en el banco (transferencias directas)")
+    monto_saldo_plataforma = models.DecimalField(
+                                 max_digits=12, decimal_places=2, default=Decimal('0'),
+                                 help_text="Corrección/agregado manual al saldo a favor en la "
+                                           "plataforma. Normalmente 0 — el saldo a favor ya se "
+                                           "arrastra solo vía 'diferencia', no hace falta cargarlo "
+                                           "cada ciclo. Completar solo para corregir un desvío.")
     monto              = models.DecimalField(
                              max_digits=12, decimal_places=2,
-                             help_text="Monto depositado en el banco")
+                             help_text="Monto total depositado (suma de los 3 componentes de arriba)")
     numero_comprobante = models.CharField(
                              max_length=100, blank=True,
                              help_text="Número de boleta o comprobante bancario")
@@ -466,6 +467,25 @@ class DepositoBancario(models.Model):
                              max_digits=12, decimal_places=2, null=True, blank=True,
                              help_text="monto − pendiente de depositar en ese momento. "
                                        "Positivo = sobrante, negativo = faltante.")
+
+    # ── Snapshot del cálculo al momento de este depósito (auditoría) ──
+    # Se guardan además de 'diferencia' para que el historial muestre el
+    # cálculo completo de cada depósito, no solo el resultado final.
+    recaudado_pendiente_momento = models.DecimalField(
+                             max_digits=12, decimal_places=2, null=True, blank=True,
+                             help_text="Suma de recaudación del período cubierto, antes de "
+                                       "descontar el saldo anterior.")
+    saldo_anterior_momento      = models.DecimalField(
+                             max_digits=12, decimal_places=2, null=True, blank=True,
+                             help_text="Diferencia del depósito anterior (con signo) vigente "
+                                       "al momento de registrar este depósito.")
+    neto_a_depositar_momento    = models.DecimalField(
+                             max_digits=12, decimal_places=2, null=True, blank=True,
+                             help_text="Recaudado pendiente − saldo anterior: lo que había que "
+                                       "depositar en este ciclo, antes de este depósito.")
+    periodo_desde_momento       = models.DateField(null=True, blank=True)
+    periodo_hasta_momento       = models.DateField(null=True, blank=True)
+
     observaciones      = models.TextField(blank=True)
     realizado_por      = models.ForeignKey(
                              Usuario, on_delete=models.SET_NULL,
@@ -554,6 +574,11 @@ class RecaudacionDiaria(models.Model):
     monto          = models.DecimalField(
                          max_digits=12, decimal_places=2,
                          help_text="Monto recaudado en el día")
+    cubierta_por   = models.ForeignKey(
+                         'DepositoBancario', on_delete=models.SET_NULL,
+                         null=True, blank=True, related_name='recaudaciones_cubiertas',
+                         help_text="Depósito que saldó esta recaudación. "
+                                   "NULL = todavía pendiente de depositar.")
     observaciones  = models.TextField(blank=True)
     registrado_por = models.ForeignKey(
                          'core.Usuario', on_delete=models.SET_NULL,
@@ -575,3 +600,39 @@ class RecaudacionDiaria(models.Model):
             f"Recaudación {self.get_entidad_display()} "
             f"${self.monto} — {self.fecha:%d/%m/%Y}"
         )
+
+
+# ─────────────────────────────────────────────────────────────
+# GANANCIAS (adicionales)
+#
+# El "adicional" cobrado en cada ItemCobro (monto_adicional) es la
+# ganancia propia del negocio, separada de lo que hay que depositar
+# a PagoFácil/RapiPago. Se va acumulando en un pozo único (no se
+# reinicia por ciclo, a diferencia de los depósitos) del que se
+# retira plata para gastos/adelantos a empleados. GastoGanancia
+# registra cada retiro: quién lo usó y para qué, para poder
+# descontarlo del total ganado.
+# ─────────────────────────────────────────────────────────────
+
+class GastoGanancia(models.Model):
+    fecha          = models.DateField(default=timezone.localdate,
+                         help_text="Fecha en que se entregó/usó el dinero")
+    persona        = models.CharField(
+                         max_length=150,
+                         help_text="Quién lo usó. Texto libre: puede ser un usuario del "
+                                   "sistema o simplemente el nombre de una persona.")
+    motivo         = models.CharField(max_length=300, help_text="Para qué se usó")
+    monto          = models.DecimalField(max_digits=12, decimal_places=2)
+    observaciones  = models.TextField(blank=True)
+    registrado_por = models.ForeignKey(
+                         'core.Usuario', on_delete=models.SET_NULL,
+                         null=True, related_name='gastos_ganancias_registrados')
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha', '-fecha_registro']
+        verbose_name        = 'Gasto de ganancias'
+        verbose_name_plural = 'Gastos de ganancias'
+
+    def __str__(self):
+        return f"Gasto ${self.monto} — {self.persona} — {self.fecha:%d/%m/%Y}"

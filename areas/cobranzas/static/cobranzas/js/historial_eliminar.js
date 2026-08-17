@@ -110,9 +110,11 @@
                 const res  = await postJSON(ELIMINAR_URL, { ids: idsAEliminar });
                 const data = await res.json();
                 if (data.success) {
-                    idsAEliminar.forEach(id =>
-                        document.querySelector(`.hist-fila[data-id="${id}"]`)?.remove()
-                    );
+                    idsAEliminar.forEach(id => {
+                        document.querySelector(`.hist-fila[data-id="${id}"]`)?.remove();
+                        // Depósitos: la fila de detalle (días cubiertos) es un <tr> aparte.
+                        document.getElementById(`hist-detalle-${id}`)?.remove();
+                    });
                     getModal().hide();
                     if (checkTodos) checkTodos.checked = false;
                     actualizarBarra();

@@ -48,15 +48,6 @@
             <option value="{{ ENTIDAD_RP }}" {% if entidad == ENTIDAD_RP %}selected{% endif %}>RapiPago</option>
         </select>
     </div>
-    <div class="filtro-fecha-wrap">
-        <label>Tipo</label>
-        <select name="tipo_deposito" class="filtro-input">
-            <option value="">Todos</option>
-            {% for valor, etiqueta in TIPOS_DEPOSITO %}
-            <option value="{{ valor }}" {% if tipo_deposito == valor %}selected{% endif %}>{{ etiqueta }}</option>
-            {% endfor %}
-        </select>
-    </div>
     <button type="submit" class="btn-filtrar">Filtrar</button>
     <a href="{% url 'cobranzas:depositos_historial' %}" class="btn-volver">Limpiar</a>
 </form>
@@ -89,11 +80,15 @@
                            style="accent-color:#E85C0D;cursor:pointer;width:15px;height:15px;">
                 </th>
                 {% endif %}
+                <th style="width:44px;">Detalle</th>
                 <th>#</th>
                 <th>Entidad</th>
                 <th>Fecha depósito</th>
+                <th>Período cubierto</th>
+                <th>Recaudado pendiente</th>
+                <th>Saldo anterior</th>
+                <th>Neto a depositar</th>
                 <th>Monto</th>
-                <th>Tipo</th>
                 <th>Diferencia</th>
                 <th>Comprobante</th>
                 <th>Observaciones</th>
@@ -112,6 +107,14 @@
                            style="accent-color:#E85C0D;cursor:pointer;width:15px;height:15px;">
                 </td>
                 {% endif %}
+                <td>
+                    <button type="button" class="btn-expandir-fila" data-target="hist-detalle-{{ d.pk }}"
+                            aria-expanded="false" title="Ver composición y días cubiertos">
+                        <svg viewBox="0 0 12 12" fill="none" width="11" height="11">
+                            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </td>
                 <td><strong>#{{ d.pk }}</strong></td>
                 <td>
                     <span class="badge-entidad badge-entidad-{{ d.entidad }}">
@@ -119,15 +122,24 @@
                     </span>
                 </td>
                 <td>{{ d.fecha|date:"d/m/Y" }}</td>
-                <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
                 <td>
-                    {% if d.tipo_deposito %}<span class="badge-tipo-deposito badge-tipo-{{ d.tipo_deposito }}">{{ d.get_tipo_deposito_display }}</span>
+                    {% if d.periodo_desde_momento %}{{ d.periodo_desde_momento|date:"d/m/Y" }} al {{ d.periodo_hasta_momento|date:"d/m/Y" }}
                     {% else %}—{% endif %}
                 </td>
+                <td>{% if d.recaudado_pendiente_momento is not None %}${{ d.recaudado_pendiente_momento|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td>
+                    {% if d.saldo_anterior_momento is None %}—
+                    {% elif d.saldo_anterior_momento > 0 %}<span class="dep-dif-favor">${{ d.saldo_anterior_momento|floatformat:2 }} (A FAVOR)</span>
+                    {% elif d.saldo_anterior_momento < 0 %}<span class="dep-dif-contra">${{ d.saldo_anterior_momento|floatformat:2 }} (EN CONTRA)</span>
+                    {% else %}<span class="dep-dif-sindif">$0,00</span>
+                    {% endif %}
+                </td>
+                <td>{% if d.neto_a_depositar_momento is not None %}${{ d.neto_a_depositar_momento|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
                 <td>
                     {% if d.diferencia is None %}—
-                    {% elif d.diferencia > 0 %}<span class="dep-dif-sobrante">+${{ d.diferencia|floatformat:2 }}</span>
-                    {% elif d.diferencia < 0 %}<span class="dep-dif-faltante">${{ d.diferencia|floatformat:2 }}</span>
+                    {% elif d.diferencia > 0 %}<span class="dep-dif-favor">+${{ d.diferencia|floatformat:2 }} (A FAVOR)</span>
+                    {% elif d.diferencia < 0 %}<span class="dep-dif-contra">${{ d.diferencia|floatformat:2 }} (EN CONTRA)</span>
                     {% else %}<span class="dep-dif-sindif">$0,00</span>
                     {% endif %}
                 </td>
@@ -152,6 +164,55 @@
                 </td>
                 {% endif %}
             </tr>
+            <tr class="hist-detalle-fila" id="hist-detalle-{{ d.pk }}" style="display:none;">
+                <td colspan="{% if user.is_staff or user.is_superuser %}17{% else %}15{% endif %}">
+                    <div class="hist-detalle-titulo">Detalle del depósito #{{ d.pk }}</div>
+                    <div class="hist-detalle-grid">
+                        <div class="hist-detalle-box">
+                            <div class="hist-detalle-box-titulo">
+                                <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+                                    <rect x="2" y="5" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                                    <path d="M2 9h16" stroke="currentColor" stroke-width="1.4"/>
+                                    <circle cx="14" cy="12.5" r="1.3" fill="currentColor"/>
+                                </svg>
+                                Composición
+                            </div>
+                            <ul class="hist-composicion-lista">
+                                {% if d.monto_efectivo_fisico %}<li><span>Efectivo físico</span><strong>${{ d.monto_efectivo_fisico|floatformat:2 }}</strong></li>{% endif %}
+                                {% if d.monto_ya_en_banco %}<li><span>Ya estaba en el banco</span><strong>${{ d.monto_ya_en_banco|floatformat:2 }}</strong></li>{% endif %}
+                                {% if d.monto_saldo_plataforma %}<li><span>Corrección de saldo a favor</span><strong>${{ d.monto_saldo_plataforma|floatformat:2 }}</strong></li>{% endif %}
+                                <li class="hist-composicion-total"><span>Total</span><strong>${{ d.monto|floatformat:2 }}</strong></li>
+                            </ul>
+                        </div>
+                        {% with dias=d.recaudaciones_cubiertas.all %}
+                        <div class="hist-detalle-box">
+                            <div class="hist-detalle-box-titulo">
+                                <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+                                    <rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                                    <path d="M7 4V3M13 4V3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                                    <path d="M3 8h14" stroke="currentColor" stroke-width="1.4"/>
+                                </svg>
+                                Días de recaudación cubiertos
+                            </div>
+                            {% if dias %}
+                            <table class="tabla-mini">
+                                <thead><tr><th>Fecha</th><th>Monto</th></tr></thead>
+                                <tbody>
+                                    {% for r in dias %}
+                                    <tr><td>{{ r.fecha|date:"d/m/Y" }}</td><td>${{ r.monto|floatformat:2 }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <p class="hist-dias-vacio">
+                                Ninguno — este depósito fue registrado como ajuste de saldo.
+                            </p>
+                            {% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
@@ -167,13 +228,86 @@
 .badge-entidad { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; }
 .badge-entidad-pagofacil { background:#fff3e0; color:#e65100; }
 .badge-entidad-rapipago  { background:#e8f5e9; color:#2e7d32; }
-.dep-dif-sobrante { color: #16a34a; font-weight: 700; }
-.dep-dif-faltante { color: #dc2626; font-weight: 700; }
+.dep-dif-favor  { color: #16a34a; font-weight: 700; }
+.dep-dif-contra { color: #dc2626; font-weight: 700; }
 .dep-dif-sindif   { color: #888; }
-.badge-tipo-deposito { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; white-space:nowrap; }
-.badge-tipo-efectivo_fisico  { background:#e8f5e9; color:#2e7d32; }
-.badge-tipo-ya_en_banco      { background:#e3f2fd; color:#1565c0; }
-.badge-tipo-saldo_plataforma { background:#fff3e0; color:#e65100; }
+/* ── Botón desplegar (bien visible, no un ícono perdido) ── */
+.btn-expandir-fila {
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; padding: 0;
+    background: rgba(232,92,13,.08); border: 1.5px solid rgba(232,92,13,.35); border-radius: 8px;
+    color: #E85C0D; cursor: pointer; transition: all .15s;
+}
+.btn-expandir-fila:hover {
+    background: rgba(232,92,13,.18); border-color: #E85C0D;
+    box-shadow: 0 2px 6px rgba(232,92,13,.2);
+}
+.btn-expandir-fila svg { transition: transform .15s; }
+.btn-expandir-fila[aria-expanded="true"] {
+    background: #E85C0D; border-color: #E85C0D; color: #fff;
+    box-shadow: 0 2px 8px rgba(232,92,13,.4);
+}
+.btn-expandir-fila[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+/* Resalta la fila principal mientras su detalle está abierto */
+.tabla-base tbody tr.hist-fila-activa td {
+    background: rgba(232,92,13,.055);
+    border-top: 1px solid rgba(232,92,13,.25);
+}
+
+/* ── Fila de detalle: bien diferenciada del resto de la tabla ── */
+.hist-detalle-fila td {
+    background: #fff8f2;
+    border-left: 4px solid #E85C0D;
+    border-bottom: 1px solid rgba(232,92,13,.25);
+    padding: 1.2rem 1.4rem 1.4rem;
+}
+.hist-detalle-titulo {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: .95rem; font-weight: 700; letter-spacing: .3px;
+    color: #c2410c; margin-bottom: .8rem;
+}
+.hist-detalle-grid {
+    display: grid; grid-template-columns: minmax(240px, 340px) 1fr;
+    gap: 1.2rem;
+}
+.hist-detalle-box {
+    background: #fff;
+    border: 1px solid #f2ddc9;
+    border-radius: 10px;
+    padding: .9rem 1.1rem 1.1rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+.hist-detalle-box-titulo {
+    display: flex; align-items: center; gap: .5rem;
+    font-size: .74rem; font-weight: 700; color: #c2410c;
+    text-transform: uppercase; letter-spacing: .05em;
+    padding-bottom: .55rem; margin-bottom: .55rem;
+    border-bottom: 1.5px solid #f5e6d8;
+}
+.hist-detalle-box-titulo svg { flex-shrink: 0; color: #E85C0D; }
+.hist-composicion-lista { list-style: none; margin: 0; padding: 0; }
+.hist-composicion-lista li {
+    display: flex; justify-content: space-between; gap: 1rem;
+    padding: .4rem 0; border-bottom: 1px solid #f3f3f3; font-size: .87rem; color: #555;
+}
+.hist-composicion-lista li:last-child { border-bottom: none; }
+.hist-composicion-lista li strong { color: #111; font-weight: 700; }
+.hist-composicion-total { margin-top: .15rem; padding-top: .55rem !important; border-top: 1.5px solid #eee !important; }
+.hist-composicion-total strong { font-size: 1rem; color: #c2410c !important; }
+.hist-dias-vacio { font-size: .85rem; color: #888; margin: 0; }
+.tabla-mini { border-collapse: collapse; font-size: .84rem; width: 100%; }
+.tabla-mini th {
+    text-align: left; padding: .35rem .8rem .35rem 0;
+    color: #999; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
+    border-bottom: 1px solid #f0f0f0;
+}
+.tabla-mini td { padding: .32rem .8rem .32rem 0; color: #333; border-bottom: 1px solid #f7f7f7; }
+.tabla-mini tr:last-child td { border-bottom: none; }
+
+@media (max-width: 900px) {
+    .hist-detalle-grid { grid-template-columns: 1fr; }
+}
 </style>
 
 {% include 'cobranzas/_modal_ticket.html' %}
@@ -216,6 +350,23 @@
 </div>
 
 {% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    document.querySelectorAll('.btn-expandir-fila').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const fila = document.getElementById(this.dataset.target);
+            if (!fila) return;
+            const filaPadre = this.closest('tr');
+            const abierta = fila.style.display !== 'none';
+            fila.style.display = abierta ? 'none' : '';
+            this.setAttribute('aria-expanded', String(!abierta));
+            if (filaPadre) filaPadre.classList.toggle('hist-fila-activa', !abierta);
+        });
+    });
+});
+</script>
 
 {% endblock %}
 

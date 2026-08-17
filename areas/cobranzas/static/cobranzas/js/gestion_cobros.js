@@ -539,17 +539,27 @@ function renderCarrito() {
             <div class="cobro-item-montos">
                 <div class="cobro-item-monto-col">
                     <span class="cobro-monto-label">Factura</span>
-                    <span class="cobro-monto-val">${fmt(item.monto_factura)}</span>
+                    <div class="cobro-monto-edit-wrap">
+                        <span class="cobro-monto-edit-signo">$</span>
+                        <input type="number" class="cobro-monto-edit-input" min="0" step="0.01"
+                               data-iid="${item._id}" data-field="monto_factura"
+                               value="${item.monto_factura.toFixed(2)}">
+                    </div>
                 </div>
                 <span class="cobro-monto-mas">+</span>
                 <div class="cobro-item-monto-col">
                     <span class="cobro-monto-label">Adicional</span>
-                    <span class="cobro-monto-val cobro-monto-adicional">${fmt(item.monto_adicional)}</span>
+                    <div class="cobro-monto-edit-wrap">
+                        <span class="cobro-monto-edit-signo">$</span>
+                        <input type="number" class="cobro-monto-edit-input cobro-monto-adicional" min="0" step="0.01"
+                               data-iid="${item._id}" data-field="monto_adicional"
+                               value="${item.monto_adicional.toFixed(2)}">
+                    </div>
                 </div>
                 <span class="cobro-monto-mas">=</span>
                 <div class="cobro-item-monto-col cobro-item-subtotal">
                     <span class="cobro-monto-label">Subtotal</span>
-                    <span class="cobro-monto-val cobro-monto-total">${fmt(item.monto_factura + item.monto_adicional)}</span>
+                    <span class="cobro-monto-val cobro-monto-total" data-subtotal-iid="${item._id}">${fmt(item.monto_factura + item.monto_adicional)}</span>
                 </div>
             </div>
         </div>
@@ -560,6 +570,31 @@ function renderCarrito() {
             estado.items = estado.items.filter(i => i._id !== parseInt(btn.dataset.iid));
             renderCarrito();
             actualizarBalance();
+        });
+    });
+
+    // Factura y adicional editables — para poder redondear el total a mano
+    // (no siempre hay cambio exacto: ej. 152,23 + 10 = 162,23 se redondea a
+    // 165/170/200, y no sabemos de antemano cuál de los dos montos absorbe
+    // la diferencia). No se re-renderiza la lista completa en cada tecleo
+    // para no perder el foco del input mientras se escribe.
+    listaItems.querySelectorAll('.cobro-monto-edit-input').forEach(inp => {
+        inp.addEventListener('input', () => {
+            const item = estado.items.find(i => i._id === parseInt(inp.dataset.iid));
+            if (!item) return;
+            let val = parseFloat(inp.value);
+            if (isNaN(val) || val < 0) val = 0;
+            item[inp.dataset.field] = val;
+
+            const subtotalEl = listaItems.querySelector(`[data-subtotal-iid="${item._id}"]`);
+            if (subtotalEl) subtotalEl.textContent = fmt(item.monto_factura + item.monto_adicional);
+
+            actualizarTotales();
+            sincronizarPago();
+        });
+        inp.addEventListener('blur', () => {
+            const item = estado.items.find(i => i._id === parseInt(inp.dataset.iid));
+            if (item) inp.value = item[inp.dataset.field].toFixed(2);
         });
     });
 

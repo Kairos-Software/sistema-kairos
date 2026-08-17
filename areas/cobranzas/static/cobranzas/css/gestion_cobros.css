@@ -423,8 +423,47 @@
     font-weight: 600;
 }
 .cobro-monto-val      { font-size: .82rem; font-weight: 600; color: #333; }
-.cobro-monto-adicional { color: #E85C0D; }
+.cobro-monto-val.cobro-monto-adicional { color: #E85C0D; }
 .cobro-monto-total    { color: #111; font-weight: 800; }
+
+/* ── Factura/Adicional editables (redondeo manual) ── */
+.cobro-monto-edit-wrap {
+    display: flex;
+    align-items: center;
+    width: 96px;
+    border: 1px solid #dcdde4;
+    border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
+}
+.cobro-monto-edit-wrap:focus-within {
+    border-color: #E85C0D;
+    box-shadow: 0 0 0 2px rgba(232,92,13,.15);
+}
+.cobro-monto-edit-signo {
+    padding: 0 .3rem 0 .4rem;
+    color: #aaa;
+    font-size: .78rem;
+    flex-shrink: 0;
+}
+.cobro-monto-edit-input {
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: .3rem .35rem .3rem 0;
+    font-size: .82rem;
+    font-weight: 600;
+    color: #333;
+    width: 100%;
+    min-width: 0;
+}
+.cobro-monto-edit-input.cobro-monto-adicional { color: #E85C0D; }
+.cobro-monto-edit-input::-webkit-outer-spin-button,
+.cobro-monto-edit-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
 
 /* ── Totales ── */
 .cobro-totales-bloque {

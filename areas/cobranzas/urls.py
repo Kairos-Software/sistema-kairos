@@ -5,6 +5,7 @@ from . import views_caja
 from . import views_caja_grande
 from . import views_depositos
 from . import views_servicios_io
+from . import views_ganancias
 from .views_recaudaciones import (
     RecaudacionesView,
     RegistrarRecaudacionAjax,
@@ -65,11 +66,18 @@ urlpatterns = [
     path('depositos/historial/', views_depositos.HistorialDepositosView.as_view(), name='depositos_historial'),
     path('depositos/eliminar/', views_depositos.EliminarDepositosAjax.as_view(), name='depositos_eliminar'),
     path('depositos/ticket/', views_depositos.TicketDepositoAjax.as_view(), name='depositos_ticket'),
+    path('depositos/pendientes/', views_depositos.PendientesRecaudacionAjax.as_view(), name='depositos_pendientes'),
 
     path('recaudaciones/',           RecaudacionesView.as_view(),        name='recaudaciones'),
     path('recaudaciones/registrar/', RegistrarRecaudacionAjax.as_view(), name='recaudaciones_registrar'),
     path('recaudaciones/eliminar/',  EliminarRecaudacionAjax.as_view(),  name='recaudaciones_eliminar'),
     path('recaudaciones/estado/',    EstadoRecaudacionAjax.as_view(),    name='recaudaciones_estado'),
+
+    # ── Ganancias (adicionales) ─────────────────────────────
+    path('ganancias/',           views_ganancias.GananciasView.as_view(),     name='ganancias'),
+    path('ganancias/registrar/', views_ganancias.RegistrarGastoAjax.as_view(), name='ganancias_registrar'),
+    path('ganancias/listar/',    views_ganancias.ListarGastosAjax.as_view(),  name='ganancias_listar'),
+    path('ganancias/eliminar/',  views_ganancias.EliminarGastoAjax.as_view(), name='ganancias_eliminar'),
 
     # Dentro de urlpatterns
     path('historial/turnos/exportar/', views_caja.export_turnos_csv, name='exportar_turnos_csv'),

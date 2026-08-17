@@ -31,16 +31,24 @@
                 data-entidad="{{ ENTIDAD_PF }}" data-label="PagoFácil">
             <span class="dep-entidad-icono">💳</span>
             <span class="dep-entidad-nombre">PagoFácil</span>
-            <span class="dep-entidad-total">${{ total_pf|floatformat:2 }}</span>
             <span class="dep-entidad-cant">{{ cant_pf }} depósito{{ cant_pf|pluralize }}</span>
+            <span class="dep-pendiente-pill {% if tot_pf.pendiente > 0 %}pill-alerta{% elif tot_pf.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
+                {% if tot_pf.pendiente > 0 %}Pendiente ${{ tot_pf.pendiente_mostrar|floatformat:2 }}
+                {% elif tot_pf.pendiente < 0 %}A favor ${{ tot_pf.a_favor|floatformat:2 }}
+                {% else %}Sin pendiente{% endif %}
+            </span>
         </button>
 
         <button class="dep-entidad-btn {% if entidad == ENTIDAD_RP %}dep-entidad-activa{% endif %}"
                 data-entidad="{{ ENTIDAD_RP }}" data-label="RapiPago">
             <span class="dep-entidad-icono">🏦</span>
             <span class="dep-entidad-nombre">RapiPago</span>
-            <span class="dep-entidad-total">${{ total_rp|floatformat:2 }}</span>
             <span class="dep-entidad-cant">{{ cant_rp }} depósito{{ cant_rp|pluralize }}</span>
+            <span class="dep-pendiente-pill {% if tot_rp.pendiente > 0 %}pill-alerta{% elif tot_rp.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
+                {% if tot_rp.pendiente > 0 %}Pendiente ${{ tot_rp.pendiente_mostrar|floatformat:2 }}
+                {% elif tot_rp.pendiente < 0 %}A favor ${{ tot_rp.a_favor|floatformat:2 }}
+                {% else %}Sin pendiente{% endif %}
+            </span>
         </button>
 
     </div>
@@ -56,18 +64,62 @@
         Completá los datos del depósito realizado en el banco para la entidad seleccionada.
     </p>
 
+    {# valores numéricos vía JSON para no romper con la coma decimal de es-es #}
+    {{ neto_a_depositar|json_script:"netoADepositarData" }}
+    {{ saldo_anterior|json_script:"saldoAnteriorData" }}
+
+    {# ── Mensajes clave (Recaudado pendiente / Última diferencia / Neto a depositar / Período a cubrir) ── #}
+    <div class="dep-mensajes-clave" id="mensajesClave">
+        <div class="dep-mensaje-item">
+            <span class="dep-mensaje-label">Recaudado pendiente</span>
+            <span class="dep-mensaje-valor" id="msgRecaudadoPendiente">
+                ${{ recaudado_pendiente|floatformat:2 }}
+            </span>
+        </div>
+        <div class="dep-mensaje-item">
+            <span class="dep-mensaje-label">Neto a depositar</span>
+            <span class="dep-mensaje-valor dep-mensaje-neto" id="msgNetoADepositar">
+                ${{ neto_a_depositar|floatformat:2 }}
+            </span>
+        </div>
+        <div class="dep-mensaje-item">
+            <span class="dep-mensaje-label">Última diferencia</span>
+            <span class="dep-mensaje-valor" id="msgUltimaDiferencia">
+                {% if saldo_anterior is None %}
+                    —
+                {% elif saldo_anterior > 0 %}
+                    <span class="dep-dif-favor">${{ saldo_anterior|floatformat:2 }} (A FAVOR)</span>
+                {% elif saldo_anterior < 0 %}
+                    <span class="dep-dif-contra">${{ saldo_anterior|floatformat:2 }} (EN CONTRA)</span>
+                {% else %}
+                    <span class="dep-dif-sindif">$0,00</span>
+                {% endif %}
+            </span>
+        </div>
+        <div class="dep-mensaje-item">
+            <span class="dep-mensaje-label">Período a cubrir</span>
+            <span class="dep-mensaje-valor dep-mensaje-periodo" id="msgPeriodoCubrir">
+                {% if periodo_desde %}{{ periodo_desde|date:"d/m/Y" }} al {{ periodo_hasta|date:"d/m/Y" }}
+                {% else %}—{% endif %}
+            </span>
+        </div>
+    </div>
+
+    {# ── Selector de días de recaudación a cubrir ── #}
+    <div class="caja-field" style="margin-top:.3rem;">
+        <label class="caja-label">
+            Recaudaciones a cubrir con este depósito
+            <span class="caja-hint">(tildadas por defecto todas las pendientes; destildá las que no cubra este depósito)</span>
+        </label>
+        <div id="listaPendientes" class="dep-lista-pendientes">
+            <p class="dep-pendientes-vacio" id="pendientesVacioMsg">Cargando…</p>
+        </div>
+    </div>
+
     <div class="dep-form-grid">
         <div class="caja-field">
             <label class="caja-label">Fecha del depósito</label>
             <input type="date" id="inputFecha" class="dep-input" value="{{ hoy|date:'Y-m-d' }}">
-        </div>
-        <div class="caja-field">
-            <label class="caja-label">Monto depositado</label>
-            <div class="dep-input-money">
-                <span class="dep-signo">$</span>
-                <input type="number" id="inputMonto" class="dep-input dep-input-num"
-                       min="0.01" step="0.01" placeholder="0,00">
-            </div>
         </div>
         <div class="caja-field">
             <label class="caja-label">
@@ -75,14 +127,42 @@
             </label>
             <input type="text" id="inputComprobante" class="dep-input" placeholder="Ej: 00123456">
         </div>
+    </div>
+
+    <div class="dep-form-grid" style="margin-top:.8rem;">
         <div class="caja-field">
-            <label class="caja-label">Tipo de depósito</label>
-            <select id="inputTipoDeposito" class="dep-input">
-                <option value="efectivo_fisico">Efectivo físico</option>
-                <option value="ya_en_banco">Ya estaba en el banco</option>
-                <option value="saldo_plataforma">Saldo a favor en la plataforma</option>
-            </select>
+            <label class="caja-label">Efectivo físico</label>
+            <div class="dep-input-money">
+                <span class="dep-signo">$</span>
+                <input type="number" id="inputMontoEfectivo" class="dep-input dep-input-num dep-input-componente"
+                       min="0" step="0.01" placeholder="0,00">
+            </div>
         </div>
+        <div class="caja-field">
+            <label class="caja-label">
+                Ya estaba en el banco <span class="caja-hint">(transferencias)</span>
+            </label>
+            <div class="dep-input-money">
+                <span class="dep-signo">$</span>
+                <input type="number" id="inputMontoBanco" class="dep-input dep-input-num dep-input-componente"
+                       min="0" step="0.01" placeholder="0,00">
+            </div>
+        </div>
+        <div class="caja-field">
+            <label class="caja-label">
+                Corrección de saldo a favor <span class="caja-hint">(dejar en 0 salvo corrección)</span>
+            </label>
+            <div class="dep-input-money">
+                <span class="dep-signo">$</span>
+                <input type="number" id="inputMontoPlataforma" class="dep-input dep-input-num dep-input-componente"
+                       min="0" step="0.01" placeholder="0,00">
+            </div>
+        </div>
+    </div>
+
+    <div class="dep-total-row">
+        <span class="dep-total-label">Total a depositar: <strong id="totalADepositar">$0,00</strong></span>
+        <span class="dep-resultado-vivo" id="resultadoEnVivo"></span>
     </div>
 
     <div class="caja-field" style="margin-top:.6rem;">
@@ -125,8 +205,12 @@
                 <tr>
                     <th>#</th>
                     <th>Fecha</th>
+                    <th>Período cubierto</th>
+                    <th>Recaudado pendiente</th>
+                    <th>Saldo anterior</th>
+                    <th>Neto a depositar</th>
                     <th>Monto</th>
-                    <th>Tipo</th>
+                    <th>Composición</th>
                     <th>Diferencia</th>
                     <th>Comprobante</th>
                     <th>Observaciones</th>
@@ -139,15 +223,29 @@
                 <tr>
                     <td><strong>#{{ d.pk }}</strong></td>
                     <td>{{ d.fecha|date:"d/m/Y" }}</td>
-                    <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
                     <td>
-                        {% if d.tipo_deposito %}<span class="badge-tipo-deposito badge-tipo-{{ d.tipo_deposito }}">{{ d.get_tipo_deposito_display }}</span>
+                        {% if d.periodo_desde_momento %}{{ d.periodo_desde_momento|date:"d/m/Y" }} al {{ d.periodo_hasta_momento|date:"d/m/Y" }}
                         {% else %}—{% endif %}
+                    </td>
+                    <td>{% if d.recaudado_pendiente_momento is not None %}${{ d.recaudado_pendiente_momento|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td>
+                        {% if d.saldo_anterior_momento is None %}—
+                        {% elif d.saldo_anterior_momento > 0 %}<span class="dep-dif-favor">${{ d.saldo_anterior_momento|floatformat:2 }} (A FAVOR)</span>
+                        {% elif d.saldo_anterior_momento < 0 %}<span class="dep-dif-contra">${{ d.saldo_anterior_momento|floatformat:2 }} (EN CONTRA)</span>
+                        {% else %}<span class="dep-dif-sindif">$0,00</span>
+                        {% endif %}
+                    </td>
+                    <td>{% if d.neto_a_depositar_momento is not None %}${{ d.neto_a_depositar_momento|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td><strong>${{ d.monto|floatformat:2 }}</strong></td>
+                    <td class="dep-composicion">
+                        {% if d.monto_efectivo_fisico %}<span class="badge-tipo-deposito badge-tipo-efectivo">Efectivo ${{ d.monto_efectivo_fisico|floatformat:2 }}</span>{% endif %}
+                        {% if d.monto_ya_en_banco %}<span class="badge-tipo-deposito badge-tipo-banco">Banco ${{ d.monto_ya_en_banco|floatformat:2 }}</span>{% endif %}
+                        {% if d.monto_saldo_plataforma %}<span class="badge-tipo-deposito badge-tipo-plataforma">A favor ${{ d.monto_saldo_plataforma|floatformat:2 }}</span>{% endif %}
                     </td>
                     <td>
                         {% if d.diferencia is None %}—
-                        {% elif d.diferencia > 0 %}<span class="dep-dif-sobrante">+${{ d.diferencia|floatformat:2 }} (sobrante)</span>
-                        {% elif d.diferencia < 0 %}<span class="dep-dif-faltante">${{ d.diferencia|floatformat:2 }} (faltante)</span>
+                        {% elif d.diferencia > 0 %}<span class="dep-dif-favor">+${{ d.diferencia|floatformat:2 }} (A FAVOR)</span>
+                        {% elif d.diferencia < 0 %}<span class="dep-dif-contra">${{ d.diferencia|floatformat:2 }} (EN CONTRA)</span>
                         {% else %}<span class="dep-dif-sindif">$0,00</span>
                         {% endif %}
                     </td>
@@ -162,7 +260,7 @@
                 </tr>
                 {% empty %}
                 <tr id="trVacio">
-                    <td colspan="9" class="dep-vacio">
+                    <td colspan="13" class="dep-vacio">
                         No hay depósitos registrados para esta entidad.
                     </td>
                 </tr>
@@ -187,16 +285,40 @@
                     <strong id="modalEntidad">—</strong>
                 </div>
                 <div class="caja-modal-fila">
-                    <span>Fecha</span>
+                    <span>Período cubierto</span>
+                    <strong id="modalPeriodo">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span>Fecha depósito</span>
                     <strong id="modalFecha">—</strong>
                 </div>
                 <div class="caja-modal-fila">
-                    <span>Monto</span>
-                    <strong id="modalMonto">—</strong>
+                    <span>Recaudado pendiente</span>
+                    <strong id="modalRecaudadoPendiente">—</strong>
                 </div>
                 <div class="caja-modal-fila">
-                    <span>Tipo</span>
-                    <strong id="modalTipoDeposito">—</strong>
+                    <span>Saldo anterior</span>
+                    <strong id="modalSaldoAnterior">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span>Neto a depositar</span>
+                    <strong id="modalNetoADepositar">—</strong>
+                </div>
+                <div class="caja-modal-fila" id="modalFilaEfectivo" style="display:none;">
+                    <span>Efectivo físico</span>
+                    <strong id="modalMontoEfectivo">—</strong>
+                </div>
+                <div class="caja-modal-fila" id="modalFilaBanco" style="display:none;">
+                    <span>Ya estaba en el banco</span>
+                    <strong id="modalMontoBanco">—</strong>
+                </div>
+                <div class="caja-modal-fila" id="modalFilaPlataforma" style="display:none;">
+                    <span>Corrección de saldo a favor</span>
+                    <strong id="modalMontoPlataforma">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span>Monto depositado (total)</span>
+                    <strong id="modalMonto">—</strong>
                 </div>
                 <div class="caja-modal-fila" id="modalFilaComprobante" style="display:none;">
                     <span>Comprobante</span>
@@ -245,6 +367,15 @@
 .dep-entidad-cant             { font-size: .78rem; color: var(--text-muted, #888); }
 .dep-entidad-label-activa     { color: var(--accent, #E85C0D); }
 
+/* ── Pill de pendiente/a favor en el selector de entidad ── */
+.dep-pendiente-pill {
+    margin-top: .2rem; font-size: .75rem; font-weight: 600;
+    padding: .15rem .55rem; border-radius: 99px;
+}
+.pill-alerta { background: #fff3cd; color: #856404; }
+.pill-ok     { background: #d1fae5; color: #065f46; }
+.pill-favor  { background: #dbeafe; color: #1e40af; }
+
 /* ── Form grid ── */
 .dep-form-grid {
     display: grid;
@@ -282,15 +413,79 @@
 .dep-vacio { text-align: center; color: var(--text-muted, #888); padding: 1.5rem 0; }
 
 /* ── Diferencia (sobrante/faltante) ── */
-.dep-dif-sobrante { color: #16a34a; font-weight: 700; }
-.dep-dif-faltante { color: #dc2626; font-weight: 700; }
+.dep-dif-favor  { color: #16a34a; font-weight: 700; }
+.dep-dif-contra { color: #dc2626; font-weight: 700; }
+
+/* ── Mensajes clave (Recaudado pendiente / Neto a depositar / Última diferencia / Período) ── */
+.dep-mensajes-clave {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: .6rem 1.2rem;
+    margin: .9rem 0 1.1rem;
+    padding: .8rem 1rem;
+    background: var(--surface-raised, #f4f4f5);
+    border-radius: 9px;
+}
+.dep-mensaje-item  { display: flex; flex-direction: column; gap: .15rem; }
+.dep-mensaje-label { font-size: .74rem; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; color: var(--text-muted, #888); }
+.dep-mensaje-valor { font-size: 1.05rem; font-weight: 700; color: var(--text-primary, #111); }
+.dep-mensaje-neto    { color: var(--accent, #E85C0D); }
+.dep-mensaje-periodo { font-size: .88rem; font-weight: 600; }
+
+/* ── Resultado en vivo (mientras se escribe el monto) ── */
+.dep-resultado-vivo {
+    display: block;
+    margin-top: .35rem;
+    font-size: .85rem;
+    font-weight: 700;
+    min-height: 1.1em;
+}
+
+/* ── Selector de días de recaudación pendiente ── */
+.dep-lista-pendientes {
+    margin-top: .4rem;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1.5px solid var(--border, #d1d5db);
+    border-radius: 7px;
+    padding: .3rem .5rem;
+    background: var(--surface, #fff);
+}
+.dep-pendiente-fila {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .35rem .3rem;
+    font-size: .87rem;
+    border-bottom: 1px solid var(--border, #eee);
+}
+.dep-pendiente-fila:last-child { border-bottom: none; }
+.dep-pendiente-fila input[type="checkbox"] { accent-color: var(--accent, #E85C0D); cursor: pointer; width: 15px; height: 15px; }
+.dep-pendiente-fecha { flex: 1; }
+.dep-pendiente-monto { font-weight: 600; }
+.dep-pendientes-vacio { text-align: center; color: var(--text-muted, #888); font-size: .85rem; padding: .5rem 0; margin: 0; }
+.dep-pendientes-acciones { display: flex; gap: .8rem; margin-top: .35rem; }
+.dep-pendientes-link { font-size: .78rem; color: var(--accent, #E85C0D); cursor: pointer; background: none; border: none; padding: 0; text-decoration: underline; }
+
+@media (max-width: 900px) {
+    .dep-mensajes-clave { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+    .dep-mensajes-clave { grid-template-columns: 1fr; }
+}
 .dep-dif-sindif   { color: var(--text-muted, #888); }
 
-/* ── Tipo de depósito ── */
+/* ── Composición del depósito (efectivo / banco / corrección de saldo) ── */
+.dep-composicion { display: flex; flex-direction: column; gap: .25rem; align-items: flex-start; }
 .badge-tipo-deposito { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; white-space:nowrap; }
-.badge-tipo-efectivo_fisico  { background:#e8f5e9; color:#2e7d32; }
-.badge-tipo-ya_en_banco      { background:#e3f2fd; color:#1565c0; }
-.badge-tipo-saldo_plataforma { background:#fff3e0; color:#e65100; }
+.badge-tipo-efectivo   { background:#e8f5e9; color:#2e7d32; }
+.badge-tipo-banco      { background:#e3f2fd; color:#1565c0; }
+.badge-tipo-plataforma { background:#fff3e0; color:#e65100; }
+
+/* ── Total en vivo (suma de los 3 componentes) ── */
+.dep-total-row { display: flex; align-items: baseline; gap: 1rem; margin-top: .8rem; flex-wrap: wrap; }
+.dep-total-label { font-size: .9rem; color: var(--text-muted, #6b7280); }
+.dep-total-label strong { font-size: 1rem; color: var(--text-primary, #111); }
 
 @media (max-width: 640px) {
     .dep-entidad-selector { flex-direction: column; }
@@ -304,6 +499,7 @@
 
     window.ticketDepositoUrl = "{% url 'cobranzas:depositos_ticket' %}";
 
+    const urlPendientes = "{% url 'cobranzas:depositos_pendientes' %}";
     const urlRegistrar = "{% url 'cobranzas:depositos_registrar' %}";
     const urlHistorial = "{% url 'cobranzas:depositos_historial' %}";
     const urlDepositos = "{% url 'cobranzas:depositos' %}";
@@ -323,17 +519,141 @@
         });
     }
 
-    const tipoDepositoLabels = {
-        'efectivo_fisico':  'Efectivo físico',
-        'ya_en_banco':      'Ya estaba en el banco',
-        'saldo_plataforma': 'Saldo a favor en la plataforma',
-    };
-
     // Fecha de hoy por defecto
     const inputFecha = document.getElementById('inputFecha');
     if (!inputFecha.value) {
         inputFecha.value = new Date().toISOString().split('T')[0];
     }
+
+    // ── Resultado en vivo: mientras se escribe el monto, se ve al toque si
+    //    va a quedar A FAVOR o EN CONTRA (igual que el Excel de referencia,
+    //    que ya mostraba "A FAVOR: $X" antes de confirmar el depósito) ──
+    let netoADepositar = parseFloat(JSON.parse(document.getElementById('netoADepositarData').textContent));
+    let saldoAnteriorSigned = JSON.parse(document.getElementById('saldoAnteriorData').textContent);
+    saldoAnteriorSigned = (saldoAnteriorSigned === null) ? null : parseFloat(saldoAnteriorSigned);
+
+    const inputMontoEfectivo   = document.getElementById('inputMontoEfectivo');
+    const inputMontoBanco      = document.getElementById('inputMontoBanco');
+    const inputMontoPlataforma = document.getElementById('inputMontoPlataforma');
+    const elTotalADepositar    = document.getElementById('totalADepositar');
+    const elResultadoVivo      = document.getElementById('resultadoEnVivo');
+
+    function componentesActuales() {
+        return {
+            efectivo:   parseFloat(inputMontoEfectivo.value) || 0,
+            banco:      parseFloat(inputMontoBanco.value) || 0,
+            plataforma: parseFloat(inputMontoPlataforma.value) || 0,
+        };
+    }
+
+    function totalComponentes() {
+        const c = componentesActuales();
+        return c.efectivo + c.banco + c.plataforma;
+    }
+
+    function actualizarResultadoEnVivo() {
+        const monto = totalComponentes();
+        elTotalADepositar.textContent = fmt(monto);
+
+        if (!monto || monto <= 0 || isNaN(netoADepositar)) {
+            elResultadoVivo.textContent = '';
+            return;
+        }
+        const diferencia = monto - netoADepositar;
+        if (diferencia > 0) {
+            elResultadoVivo.innerHTML = `<span class="dep-dif-favor">Quedaría ${fmt(diferencia)} A FAVOR</span>`;
+        } else if (diferencia < 0) {
+            elResultadoVivo.innerHTML = `<span class="dep-dif-contra">Quedaría ${fmt(Math.abs(diferencia))} EN CONTRA</span>`;
+        } else {
+            elResultadoVivo.innerHTML = `<span class="dep-dif-sindif">Queda exacto, sin diferencia</span>`;
+        }
+    }
+    [inputMontoEfectivo, inputMontoBanco, inputMontoPlataforma].forEach(inp => {
+        inp.addEventListener('input', actualizarResultadoEnVivo);
+    });
+
+    // ── Selector de días de recaudación a cubrir ──────────
+    // Al tildar/destildar, "Recaudado pendiente", "Período a cubrir" y
+    // "Neto a depositar" se recalculan al toque, sin ir al servidor (mismos
+    // datos que ya se trajeron al cargar la página).
+    let pendientesActuales = [];
+    const elListaPendientes = document.getElementById('listaPendientes');
+
+    function renderListaPendientes() {
+        if (pendientesActuales.length === 0) {
+            elListaPendientes.innerHTML = '<p class="dep-pendientes-vacio" id="pendientesVacioMsg">No hay recaudación pendiente para esta entidad.</p>';
+            return;
+        }
+        const filas = pendientesActuales.map(r => `
+            <label class="dep-pendiente-fila">
+                <input type="checkbox" class="chk-pendiente" value="${r.id}" data-monto="${r.monto}" checked>
+                <span class="dep-pendiente-fecha">${r.fecha_display}</span>
+                <span class="dep-pendiente-monto">${fmt(r.monto)}</span>
+            </label>
+        `).join('');
+        elListaPendientes.innerHTML = filas + `
+            <div class="dep-pendientes-acciones">
+                <button type="button" class="dep-pendientes-link" id="btnMarcarTodo">Marcar todo</button>
+                <button type="button" class="dep-pendientes-link" id="btnDesmarcarTodo">Desmarcar todo</button>
+            </div>
+        `;
+        elListaPendientes.querySelectorAll('.chk-pendiente').forEach(chk => {
+            chk.addEventListener('change', recalcularEnVivo);
+        });
+        document.getElementById('btnMarcarTodo').addEventListener('click', () => {
+            elListaPendientes.querySelectorAll('.chk-pendiente').forEach(c => { c.checked = true; });
+            recalcularEnVivo();
+        });
+        document.getElementById('btnDesmarcarTodo').addEventListener('click', () => {
+            elListaPendientes.querySelectorAll('.chk-pendiente').forEach(c => { c.checked = false; });
+            recalcularEnVivo();
+        });
+    }
+
+    function seleccionadosActuales() {
+        return Array.from(elListaPendientes.querySelectorAll('.chk-pendiente:checked'));
+    }
+
+    function recalcularEnVivo() {
+        const seleccionados = seleccionadosActuales();
+        const recaudadoSeleccionado = seleccionados.reduce(
+            (acc, c) => acc + parseFloat(c.dataset.monto), 0
+        );
+        document.getElementById('msgRecaudadoPendiente').textContent = fmt(recaudadoSeleccionado);
+
+        const elPeriodo = document.getElementById('msgPeriodoCubrir');
+        if (seleccionados.length > 0) {
+            const objs = seleccionados
+                .map(c => pendientesActuales.find(p => String(p.id) === c.value))
+                .sort((a, b) => a.fecha.localeCompare(b.fecha));
+            const desde = objs[0];
+            const hasta = objs[objs.length - 1];
+            elPeriodo.textContent = desde.id === hasta.id
+                ? desde.fecha_display
+                : `${desde.fecha_display} al ${hasta.fecha_display}`;
+        } else {
+            elPeriodo.textContent = '—';
+        }
+
+        const saldoAnt = saldoAnteriorSigned || 0;
+        netoADepositar = Math.max(recaudadoSeleccionado - saldoAnt, 0);
+        document.getElementById('msgNetoADepositar').textContent = fmt(netoADepositar);
+
+        actualizarResultadoEnVivo();
+    }
+
+    async function cargarPendientes() {
+        try {
+            const res  = await fetch(`${urlPendientes}?entidad=${entidadActual}`);
+            const data = await res.json();
+            pendientesActuales = data.pendientes || [];
+        } catch (e) {
+            pendientesActuales = [];
+        }
+        renderListaPendientes();
+        recalcularEnVivo();
+    }
+    cargarPendientes();
 
     // ── Selector de entidad ───────────────────────────────
     document.querySelectorAll('.dep-entidad-btn').forEach(btn => {
@@ -362,10 +682,10 @@
     // ── Abrir modal ───────────────────────────────────────
     document.getElementById('btnRegistrar').addEventListener('click', function () {
         const fecha  = document.getElementById('inputFecha').value;
-        const monto  = parseFloat(document.getElementById('inputMonto').value);
         const comp   = document.getElementById('inputComprobante').value.trim();
         const obs    = document.getElementById('inputObservaciones').value.trim();
-        const tipo   = document.getElementById('inputTipoDeposito').value;
+        const componentes = componentesActuales();
+        const monto  = componentes.efectivo + componentes.banco + componentes.plataforma;
         const errEl  = document.getElementById('depositoError');
         const okEl   = document.getElementById('depositoExito');
 
@@ -378,7 +698,7 @@
             return;
         }
         if (!monto || monto <= 0) {
-            errEl.textContent = 'El monto debe ser mayor a cero.';
+            errEl.textContent = 'El monto total debe ser mayor a cero (completá al menos uno de los 3 campos).';
             errEl.style.display = '';
             return;
         }
@@ -393,7 +713,35 @@
         const [y, m, d] = fecha.split('-');
         document.getElementById('modalFecha').textContent = `${d}/${m}/${y}`;
         document.getElementById('modalMonto').textContent = fmt(monto);
-        document.getElementById('modalTipoDeposito').textContent = tipoDepositoLabels[tipo] || tipo;
+
+        const filaEfectivo = document.getElementById('modalFilaEfectivo');
+        if (componentes.efectivo > 0) {
+            document.getElementById('modalMontoEfectivo').textContent = fmt(componentes.efectivo);
+            filaEfectivo.style.display = '';
+        } else {
+            filaEfectivo.style.display = 'none';
+        }
+        const filaBanco = document.getElementById('modalFilaBanco');
+        if (componentes.banco > 0) {
+            document.getElementById('modalMontoBanco').textContent = fmt(componentes.banco);
+            filaBanco.style.display = '';
+        } else {
+            filaBanco.style.display = 'none';
+        }
+        const filaPlataforma = document.getElementById('modalFilaPlataforma');
+        if (componentes.plataforma > 0) {
+            document.getElementById('modalMontoPlataforma').textContent = fmt(componentes.plataforma);
+            filaPlataforma.style.display = '';
+        } else {
+            filaPlataforma.style.display = 'none';
+        }
+
+        // Los mensajes clave (neto a depositar / saldo anterior / período) ya
+        // están calculados y mostrados en el formulario — se copian tal cual.
+        document.getElementById('modalRecaudadoPendiente').textContent = document.getElementById('msgRecaudadoPendiente').textContent.trim();
+        document.getElementById('modalNetoADepositar').textContent = document.getElementById('msgNetoADepositar').textContent.trim();
+        document.getElementById('modalSaldoAnterior').innerHTML     = document.getElementById('msgUltimaDiferencia').innerHTML;
+        document.getElementById('modalPeriodo').textContent         = document.getElementById('msgPeriodoCubrir').textContent.trim();
 
         const filaCom = document.getElementById('modalFilaComprobante');
         if (comp) {
@@ -423,10 +771,9 @@
     // ── Confirmar ─────────────────────────────────────────
     document.getElementById('btnConfirmar').addEventListener('click', async function () {
         const fecha = document.getElementById('inputFecha').value;
-        const monto = parseFloat(document.getElementById('inputMonto').value);
         const comp  = document.getElementById('inputComprobante').value.trim();
         const obs   = document.getElementById('inputObservaciones').value.trim();
-        const tipo  = document.getElementById('inputTipoDeposito').value;
+        const componentes = componentesActuales();
         const errEl = document.getElementById('modalError');
         const btn   = this;
 
@@ -444,12 +791,14 @@
                     'X-CSRFToken': getCsrf(),
                 },
                 body: JSON.stringify({
-                    entidad:            entidadActual,
+                    entidad:                 entidadActual,
                     fecha,
-                    monto,
-                    tipo_deposito:      tipo,
-                    numero_comprobante: comp,
-                    observaciones:      obs,
+                    monto_efectivo_fisico:   componentes.efectivo,
+                    monto_ya_en_banco:       componentes.banco,
+                    monto_saldo_plataforma:  componentes.plataforma,
+                    numero_comprobante:      comp,
+                    observaciones:           obs,
+                    recaudaciones_ids:       seleccionadosActuales().map(c => parseInt(c.value)),
                 }),
             });
         } catch (e) {
@@ -491,15 +840,30 @@
                 modalInstance = null;
             }
 
-            // Actualizar contador y total en el botón de entidad
+            // Actualizar contador en el botón de entidad
             const btnActivo = document.querySelector(
                 `.dep-entidad-btn[data-entidad="${entidadActual}"]`
             );
             if (btnActivo) {
-                btnActivo.querySelector('.dep-entidad-total').textContent = fmt(data.nuevo_total);
                 const cantEl = btnActivo.querySelector('.dep-entidad-cant');
                 const n = (parseInt(cantEl.textContent) || 0) + 1;
                 cantEl.textContent = `${n} depósito${n !== 1 ? 's' : ''}`;
+
+                // Pill de pendiente/a favor: el nuevo pendiente con signo es
+                // -diferencia (diferencia > 0 => a favor; < 0 => pendiente).
+                const pill = btnActivo.querySelector('.dep-pendiente-pill');
+                if (pill) {
+                    if (data.diferencia > 0) {
+                        pill.textContent = `A favor ${fmt(data.diferencia)}`;
+                        pill.className   = 'dep-pendiente-pill pill-favor';
+                    } else if (data.diferencia < 0) {
+                        pill.textContent = `Pendiente ${fmt(Math.abs(data.diferencia))}`;
+                        pill.className   = 'dep-pendiente-pill pill-alerta';
+                    } else {
+                        pill.textContent = 'Sin pendiente';
+                        pill.className   = 'dep-pendiente-pill pill-ok';
+                    }
+                }
             }
 
             // Agregar fila en tabla
@@ -510,24 +874,40 @@
             let difHtml = '—';
             if (data.diferencia !== null && data.diferencia !== undefined) {
                 if (data.diferencia > 0) {
-                    difHtml = `<span class="dep-dif-sobrante">+${fmt(data.diferencia)} (sobrante)</span>`;
+                    difHtml = `<span class="dep-dif-favor">+${fmt(data.diferencia)} (A FAVOR)</span>`;
                 } else if (data.diferencia < 0) {
-                    difHtml = `<span class="dep-dif-faltante">${fmt(data.diferencia)} (faltante)</span>`;
+                    difHtml = `<span class="dep-dif-contra">${fmt(data.diferencia)} (EN CONTRA)</span>`;
                 } else {
                     difHtml = `<span class="dep-dif-sindif">$0,00</span>`;
                 }
             }
 
-            const tipoHtml = data.tipo_deposito
-                ? `<span class="badge-tipo-deposito badge-tipo-${data.tipo_deposito}">${data.tipo_deposito_label}</span>`
-                : '—';
+            let composicionHtml = '';
+            if (data.monto_efectivo_fisico > 0) composicionHtml += `<span class="badge-tipo-deposito badge-tipo-efectivo">Efectivo ${fmt(data.monto_efectivo_fisico)}</span>`;
+            if (data.monto_ya_en_banco > 0)     composicionHtml += `<span class="badge-tipo-deposito badge-tipo-banco">Banco ${fmt(data.monto_ya_en_banco)}</span>`;
+            if (data.monto_saldo_plataforma > 0) composicionHtml += `<span class="badge-tipo-deposito badge-tipo-plataforma">A favor ${fmt(data.monto_saldo_plataforma)}</span>`;
+
+            let saldoAntHtml = '—';
+            if (data.saldo_anterior_momento !== null && data.saldo_anterior_momento !== undefined) {
+                if (data.saldo_anterior_momento > 0) {
+                    saldoAntHtml = `<span class="dep-dif-favor">${fmt(data.saldo_anterior_momento)} (A FAVOR)</span>`;
+                } else if (data.saldo_anterior_momento < 0) {
+                    saldoAntHtml = `<span class="dep-dif-contra">${fmt(data.saldo_anterior_momento)} (EN CONTRA)</span>`;
+                } else {
+                    saldoAntHtml = `<span class="dep-dif-sindif">$0,00</span>`;
+                }
+            }
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><strong>#${data.deposito_id}</strong></td>
                 <td>${data.fecha}</td>
+                <td>${data.periodo_momento || '—'}</td>
+                <td>${data.recaudado_pendiente_momento !== null && data.recaudado_pendiente_momento !== undefined ? fmt(data.recaudado_pendiente_momento) : '—'}</td>
+                <td>${saldoAntHtml}</td>
+                <td>${data.neto_a_depositar_momento !== null && data.neto_a_depositar_momento !== undefined ? fmt(data.neto_a_depositar_momento) : '—'}</td>
                 <td><strong>${fmt(data.monto)}</strong></td>
-                <td>${tipoHtml}</td>
+                <td class="dep-composicion">${composicionHtml || '—'}</td>
                 <td>${difHtml}</td>
                 <td>${data.numero_comprobante || '—'}</td>
                 <td>${data.observaciones || '—'}</td>
@@ -539,18 +919,37 @@
             // Mensaje de éxito
             const okEl = document.getElementById('depositoExito');
             let difMsg = '';
-            if (data.diferencia > 0) difMsg = ` Sobrante: ${fmt(data.diferencia)}.`;
-            else if (data.diferencia < 0) difMsg = ` Faltante: ${fmt(Math.abs(data.diferencia))}.`;
+            if (data.diferencia > 0) difMsg = ` A favor: ${fmt(data.diferencia)}.`;
+            else if (data.diferencia < 0) difMsg = ` En contra: ${fmt(Math.abs(data.diferencia))}.`;
             okEl.textContent =
-                `Depósito de ${fmt(data.monto)} registrado para ${data.entidad_label}. ` +
-                `Total acumulado: ${fmt(data.nuevo_total)}.${difMsg}`;
+                `Depósito de ${fmt(data.monto)} registrado para ${data.entidad_label}.${difMsg}`;
             okEl.style.display = '';
 
-            // Limpiar campos
-            document.getElementById('inputMonto').value          = '';
+            // Limpiar campos (antes de recalcular, para que el total en vivo
+            // arranque en $0 y no quede pisado por lo que se acaba de depositar)
+            inputMontoEfectivo.value   = '';
+            inputMontoBanco.value      = '';
+            inputMontoPlataforma.value = '';
             document.getElementById('inputComprobante').value    = '';
             document.getElementById('inputObservaciones').value  = '';
-            document.getElementById('inputTipoDeposito').value   = 'efectivo_fisico';
+
+            // Actualizar mensajes clave: la diferencia de este depósito pasa
+            // a ser el "saldo anterior" del próximo, y las recaudaciones que
+            // cubrió salen de la lista de pendientes.
+            saldoAnteriorSigned = data.diferencia;
+            const cubiertasIds = new Set((data.recaudaciones_cubiertas_ids || []).map(String));
+            pendientesActuales = pendientesActuales.filter(p => !cubiertasIds.has(String(p.id)));
+            renderListaPendientes();
+            recalcularEnVivo();
+
+            const elUltimaDif = document.getElementById('msgUltimaDiferencia');
+            if (data.diferencia > 0) {
+                elUltimaDif.innerHTML = `<span class="dep-dif-favor">${fmt(data.diferencia)} (A FAVOR)</span>`;
+            } else if (data.diferencia < 0) {
+                elUltimaDif.innerHTML = `<span class="dep-dif-contra">${fmt(data.diferencia)} (EN CONTRA)</span>`;
+            } else {
+                elUltimaDif.innerHTML = `<span class="dep-dif-sindif">$0,00</span>`;
+            }
 
         } else {
             errEl.textContent = data.error || 'Error al registrar el depósito.';

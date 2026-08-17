@@ -170,6 +170,7 @@
                     <th>#</th>
                     <th>Fecha</th>
                     <th>Monto</th>
+                    <th>Estado</th>
                     <th>Observaciones</th>
                     <th>Registrado por</th>
                     {% if user.is_staff or user.is_superuser %}
@@ -183,20 +184,29 @@
                     <td><strong>#{{ r.pk }}</strong></td>
                     <td>{{ r.fecha|date:"d/m/Y" }}</td>
                     <td><strong>${{ r.monto|floatformat:2 }}</strong></td>
+                    <td>
+                        {% if r.cubierta_por_id %}
+                            <span class="badge-cubierta">Cubierta (depósito #{{ r.cubierta_por_id }})</span>
+                        {% else %}
+                            <span class="badge-pendiente">Pendiente</span>
+                        {% endif %}
+                    </td>
                     <td>{{ r.observaciones|default:"—" }}</td>
                     <td>{{ r.registrado_por }}</td>
                     {% if user.is_staff or user.is_superuser %}
                     <td>
+                        {% if not r.cubierta_por_id %}
                         <button class="btn-eliminar-rec btn-caja-secundario"
                                 data-id="{{ r.pk }}" style="font-size:.78rem; padding:.25rem .6rem;">
                             Eliminar
                         </button>
+                        {% else %}—{% endif %}
                     </td>
                     {% endif %}
                 </tr>
                 {% empty %}
                 <tr id="trVacio">
-                    <td colspan="{% if user.is_staff or user.is_superuser %}6{% else %}5{% endif %}"
+                    <td colspan="{% if user.is_staff or user.is_superuser %}7{% else %}6{% endif %}"
                         class="dep-vacio">
                         No hay recaudaciones registradas para esta entidad.
                     </td>
@@ -278,6 +288,14 @@
 .pill-alerta { background: #fff3cd; color: #856404; }
 .pill-ok     { background: #d1fae5; color: #065f46; }
 .pill-favor  { background: #dbeafe; color: #1e40af; }
+
+/* ── Estado de recaudación (cubierta / pendiente) ── */
+.badge-cubierta, .badge-pendiente {
+    display: inline-block; padding: .2rem .55rem; border-radius: 20px;
+    font-size: .78rem; font-weight: 600; white-space: nowrap;
+}
+.badge-cubierta  { background: #d1fae5; color: #065f46; }
+.badge-pendiente { background: #fff3cd; color: #856404; }
 
 /* ── Balance card ── */
 .rec-balance-grid {
