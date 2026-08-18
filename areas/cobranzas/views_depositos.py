@@ -14,7 +14,7 @@ from django.utils.dateparse import parse_date
 from django.views import View
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
-from .models import DepositoBancario, DepositoTicket, RecaudacionDiaria
+from .models import DepositoBancario, DepositoTicket, RecaudacionDiaria, AjusteSaldoFavor
 from .views_recaudaciones import _totales_por_entidad, _ultima_diferencia, _recaudado_pendiente
 
 
@@ -61,6 +61,12 @@ class DepositosView(LoginRequiredMixin, View):
         recaudado_pendiente = _recaudado_pendiente(entidad)
         periodo             = _periodo_pendiente(entidad)
 
+        usos_saldo = (
+            AjusteSaldoFavor.objects
+            .filter(entidad=entidad)
+            .select_related('registrado_por')[:15]
+        )
+
         return render(request, 'cobranzas/depositos.html', {
             'entidad':             entidad,
             'entidad_label':       'PagoFácil' if entidad == DepositoBancario.ENTIDAD_PAGOFACIL else 'RapiPago',
@@ -74,6 +80,7 @@ class DepositosView(LoginRequiredMixin, View):
             'recaudado_pendiente': recaudado_pendiente,
             'periodo_desde':       periodo[0] if periodo else None,
             'periodo_hasta':       periodo[1] if periodo else None,
+            'usos_saldo':          usos_saldo,
             'ENTIDAD_PF':          DepositoBancario.ENTIDAD_PAGOFACIL,
             'ENTIDAD_RP':          DepositoBancario.ENTIDAD_RAPIPAGO,
             'hoy':                 timezone.localdate(),
@@ -390,5 +397,108 @@ class EliminarDepositosAjax(LoginRequiredMixin, View):
  
         with transaction.atomic():
             eliminados, _ = DepositoBancario.objects.filter(pk__in=ids).delete()
- 
+
         return JsonResponse({'success': True, 'eliminados': eliminados})
+
+
+class UsarSaldoFavorAjax(LoginRequiredMixin, View):
+    """
+    Registra un uso del saldo a favor (ej: carga de SUBE con el crédito de
+    la plataforma) que no pasa por un depósito real. Resta del saldo a
+    favor vigente vía AjusteSaldoFavor — ver _ultima_diferencia().
+    """
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        entidad = data.get('entidad', '').strip()
+        if entidad not in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
+            return JsonResponse({'error': 'Entidad inválida.'}, status=400)
+
+        fecha_raw = data.get('fecha', '').strip()
+        if not fecha_raw:
+            return JsonResponse({'error': 'La fecha es obligatoria.'}, status=400)
+        fecha = parse_date(fecha_raw)
+        if fecha is None:
+            return JsonResponse({'error': 'Fecha inválida. Usá el formato AAAA-MM-DD.'}, status=400)
+        if fecha > timezone.localdate():
+            return JsonResponse({'error': 'La fecha no puede ser futura.'}, status=400)
+
+        try:
+            monto = Decimal(str(data.get('monto', 0)))
+            if monto <= 0:
+                raise ValueError
+        except (ValueError, InvalidOperation):
+            return JsonResponse({'error': 'El monto debe ser mayor a cero.'}, status=400)
+
+        motivo = data.get('motivo', '').strip()
+        if not motivo:
+            return JsonResponse({'error': 'Indicá para qué se usó el saldo (ej: carga SUBE).'}, status=400)
+
+        observaciones = data.get('observaciones', '').strip()
+
+        with transaction.atomic():
+            uso = AjusteSaldoFavor.objects.create(
+                entidad=entidad,
+                fecha=fecha,
+                monto=monto,
+                motivo=motivo,
+                observaciones=observaciones,
+                registrado_por=request.user,
+            )
+
+        saldo_anterior = _ultima_diferencia(entidad)
+        totales = _totales_por_entidad(entidad)
+
+        try:
+            realizado_por_str = request.user.get_full_name() or request.user.username
+        except Exception:
+            realizado_por_str = str(request.user.pk)
+
+        return JsonResponse({
+            'success':            True,
+            'uso_id':             uso.pk,
+            'fecha':              uso.fecha.strftime('%d/%m/%Y'),
+            'monto':              float(uso.monto),
+            'motivo':             uso.motivo,
+            'observaciones':      uso.observaciones or '',
+            'realizado_por':      realizado_por_str,
+            'saldo_anterior':     float(saldo_anterior) if saldo_anterior is not None else None,
+            'neto_a_depositar':   float(totales['pendiente_mostrar']),
+            'a_favor':            float(totales['a_favor']),
+        })
+
+
+class EliminarUsoSaldoFavorAjax(LoginRequiredMixin, View):
+    """Elimina un AjusteSaldoFavor. Solo staff/superuser."""
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return JsonResponse({'error': 'Solo administradores pueden eliminar usos de saldo a favor.'}, status=403)
+
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        uso_id = data.get('id')
+        if not uso_id:
+            return JsonResponse({'error': 'No se recibió el ID.'}, status=400)
+
+        uso = get_object_or_404(AjusteSaldoFavor, pk=uso_id)
+        entidad = uso.entidad
+
+        with transaction.atomic():
+            uso.delete()
+
+        saldo_anterior = _ultima_diferencia(entidad)
+        totales = _totales_por_entidad(entidad)
+
+        return JsonResponse({
+            'success':          True,
+            'entidad':          entidad,
+            'saldo_anterior':   float(saldo_anterior) if saldo_anterior is not None else None,
+            'neto_a_depositar': float(totales['pendiente_mostrar']),
+            'a_favor':          float(totales['a_favor']),
+        })

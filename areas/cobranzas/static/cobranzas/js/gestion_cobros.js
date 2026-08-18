@@ -207,8 +207,10 @@ elSmartPrefijo.addEventListener('keydown', e => {
     }
     if (e.key === 'Enter') {
         e.preventDefault();
-        if (hayDropdown && prefijoActivoIdx >= 0) {
-            seleccionarPrefijo(elPrefijoDropdown.children[prefijoActivoIdx].dataset.prefijo);
+        if (hayDropdown) {
+            // Sin selección explícita con flechas, Enter toma el primero de la lista.
+            const idx = prefijoActivoIdx >= 0 ? prefijoActivoIdx : 0;
+            seleccionarPrefijo(elPrefijoDropdown.children[idx].dataset.prefijo);
         } else {
             ocultarDropdownPrefijos();
             elSmartImporte.focus();
@@ -359,6 +361,18 @@ inputBuscar.addEventListener('input', () => {
     searchTimer = setTimeout(() => buscarServicios(q), 280);
 });
 
+// Enter → busca ya (sin esperar el debounce) y toma el primer resultado.
+inputBuscar.addEventListener('keydown', async e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const q = inputBuscar.value.trim();
+    if (!q) return;
+    clearTimeout(searchTimer);
+    await buscarServicios(q);
+    const primero = listaResultados.querySelector('.cobro-resultado-item');
+    if (primero) primero.click();
+});
+
 btnLimpiar.addEventListener('click', () => {
     inputBuscar.value = '';
     btnLimpiar.style.display = 'none';
@@ -473,7 +487,7 @@ agrImporte.addEventListener('input', () => {
 
 // Enter en importe → agregar
 agrImporte.addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('btnAgregarItem').click();
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btnAgregarItem').click(); }
 });
 
 document.getElementById('btnAgregarItem').addEventListener('click', () => {

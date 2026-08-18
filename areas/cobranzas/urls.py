@@ -67,6 +67,8 @@ urlpatterns = [
     path('depositos/eliminar/', views_depositos.EliminarDepositosAjax.as_view(), name='depositos_eliminar'),
     path('depositos/ticket/', views_depositos.TicketDepositoAjax.as_view(), name='depositos_ticket'),
     path('depositos/pendientes/', views_depositos.PendientesRecaudacionAjax.as_view(), name='depositos_pendientes'),
+    path('depositos/saldo-favor/usar/', views_depositos.UsarSaldoFavorAjax.as_view(), name='depositos_saldo_favor_usar'),
+    path('depositos/saldo-favor/eliminar/', views_depositos.EliminarUsoSaldoFavorAjax.as_view(), name='depositos_saldo_favor_eliminar'),
 
     path('recaudaciones/',           RecaudacionesView.as_view(),        name='recaudaciones'),
     path('recaudaciones/registrar/', RegistrarRecaudacionAjax.as_view(), name='recaudaciones_registrar'),

@@ -508,6 +508,41 @@ class DepositoBancario(models.Model):
         )
 
 
+# ─────────────────────────────────────────────────────────────
+# USO DEL SALDO A FAVOR
+#
+# El saldo a favor (diferencia positiva del último depósito) no
+# siempre se "cobra" depositando de menos la próxima vez: a veces se
+# usa directo desde la plataforma para cargar crédito (SUBE, celular,
+# etc.), sin que pase dinero físico por caja. Cada fila acá resta del
+# saldo a favor vigente de esa entidad — ver _ultima_diferencia() en
+# views_recaudaciones.py, que descuenta estos usos posteriores al
+# último depósito antes de mostrar "A favor".
+# ─────────────────────────────────────────────────────────────
+
+class AjusteSaldoFavor(models.Model):
+    entidad = models.CharField(max_length=20, choices=DepositoBancario.ENTIDADES)
+    fecha   = models.DateField(default=timezone.localdate,
+                                help_text="Fecha en que se usó el saldo a favor")
+    monto   = models.DecimalField(max_digits=12, decimal_places=2,
+                                help_text="Cuánto se descontó del saldo a favor")
+    motivo  = models.CharField(max_length=200,
+                                help_text="Ej: Carga SUBE, recarga celular...")
+    observaciones  = models.TextField(blank=True)
+    registrado_por = models.ForeignKey(
+                        Usuario, on_delete=models.SET_NULL,
+                        null=True, related_name='ajustes_saldo_favor')
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha', '-fecha_registro']
+        verbose_name        = 'Uso de saldo a favor'
+        verbose_name_plural = 'Usos de saldo a favor'
+
+    def __str__(self):
+        return f"Uso saldo a favor {self.get_entidad_display()} -${self.monto} — {self.motivo}"
+
+
 def _ticket_deposito_path(instance, filename):
     return f'cobranzas/tickets_depositos/{instance.deposito_id}/{filename}'
 

@@ -14,14 +14,16 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views import View
 
-from .models import RecaudacionDiaria, DepositoBancario
+from decimal import Decimal
+
+from .models import RecaudacionDiaria, DepositoBancario, AjusteSaldoFavor
 
 
 # ─────────────────────────────────────────────────────────────
@@ -29,14 +31,32 @@ from .models import RecaudacionDiaria, DepositoBancario
 # ─────────────────────────────────────────────────────────────
 
 def _ultima_diferencia(entidad: str):
-    """Diferencia del último depósito registrado para esa entidad (o None)."""
+    """
+    Saldo a favor/en contra vigente para esa entidad: la diferencia del
+    último depósito, descontando cualquier uso posterior del saldo a favor
+    (AjusteSaldoFavor — ej. cargas de SUBE hechas directo con el saldo de
+    la plataforma, sin pasar por un depósito real). None si todavía no
+    hubo ningún depósito para esta entidad.
+    """
     ultimo = (
         DepositoBancario.objects
         .filter(entidad=entidad)
         .order_by('-fecha', '-fecha_registro')
         .first()
     )
-    return ultimo.diferencia if ultimo else None
+    if ultimo is None:
+        return None
+
+    usos = (
+        AjusteSaldoFavor.objects
+        .filter(entidad=entidad)
+        .filter(
+            Q(fecha__gt=ultimo.fecha) |
+            Q(fecha=ultimo.fecha, fecha_registro__gt=ultimo.fecha_registro)
+        )
+        .aggregate(t=Sum('monto'))['t'] or Decimal('0')
+    )
+    return (ultimo.diferencia or Decimal('0')) - usos
 
 
 def _recaudado_pendiente(entidad: str) -> Decimal:
