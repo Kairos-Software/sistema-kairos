@@ -126,6 +126,10 @@ class Instalacion(models.Model):
     estado      = models.CharField(max_length=15, choices=ESTADOS, default=ESTADO_ACTIVO)
     descripcion = models.TextField(blank=True)
 
+    comandos = models.TextField('Comandos de actualización', blank=True,
+                   help_text='Comandos para actualizar esta instalación puntualmente '
+                             '(ej: cd /home/deploy/proyecto && git pull && systemctl restart proyecto)')
+
     creado_por          = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True,
                                              related_name='instalaciones_creadas')
     fecha_alta          = models.DateTimeField(auto_now_add=True)

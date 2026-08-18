@@ -107,7 +107,7 @@
                 data-dominio="{{ inst.dominio }}" data-puerto="{{ inst.puerto|default:'' }}"
                 data-ruta-proyecto="{{ inst.ruta_proyecto }}" data-ruta-service="{{ inst.ruta_service }}"
                 data-ruta-conf="{{ inst.ruta_conf }}" data-estado="{{ inst.estado }}"
-                data-descripcion="{{ inst.descripcion }}"
+                data-descripcion="{{ inst.descripcion }}" data-comandos="{{ inst.comandos }}"
                 data-servicio-nombre="{{ inst.servicio.nombre }}" data-vps-nombre="{{ inst.vps.nombre }}"
                 data-cliente-orden="{{ inst.get_cliente_display }}" data-estado-orden="{{ inst.get_estado_display }}"
                 data-fecha-alta="{{ inst.fecha_alta|date:'U' }}">
@@ -120,6 +120,7 @@
                 <td>
                     <div class="acciones-cell">
                         {% if inst.dominio %}<button class="btn-accion btn-qr" data-id="{{ inst.pk }}" data-dominio="{{ inst.dominio }}">QR</button>{% endif %}
+                        {% if inst.comandos %}<button class="btn-accion btn-ver-comandos" data-id="{{ inst.pk }}">Comandos</button>{% endif %}
                         {% if puede_editar %}<button class="btn-accion btn-editar" data-id="{{ inst.pk }}">Editar</button>{% endif %}
                         {% if puede_eliminar %}<button class="btn-accion btn-eliminar" data-id="{{ inst.pk }}" data-nombre="{{ inst.servicio.nombre }} — {{ inst.vps.nombre }}">Eliminar</button>{% endif %}
                     </div>
@@ -225,9 +226,16 @@
                         </div>
                     </div>
 
-                    <div class="mb-1">
+                    <div class="mb-2">
                         <label class="form-label">Descripción</label>
                         <textarea name="descripcion" id="instDescripcion" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label">Comandos de actualización</label>
+                        <textarea name="comandos" id="instComandos" class="form-control code-textarea" rows="4"
+                                  placeholder="cd /home/deploy/proyecto && git pull && systemctl restart proyecto"></textarea>
+                        <p class="field-hint">Se pueden ver y copiar rápido desde el botón "Comandos" en la lista.</p>
                     </div>
 
                     <div id="instErrores" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
@@ -263,6 +271,28 @@
     </div>
 </div>
 {% endif %}
+
+{# ── Modal ver comandos ── #}
+<div class="modal fade" id="comandosModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">Comandos de actualización</h5>
+                    <p class="modal-subtitle" id="comandosSubtitulo"></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre class="script-contenido-view" id="comandosContenido"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnCopiarComandos">Copiar comandos</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {# ── Modal QR ── #}
 <div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">

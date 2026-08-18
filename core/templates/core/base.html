@@ -43,6 +43,11 @@
                 </ul>
                 <ul class="navbar-nav align-items-center gap-2">
                     {% if user.is_authenticated %}
+                        {% if user.is_superuser %}
+                            <li class="nav-item">
+                                <a class="btn btn-outline-danger btn-sm" href="{% url 'core:reinicio' %}">Reiniciar</a>
+                            </li>
+                        {% endif %}
                         <li class="nav-item">
                             <span class="navbar-text">Hola, <span>{{ user.username }}</span></span>
                         </li>

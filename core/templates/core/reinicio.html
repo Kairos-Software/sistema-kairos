@@ -1,0 +1,209 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Reiniciar sistema{% endblock %}
+
+{% block content %}
+<div class="reinicio-wrap">
+
+    <div class="reinicio-header">
+        <div class="reinicio-header-icono">
+            <svg viewBox="0 0 24 24" fill="none" width="26" height="26">
+                <path d="M12 9v4M12 16.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M10.3 3.9 2.5 17.5c-.6 1 .1 2.3 1.3 2.3h16.4c1.2 0 1.9-1.3 1.3-2.3L13.7 3.9c-.6-1-2-1-2.6 0z"
+                      stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div>
+            <h1>Reiniciar <span>sistema</span></h1>
+            <p class="reinicio-subtitle">Borra todos los datos de prueba de cobranzas para empezar a usar el sistema en producción. Esta acción no se puede deshacer.</p>
+        </div>
+    </div>
+
+    <div class="reinicio-grid">
+
+        <div class="reinicio-card reinicio-card-borrar">
+            <h2>Se va a borrar</h2>
+            <ul class="reinicio-lista">
+                {% for etiqueta, cantidad in conteos %}
+                <li>
+                    <span>{{ etiqueta }}</span>
+                    <strong>{{ cantidad }}</strong>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="reinicio-card reinicio-card-conservar">
+            <h2>Se conserva</h2>
+            <ul class="reinicio-lista reinicio-lista-conservar">
+                <li>Usuarios y sus permisos</li>
+                <li>Clientes</li>
+                <li>Catálogo de servicios (y prefijos)</li>
+                <li>Todo el área de Software</li>
+            </ul>
+        </div>
+
+    </div>
+
+    <div class="reinicio-card reinicio-card-confirmar">
+        <h2>Confirmar</h2>
+        <p>
+            Para habilitar el botón, escribí exactamente
+            <code>{{ frase_confirmacion }}</code> en el campo de abajo.
+        </p>
+        <input type="text" id="inputConfirmacion" class="reinicio-input"
+               autocomplete="off" placeholder="{{ frase_confirmacion }}">
+
+        <div id="reinicioError" class="reinicio-error" style="display:none;"></div>
+        <div id="reinicioExito" class="reinicio-exito" style="display:none;"></div>
+
+        <button type="button" id="btnReiniciar" class="reinicio-btn-peligro" disabled>
+            Borrar todo y reiniciar
+        </button>
+    </div>
+
+</div>
+
+<style>
+.reinicio-wrap { max-width: 760px; margin: 0 auto; padding-bottom: 3rem; }
+
+.reinicio-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.6rem; }
+.reinicio-header-icono {
+    flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px;
+    background: rgba(220,38,38,.1); color: #dc2626;
+    display: flex; align-items: center; justify-content: center;
+}
+.reinicio-header h1 {
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 1.9rem;
+    color: #111; margin: 0 0 .2rem;
+}
+.reinicio-header h1 span { color: #dc2626; }
+.reinicio-subtitle { color: #6b7280; font-size: .92rem; margin: 0; }
+
+.reinicio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (max-width: 700px) { .reinicio-grid { grid-template-columns: 1fr; } }
+
+.reinicio-card {
+    background: #fff; border-radius: 12px; padding: 1.3rem 1.4rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,.06);
+}
+.reinicio-card h2 {
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 1.05rem;
+    margin: 0 0 .8rem; text-transform: uppercase; letter-spacing: .03em;
+}
+.reinicio-card-borrar h2 { color: #dc2626; }
+.reinicio-card-conservar h2 { color: #16a34a; }
+
+.reinicio-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.reinicio-lista li {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: .88rem; color: #374151;
+    padding-bottom: .5rem; border-bottom: 1px solid #f1f1f3;
+}
+.reinicio-lista li:last-child { border-bottom: none; padding-bottom: 0; }
+.reinicio-lista li strong { color: #dc2626; font-size: .95rem; }
+.reinicio-lista-conservar li {
+    justify-content: flex-start; gap: .5rem;
+    border-bottom: none; padding-bottom: 0;
+}
+.reinicio-lista-conservar li::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: #16a34a; flex-shrink: 0;
+}
+
+.reinicio-card-confirmar { border: 1.5px solid rgba(220,38,38,.3); }
+.reinicio-card-confirmar h2 { color: #dc2626; }
+.reinicio-card-confirmar p { font-size: .88rem; color: #6b7280; margin: 0 0 .8rem; }
+.reinicio-card-confirmar code {
+    background: #fee2e2; color: #b91c1c; padding: .1rem .4rem;
+    border-radius: 5px; font-weight: 700;
+}
+.reinicio-input {
+    width: 100%; padding: .6rem .8rem; font-size: .95rem;
+    border: 1.5px solid #d1d5db; border-radius: 8px; margin-bottom: 1rem;
+    box-sizing: border-box;
+}
+.reinicio-input:focus { outline: none; border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220,38,38,.12); }
+
+.reinicio-btn-peligro {
+    width: 100%; padding: .75rem; font-weight: 700; font-size: .95rem;
+    background: #dc2626; color: #fff; border: none; border-radius: 8px;
+    cursor: pointer; transition: background .15s;
+}
+.reinicio-btn-peligro:hover:not(:disabled) { background: #b91c1c; }
+.reinicio-btn-peligro:disabled { background: #f3a8a8; cursor: not-allowed; }
+
+.reinicio-error, .reinicio-exito {
+    padding: .7rem .9rem; border-radius: 8px; font-size: .87rem; margin-bottom: 1rem;
+}
+.reinicio-error { background: #fee2e2; color: #b91c1c; }
+.reinicio-exito { background: #dcfce7; color: #15803d; }
+</style>
+
+{{ frase_confirmacion|json_script:"fraseConfirmacionData" }}
+<script>
+(function () {
+    'use strict';
+
+    const frase = JSON.parse(document.getElementById('fraseConfirmacionData').textContent);
+    const input = document.getElementById('inputConfirmacion');
+    const btn   = document.getElementById('btnReiniciar');
+    const errEl = document.getElementById('reinicioError');
+    const okEl  = document.getElementById('reinicioExito');
+
+    function getCsrf() {
+        return document.cookie.split(';')
+            .map(c => c.trim())
+            .find(c => c.startsWith('csrftoken='))
+            ?.split('=')[1] || '';
+    }
+
+    input.addEventListener('input', () => {
+        btn.disabled = input.value.trim() !== frase;
+    });
+
+    btn.addEventListener('click', async () => {
+        errEl.style.display = 'none';
+        okEl.style.display  = 'none';
+        btn.disabled    = true;
+        btn.textContent = 'Borrando...';
+
+        let resp;
+        try {
+            resp = await fetch("{% url 'core:reinicio_ejecutar' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ confirmacion: input.value.trim() }),
+            });
+        } catch (e) {
+            errEl.textContent = 'Error de red. Intentá de nuevo.';
+            errEl.style.display = '';
+            btn.disabled = false; btn.textContent = 'Borrar todo y reiniciar';
+            return;
+        }
+
+        let data;
+        try { data = await resp.json(); } catch (e) {
+            errEl.textContent = 'No se pudo leer la respuesta.';
+            errEl.style.display = '';
+            btn.disabled = false; btn.textContent = 'Borrar todo y reiniciar';
+            return;
+        }
+
+        if (data.success) {
+            okEl.textContent = 'Listo. Se borraron todos los datos de prueba de cobranzas — el sistema queda limpio para empezar a usarse en producción.';
+            okEl.style.display = '';
+            document.querySelectorAll('.reinicio-lista li strong').forEach(el => { el.textContent = '0'; });
+            input.value = '';
+            btn.textContent = 'Borrar todo y reiniciar';
+        } else {
+            errEl.textContent = data.error || 'No se pudo completar el reinicio.';
+            errEl.style.display = '';
+            btn.disabled    = false;
+            btn.textContent = 'Borrar todo y reiniciar';
+        }
+    });
+})();
+</script>
+{% endblock %}

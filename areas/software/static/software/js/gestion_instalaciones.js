@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('instRutaConf').value = row.dataset.rutaConf;
         document.getElementById('instEstado').value = row.dataset.estado;
         document.getElementById('instDescripcion').value = row.dataset.descripcion;
+        document.getElementById('instComandos').value = row.dataset.comandos;
 
         if (row.dataset.clienteId) {
             seleccionarCliente(row.dataset.clienteId, row.dataset.clienteNombre);
@@ -183,6 +184,32 @@ document.addEventListener('DOMContentLoaded', function () {
             err.style.display = 'block';
             err.textContent = data.error || 'No se pudo eliminar.';
         }
+    });
+
+    // ─── Comandos (ver / copiar) ──────────────────────────────────────────
+
+    const comandosModalEl = document.getElementById('comandosModal');
+    const comandosModal   = comandosModalEl ? new bootstrap.Modal(comandosModalEl) : null;
+
+    document.querySelectorAll('.btn-ver-comandos').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('tr');
+            document.getElementById('comandosSubtitulo').textContent =
+                `${row.dataset.servicioNombre} — ${row.dataset.vpsNombre}`;
+            document.getElementById('comandosContenido').textContent = row.dataset.comandos || '';
+            comandosModal.show();
+        });
+    });
+
+    document.getElementById('btnCopiarComandos')?.addEventListener('click', async () => {
+        const texto = document.getElementById('comandosContenido').textContent;
+        try {
+            await navigator.clipboard.writeText(texto);
+            const btn = document.getElementById('btnCopiarComandos');
+            const original = btn.textContent;
+            btn.textContent = 'Copiado ✓';
+            setTimeout(() => { btn.textContent = original; }, 1500);
+        } catch { /* clipboard no disponible */ }
     });
 
     // ─── QR (ver / imprimir / descargar) ─────────────────────────────────

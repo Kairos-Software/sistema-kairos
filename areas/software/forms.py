@@ -44,7 +44,7 @@ class InstalacionForm(forms.ModelForm):
         model  = Instalacion
         fields = [
             'vps', 'servicio', 'cliente', 'cliente_texto', 'dominio', 'puerto',
-            'ruta_proyecto', 'ruta_service', 'ruta_conf', 'estado', 'descripcion',
+            'ruta_proyecto', 'ruta_service', 'ruta_conf', 'estado', 'descripcion', 'comandos',
         ]
         widgets = {
             'vps':            forms.Select(attrs={'class': 'form-control'}),
@@ -58,6 +58,8 @@ class InstalacionForm(forms.ModelForm):
             'ruta_conf':      forms.TextInput(attrs={'class': 'form-control', 'placeholder': '/etc/nginx/sites-available/proyecto.conf'}),
             'estado':         forms.Select(attrs={'class': 'form-control'}),
             'descripcion':    forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+            'comandos':       forms.Textarea(attrs={'rows': 6, 'class': 'form-control code-textarea', 'spellcheck': 'false',
+                                                      'placeholder': 'cd /home/deploy/proyecto && git pull && systemctl restart proyecto'}),
         }
 
     def clean(self):

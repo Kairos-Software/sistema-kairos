@@ -1,4 +1,5 @@
 {% extends 'software/base_software.html' %}
+{% load static %}
 
 {% block title %}Software{% endblock %}
 
@@ -29,4 +30,52 @@
         <span>Scripts guardados</span>
     </a>
 </div>
+
+{% if user.is_superuser %}
+<div class="backup-panel">
+    <div>
+        <p class="backup-titulo">Backup del área</p>
+        <p class="backup-desc">
+            Exportá o restaurá todo lo de VPS, servicios, instalaciones y scripts como medida de seguridad.
+            Importar <strong>reemplaza por completo</strong> los datos actuales del área por los del archivo.
+        </p>
+    </div>
+    <div class="backup-acciones">
+        <a href="{% url 'software:backup_exportar' %}" class="btn-volver">Exportar backup</a>
+        <button class="btn-volver" id="btnAbrirImportar">Importar backup</button>
+        <input type="file" id="inputBackupArchivo" accept=".xlsx" style="display:none;">
+    </div>
+</div>
+
+<div class="modal fade" id="importarBackupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">Importar backup</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Vas a reemplazar <strong>todos</strong> los datos actuales del área de software
+                   (VPS, servicios, instalaciones y scripts) por los del archivo
+                   <strong id="importarBackupNombre"></strong>.</p>
+                <p class="eliminar-warning">Esta acción no se puede deshacer. Escribí <strong>REEMPLAZAR</strong> para confirmar.</p>
+                <input type="text" id="importarBackupConfirmacion" class="form-control" autocomplete="off">
+                <div id="importarBackupError" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn-nuevo" style="background:#c0392b;" id="btnConfirmarImportarBackup" disabled>Reemplazar datos</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+    window.softwareUrls = { backupImportar: "{% url 'software:backup_importar' %}" };
+</script>
+<script src="{% static 'software/js/inicio_software.js' %}"></script>
 {% endblock %}

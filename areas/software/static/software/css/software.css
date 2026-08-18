@@ -334,6 +334,17 @@ textarea.form-control { resize: vertical; min-height: 90px; }
     white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow-y: auto; margin: 0;
 }
 
+/* ── Panel de backup ── */
+.backup-panel {
+    display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
+    margin-top: 2rem; padding: 1.2rem 1.5rem;
+    background: #fff; border: 1px solid #e8e8ee; border-radius: 14px;
+    box-shadow: 0 2px 14px rgba(0,0,0,.05);
+}
+.backup-titulo { font-family: 'Rajdhani', sans-serif; font-size: 1rem; font-weight: 700; color: #111; margin: 0 0 .3rem; letter-spacing: .5px; }
+.backup-desc { font-size: .82rem; color: #999; margin: 0; max-width: 520px; }
+.backup-acciones { display: flex; gap: .6rem; flex-shrink: 0; }
+
 /* ── Tarjetas de inicio ── */
 .software-home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
 .software-home-card {

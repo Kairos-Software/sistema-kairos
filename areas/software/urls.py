@@ -4,12 +4,17 @@ from . import views_vps
 from . import views_servicios
 from . import views_instalaciones
 from . import views_scripts
+from . import views_backup
 
 app_name = 'software'
 
 urlpatterns = [
     # ── Inicio ────────────────────────────────────────────────
     path('', views.InicioSoftwareView.as_view(), name='index'),
+
+    # ── Backup (exportar / importar toda la DB del área) ────────
+    path('backup/exportar/', views_backup.SoftwareExportarView.as_view(), name='backup_exportar'),
+    path('backup/importar/', views_backup.SoftwareImportarAjax.as_view(), name='backup_importar'),
 
     # ── VPS ───────────────────────────────────────────────────
     path('vps/', views_vps.GestionVpsView.as_view(), name='gestion_vps'),
