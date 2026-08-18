@@ -544,18 +544,45 @@ class AjusteSaldoFavor(models.Model):
 
 
 def _ticket_deposito_path(instance, filename):
-    return f'cobranzas/tickets_depositos/{instance.deposito_id}/{filename}'
+    return f'cobranzas/tickets_depositos/{instance.deposito_id}/{instance.tipo}/{filename}'
 
 
 class DepositoTicket(models.Model):
     """
-    Comprobante (transferencia o depósito en efectivo) asociado a un
-    DepositoBancario. Se carga por separado, después de registrar el
-    depósito, vía el botón "Ver/editar ticket".
+    Comprobante asociado a un DepositoBancario.
+
+    Para RapiPago, un depósito puede tener hasta 3 tickets — uno por cada
+    componente que lo forma (efectivo físico, transferencia al banco,
+    corrección de saldo a favor) — ya que un cierre real suele traer un
+    comprobante distinto por cada origen del dinero.
+
+    Para PagoFácil el desglose por componente no aplica igual (los 2
+    comprobantes reales no se corresponden claramente con esas categorías),
+    así que se usan 2 tipos genéricos sin etiqueta específica (TIPO_TICKET_1/2)
+    — simplemente 2 espacios para subir comprobantes sueltos por depósito.
+
+    Se carga por separado, después de registrar el depósito, vía el botón
+    "Ver/editar ticket" correspondiente.
     """
-    deposito           = models.OneToOneField(
+    TIPO_EFECTIVO_FISICO  = 'efectivo_fisico'
+    TIPO_YA_EN_BANCO      = 'ya_en_banco'
+    TIPO_SALDO_PLATAFORMA = 'saldo_plataforma'
+    TIPO_TICKET_1         = 'ticket_1'
+    TIPO_TICKET_2         = 'ticket_2'
+    TIPOS = [
+        (TIPO_EFECTIVO_FISICO,  'Efectivo físico'),
+        (TIPO_YA_EN_BANCO,      'Transferencia al banco'),
+        (TIPO_SALDO_PLATAFORMA, 'Corrección de saldo a favor'),
+        (TIPO_TICKET_1,         'Ticket 1'),
+        (TIPO_TICKET_2,         'Ticket 2'),
+    ]
+
+    deposito           = models.ForeignKey(
                              DepositoBancario, on_delete=models.CASCADE,
-                             related_name='ticket')
+                             related_name='tickets')
+    tipo               = models.CharField(max_length=20, choices=TIPOS,
+                             default=TIPO_EFECTIVO_FISICO,
+                             help_text="A qué componente del depósito corresponde este comprobante")
     imagen              = models.ImageField(
                              upload_to=_ticket_deposito_path, blank=True, null=True,
                              help_text="Foto o captura del comprobante")
@@ -592,8 +619,11 @@ class DepositoTicket(models.Model):
                              null=True, related_name='tickets_depositos')
     fecha_carga         = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        unique_together = [('deposito', 'tipo')]
+
     def __str__(self):
-        return f"Ticket depósito #{self.deposito_id}"
+        return f"Ticket depósito #{self.deposito_id} — {self.get_tipo_display()}"
 
 
 class RecaudacionDiaria(models.Model):

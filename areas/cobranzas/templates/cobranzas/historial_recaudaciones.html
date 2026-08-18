@@ -1,0 +1,208 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Historial de Recaudaciones — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Historial de <span>Recaudaciones</span></h1>
+        <p class="page-subtitle" id="subtituloHistorial">
+            {{ recaudaciones|length }} recaudación{{ recaudaciones|length|pluralize:"es" }} encontrada{{ recaudaciones|length|pluralize }}
+        </p>
+    </div>
+    <div class="page-header-actions">
+        {% if user.is_staff or user.is_superuser %}
+        <button type="button" class="btn-eliminar-registros" id="btnEliminarSeleccionados" style="display:none;">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Eliminar seleccionados (<span id="selCount">0</span>)
+        </button>
+        {% endif %}
+        <a href="{% url 'cobranzas:recaudaciones' %}" class="btn-volver">← Volver a Recaudaciones</a>
+    </div>
+</div>
+
+<form method="get" class="filtros-bar">
+    <div class="filtro-fecha-wrap">
+        <label>Desde</label>
+        <input type="date" name="desde" value="{{ desde }}" class="filtro-input">
+    </div>
+    <div class="filtro-fecha-wrap">
+        <label>Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta }}" class="filtro-input">
+    </div>
+    <div class="filtro-fecha-wrap">
+        <label>Entidad</label>
+        <select name="entidad" class="filtro-input">
+            <option value="">Todas</option>
+            <option value="{{ ENTIDAD_PF }}" {% if entidad == ENTIDAD_PF %}selected{% endif %}>PagoFácil</option>
+            <option value="{{ ENTIDAD_RP }}" {% if entidad == ENTIDAD_RP %}selected{% endif %}>RapiPago</option>
+        </select>
+    </div>
+    <div class="filtro-fecha-wrap">
+        <label>Estado</label>
+        <select name="estado" class="filtro-input">
+            <option value="">Todos</option>
+            <option value="pendiente" {% if estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+            <option value="cubierta" {% if estado == 'cubierta' %}selected{% endif %}>Cubierta</option>
+        </select>
+    </div>
+    <button type="submit" class="btn-filtrar">Filtrar</button>
+    <a href="{% url 'cobranzas:recaudaciones_historial' %}" class="btn-volver">Limpiar</a>
+</form>
+
+{% if recaudaciones %}
+<div class="caja-card" style="margin-bottom:1rem; padding:.8rem 1.2rem;">
+    <div class="caja-resumen-grid">
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">Total período</span>
+            <strong>${{ total_filtrado|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">PagoFácil</span>
+            <strong>${{ total_pf_filtrado|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">RapiPago</span>
+            <strong>${{ total_rp_filtrado|floatformat:2 }}</strong>
+        </div>
+    </div>
+</div>
+
+<div class="tabla-scroll">
+    <table class="tabla-base">
+        <thead>
+            <tr>
+                {% if user.is_staff or user.is_superuser %}
+                <th style="width:36px;">
+                    <input type="checkbox" id="checkTodos" title="Seleccionar todos"
+                           style="accent-color:#E85C0D;cursor:pointer;width:15px;height:15px;">
+                </th>
+                {% endif %}
+                <th>#</th>
+                <th>Entidad</th>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Estado</th>
+                <th>Observaciones</th>
+                <th>Registrado por</th>
+                {% if user.is_staff or user.is_superuser %}<th style="width:44px;"></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in recaudaciones %}
+            <tr class="hist-fila" data-id="{{ r.pk }}">
+                {% if user.is_staff or user.is_superuser %}
+                <td>
+                    <input type="checkbox" class="check-item" data-id="{{ r.pk }}"
+                           style="accent-color:#E85C0D;cursor:pointer;width:15px;height:15px;">
+                </td>
+                {% endif %}
+                <td><strong>#{{ r.pk }}</strong></td>
+                <td>
+                    <span class="badge-entidad badge-entidad-{{ r.entidad }}">
+                        {{ r.get_entidad_display }}
+                    </span>
+                </td>
+                <td>{{ r.fecha|date:"d/m/Y" }}</td>
+                <td><strong>${{ r.monto|floatformat:2 }}</strong></td>
+                <td>
+                    {% if r.cubierta_por_id %}
+                        <span class="badge-cubierta">Cubierta (depósito #{{ r.cubierta_por_id }})</span>
+                    {% else %}
+                        <span class="badge-pendiente">Pendiente</span>
+                    {% endif %}
+                </td>
+                <td>{{ r.observaciones|default:"—" }}</td>
+                <td>{{ r.registrado_por|default:"—" }}</td>
+                {% if user.is_staff or user.is_superuser %}
+                <td>
+                    {% if not r.cubierta_por_id %}
+                    <button class="btn-eliminar-fila" data-id="{{ r.pk }}"
+                            title="Eliminar recaudación #{{ r.pk }}">
+                        <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
+                            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                    {% else %}—{% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="estado-vacio">
+    <p>No se encontraron recaudaciones con esos filtros.</p>
+</div>
+{% endif %}
+
+<style>
+.badge-entidad { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; }
+.badge-entidad-pagofacil { background:#fff3e0; color:#e65100; }
+.badge-entidad-rapipago  { background:#e8f5e9; color:#2e7d32; }
+.badge-cubierta, .badge-pendiente {
+    display: inline-block; padding: .2rem .55rem; border-radius: 20px;
+    font-size: .78rem; font-weight: 600; white-space: nowrap;
+}
+.badge-cubierta  { background: #d1fae5; color: #065f46; }
+.badge-pendiente { background: #fff3cd; color: #856404; }
+</style>
+
+{% if user.is_staff or user.is_superuser %}
+
+<div id="histEliminarConfig" style="display:none;"
+     data-eliminar-url="{% url 'cobranzas:recaudaciones_eliminar' %}"
+     data-label-singular="recaudación"
+     data-label-plural="recaudaciones"></div>
+
+<div class="modal fade" id="modalEliminar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content caja-modal">
+            <div class="modal-body p-4 text-center">
+                <div class="caja-modal-icono">🗑️</div>
+                <h5 class="caja-modal-titulo">Eliminar recaudación(es)</h5>
+                <p id="elimTexto" style="margin:.8rem 0 0;color:#777;font-size:.9rem;"></p>
+                <p style="font-size:.8rem;color:#dc2626;margin-top:.5rem;font-weight:600;">
+                    ⚠ Esta acción es irreversible.
+                </p>
+                <div id="elimError" class="caja-error-msg mt-2" style="display:none;"></div>
+                <div class="d-flex gap-2 mt-4 justify-content-center">
+                    <button type="button" class="btn-caja-secundario" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btnConfirmarElim" class="btn-confirmar-eliminar">
+                        <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                            <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5"
+                                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% if user.is_staff or user.is_superuser %}
+<script src="{% static 'cobranzas/js/historial_eliminar.js' %}"></script>
+{% endif %}
+{% endblock %}

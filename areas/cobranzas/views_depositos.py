@@ -30,16 +30,29 @@ def _periodo_pendiente(entidad: str):
     return agregado['desde'], agregado['hasta']
 
 
+def _marcar_tickets_cargados(depositos):
+    """
+    Adjunta a cada DepositoBancario un set `.tickets_cargados` con los
+    `tipo` que ya tienen ticket cargado (requiere que el queryset venga
+    con `.prefetch_related('tickets')` para no disparar N+1 queries).
+    """
+    depositos = list(depositos)
+    for d in depositos:
+        d.tickets_cargados = {t.tipo for t in d.tickets.all()}
+    return depositos
+
+
 class DepositosView(LoginRequiredMixin, View):
     def get(self, request):
         entidad = request.GET.get('entidad', DepositoBancario.ENTIDAD_PAGOFACIL)
         if entidad not in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
             entidad = DepositoBancario.ENTIDAD_PAGOFACIL
 
-        ultimos = (
+        ultimos = _marcar_tickets_cargados(
             DepositoBancario.objects
             .filter(entidad=entidad)
-            .select_related('realizado_por', 'ticket')[:10]
+            .select_related('realizado_por')
+            .prefetch_related('tickets')[:10]
         )
 
         cant_pf = DepositoBancario.objects.filter(entidad=DepositoBancario.ENTIDAD_PAGOFACIL).count()
@@ -274,8 +287,8 @@ class HistorialDepositosView(LoginRequiredMixin, View):
 
         qs = (
             DepositoBancario.objects
-            .select_related('realizado_por', 'ticket')
-            .prefetch_related('recaudaciones_cubiertas')
+            .select_related('realizado_por')
+            .prefetch_related('recaudaciones_cubiertas', 'tickets')
             .all()
         )
 
@@ -297,7 +310,7 @@ class HistorialDepositosView(LoginRequiredMixin, View):
         )
 
         return render(request, 'cobranzas/historial_depositos.html', {
-            'depositos':          qs[:500],
+            'depositos':          _marcar_tickets_cargados(qs[:500]),
             'desde':              desde,
             'hasta':              hasta,
             'entidad':            entidad,
@@ -310,7 +323,11 @@ class HistorialDepositosView(LoginRequiredMixin, View):
     
 
 class TicketDepositoAjax(LoginRequiredMixin, View):
-    """Ver/editar el comprobante (ticket) asociado a un DepositoBancario."""
+    """
+    Ver/editar el comprobante asociado a un DepositoBancario. Un depósito
+    puede tener hasta 3 tickets (uno por componente: efectivo/banco/
+    plataforma) — el parámetro `tipo` identifica cuál.
+    """
 
     CAMPOS_TEXTO = [
         'numero_operacion', 'banco', 'titular_nombre', 'titular_cuit',
@@ -318,10 +335,17 @@ class TicketDepositoAjax(LoginRequiredMixin, View):
         'concepto', 'estado', 'observaciones',
     ]
 
+    def _validar_tipo(self, tipo):
+        return tipo if tipo in dict(DepositoTicket.TIPOS) else None
+
     def get(self, request):
         deposito_id = request.GET.get('deposito_id')
+        tipo = self._validar_tipo(request.GET.get('tipo', ''))
+        if tipo is None:
+            return JsonResponse({'error': 'Tipo de ticket inválido.'}, status=400)
+
         deposito = get_object_or_404(DepositoBancario, pk=deposito_id)
-        ticket = getattr(deposito, 'ticket', None)
+        ticket = DepositoTicket.objects.filter(deposito=deposito, tipo=tipo).first()
 
         if ticket is None:
             return JsonResponse({'existe': False})
@@ -340,9 +364,12 @@ class TicketDepositoAjax(LoginRequiredMixin, View):
 
     def post(self, request):
         deposito_id = request.POST.get('deposito_id')
-        deposito = get_object_or_404(DepositoBancario, pk=deposito_id)
+        tipo = self._validar_tipo(request.POST.get('tipo', ''))
+        if tipo is None:
+            return JsonResponse({'error': 'Tipo de ticket inválido.'}, status=400)
 
-        ticket, _ = DepositoTicket.objects.get_or_create(deposito=deposito)
+        deposito = get_object_or_404(DepositoBancario, pk=deposito_id)
+        ticket, _ = DepositoTicket.objects.get_or_create(deposito=deposito, tipo=tipo)
 
         for campo in self.CAMPOS_TEXTO:
             setattr(ticket, campo, request.POST.get(campo, '').strip())
@@ -373,6 +400,7 @@ class TicketDepositoAjax(LoginRequiredMixin, View):
         return JsonResponse({
             'success':     True,
             'deposito_id': deposito.pk,
+            'tipo':        tipo,
             'imagen_url':  ticket.imagen.url if ticket.imagen else '',
         })
 

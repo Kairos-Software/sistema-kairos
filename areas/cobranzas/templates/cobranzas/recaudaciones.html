@@ -26,9 +26,8 @@
            class="dep-entidad-btn {% if entidad == ENTIDAD_PF %}dep-entidad-activa{% endif %}">
             <span class="dep-entidad-icono">💳</span>
             <span class="dep-entidad-nombre">PagoFácil</span>
-            <span class="dep-entidad-recaudado">${{ tot_pf.recaudado|floatformat:2 }}</span>
             <span class="dep-entidad-sub">
-                recaudado · {{ cant_pf }} día{{ cant_pf|pluralize }}
+                {{ cant_pf }} día{{ cant_pf|pluralize }} pendiente{{ cant_pf|pluralize }} de depositar
             </span>
             <span class="dep-pendiente-pill {% if tot_pf.pendiente > 0 %}pill-alerta{% elif tot_pf.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
                 {% if tot_pf.pendiente > 0 %}
@@ -45,9 +44,8 @@
            class="dep-entidad-btn {% if entidad == ENTIDAD_RP %}dep-entidad-activa{% endif %}">
             <span class="dep-entidad-icono">🏦</span>
             <span class="dep-entidad-nombre">RapiPago</span>
-            <span class="dep-entidad-recaudado">${{ tot_rp.recaudado|floatformat:2 }}</span>
             <span class="dep-entidad-sub">
-                recaudado · {{ cant_rp }} día{{ cant_rp|pluralize }}
+                {{ cant_rp }} día{{ cant_rp|pluralize }} pendiente{{ cant_rp|pluralize }} de depositar
             </span>
             <span class="dep-pendiente-pill {% if tot_rp.pendiente > 0 %}pill-alerta{% elif tot_rp.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
                 {% if tot_rp.pendiente > 0 %}
@@ -71,9 +69,9 @@
     </h2>
     <div class="rec-balance-grid">
         <div class="rec-balance-item">
-            <span class="rec-balance-label">Total recaudado</span>
+            <span class="rec-balance-label">Recaudado pendiente</span>
             <span class="rec-balance-valor" id="balRecaudado">
-                ${{ tot_activo.recaudado|floatformat:2 }}
+                ${{ tot_activo.recaudado_pendiente|floatformat:2 }}
             </span>
         </div>
         <div class="rec-balance-item">
@@ -103,11 +101,16 @@
 </div>
 
 {# ── FORMULARIO ── #}
-<div class="caja-card" style="margin-bottom:1.2rem;">
-    <h2 class="caja-card-titulo">
-        Registrar recaudación —
-        <span id="labelEntidadForm" class="dep-entidad-label-activa">{{ entidad_label }}</span>
-    </h2>
+<div class="caja-card" style="margin-bottom:1.2rem;" id="cardFormulario">
+    <div class="dep-table-header">
+        <h2 class="caja-card-titulo" style="margin-bottom:0;" id="tituloFormulario">
+            Registrar recaudación —
+            <span id="labelEntidadForm" class="dep-entidad-label-activa">{{ entidad_label }}</span>
+        </h2>
+        <button type="button" id="btnCancelarEdicion" class="btn-volver" style="display:none;">
+            Cancelar edición
+        </button>
+    </div>
 
     {% if recaudacion_hoy %}
     <div class="alerta-inline alerta-warn" id="alertaYaExiste">
@@ -159,9 +162,17 @@
 <div class="caja-card" id="panelUltimas">
     <div class="dep-table-header">
         <h2 class="caja-card-titulo" style="margin-bottom:0;">
-            Recaudaciones — <span id="labelEntidadTabla">{{ entidad_label }}</span>
+            Recaudaciones pendientes — <span id="labelEntidadTabla">{{ entidad_label }}</span>
         </h2>
+        <a href="{% url 'cobranzas:recaudaciones_historial' %}?entidad={{ entidad }}"
+           id="linkHistorialEntidad" class="btn-historial" style="font-size:.82rem;">
+            Ver historial completo →
+        </a>
     </div>
+    <p class="caja-card-desc" style="margin-top:.3rem;">
+        Una vez que una recaudación queda cubierta por un depósito, sale de esta lista — se puede
+        seguir viendo en el <a href="{% url 'cobranzas:recaudaciones_historial' %}">historial completo</a>.
+    </p>
 
     <div class="tabla-scroll" style="margin-top:.9rem;">
         <table class="tabla-base">
@@ -170,7 +181,6 @@
                     <th>#</th>
                     <th>Fecha</th>
                     <th>Monto</th>
-                    <th>Estado</th>
                     <th>Observaciones</th>
                     <th>Registrado por</th>
                     {% if user.is_staff or user.is_superuser %}
@@ -180,35 +190,33 @@
             </thead>
             <tbody id="tbodyRecaudaciones">
                 {% for r in ultimas %}
-                <tr data-id="{{ r.pk }}">
+                <tr data-id="{{ r.pk }}"
+                    data-fecha="{{ r.fecha|date:'Y-m-d' }}"
+                    data-monto="{{ r.monto }}"
+                    data-observaciones="{{ r.observaciones }}">
                     <td><strong>#{{ r.pk }}</strong></td>
                     <td>{{ r.fecha|date:"d/m/Y" }}</td>
                     <td><strong>${{ r.monto|floatformat:2 }}</strong></td>
-                    <td>
-                        {% if r.cubierta_por_id %}
-                            <span class="badge-cubierta">Cubierta (depósito #{{ r.cubierta_por_id }})</span>
-                        {% else %}
-                            <span class="badge-pendiente">Pendiente</span>
-                        {% endif %}
-                    </td>
                     <td>{{ r.observaciones|default:"—" }}</td>
                     <td>{{ r.registrado_por }}</td>
                     {% if user.is_staff or user.is_superuser %}
-                    <td>
-                        {% if not r.cubierta_por_id %}
+                    <td class="rec-acciones-cell">
+                        <button class="btn-editar-rec btn-caja-secundario"
+                                data-id="{{ r.pk }}" style="font-size:.78rem; padding:.25rem .6rem;">
+                            Editar
+                        </button>
                         <button class="btn-eliminar-rec btn-caja-secundario"
                                 data-id="{{ r.pk }}" style="font-size:.78rem; padding:.25rem .6rem;">
                             Eliminar
                         </button>
-                        {% else %}—{% endif %}
                     </td>
                     {% endif %}
                 </tr>
                 {% empty %}
                 <tr id="trVacio">
-                    <td colspan="{% if user.is_staff or user.is_superuser %}7{% else %}6{% endif %}"
+                    <td colspan="{% if user.is_staff or user.is_superuser %}6{% else %}5{% endif %}"
                         class="dep-vacio">
-                        No hay recaudaciones registradas para esta entidad.
+                        No hay recaudaciones pendientes para esta entidad.
                     </td>
                 </tr>
                 {% endfor %}
@@ -341,6 +349,14 @@
 .dep-table-header { display: flex; align-items: center; justify-content: space-between; }
 .dep-vacio { text-align: center; color: var(--text-muted, #888); padding: 1.5rem 0; }
 
+/* ── Acciones por fila (editar/eliminar) ── */
+.rec-acciones-cell { display: flex; gap: .4rem; }
+#btnCancelarEdicion { cursor: pointer; }
+#cardFormulario.rec-form-editando {
+    border: 1.5px solid var(--accent, #E85C0D);
+    box-shadow: 0 0 0 3px rgba(232,92,13,.1);
+}
+
 /* ── Alerta warn ── */
 .alerta-warn {
     background: #fff3cd; color: #856404;
@@ -370,6 +386,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let entidadActual = "{{ entidad }}";
     let modalInstance = null;
+    let idEditando    = null;   // null = "nueva recaudación", número = editando esa fila
 
     // Totales iniciales desde el servidor (para el balance card sin reload).
     // Se pasan via json_script (no interpolados directo en el <script>) para
@@ -401,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function actualizarBalance(totales) {
         const pendienteMostrar = Math.max(0, totales.pendiente);
         const aFavor           = Math.max(0, -totales.pendiente);
-        document.getElementById('balRecaudado').textContent  = fmt(totales.recaudado);
+        document.getElementById('balRecaudado').textContent  = fmt(totales.recaudado_pendiente);
         document.getElementById('balDepositado').textContent = fmt(totales.depositado);
         document.getElementById('balPendiente').textContent  = fmt(pendienteMostrar);
         document.getElementById('balAFavor').textContent     = fmt(aFavor);
@@ -409,11 +426,22 @@ document.addEventListener('DOMContentLoaded', function () {
         if (itemAFavor) itemAFavor.classList.toggle('rec-balance-favor-vacio', aFavor === 0);
     }
 
+    // ── Actualiza "N días pendientes" en el botón de la entidad, contando
+    //    las filas realmente visibles en la tabla (siempre exacto, sin
+    //    depender de que el backend nos devuelva el conteo cada vez) ──
+    function actualizarContadorDias(entidad) {
+        const btn = document.querySelector(`.dep-entidad-btn[data-entidad="${entidad}"]`);
+        if (!btn) return;
+        const sub = btn.querySelector('.dep-entidad-sub');
+        if (!sub) return;
+        const n = document.querySelectorAll('#tbodyRecaudaciones tr[data-id]').length;
+        sub.textContent = `${n} día${n === 1 ? '' : 's'} pendiente${n === 1 ? '' : 's'} de depositar`;
+    }
+
     // ── Actualizar pills en los botones de entidad ────────
     function actualizarPill(entidad, totales) {
         const btn  = document.querySelector(`.dep-entidad-btn[data-entidad="${entidad}"]`);
         if (!btn) return;
-        btn.querySelector('.dep-entidad-recaudado').textContent = fmt(totales.recaudado);
         const pill = btn.querySelector('.dep-pendiente-pill');
         if (totales.pendiente > 0) {
             pill.textContent = `Pendiente ${fmt(totales.pendiente)}`;
@@ -431,15 +459,56 @@ document.addEventListener('DOMContentLoaded', function () {
     actualizarBalance(totalesInit[entidadActual]);
 
     // ── Verificar si ya existe recaudación para la fecha seleccionada ──
+    // (excluye la propia fila si se está editando, para no "chocar consigo misma")
     async function checkExistente(fecha) {
         try {
             const r = await fetch(`${urlEstado}?entidad=${entidadActual}`);
             const d = await r.json();
-            // Buscar en las últimas si hay una para esa fecha
-            return d.ultimas?.find(u => u.fecha_iso === fecha) || null;
+            return d.ultimas?.find(u => u.fecha_iso === fecha && u.id !== idEditando) || null;
         } catch {
             return null;
         }
+    }
+
+    // ── Entrar / salir del modo edición ───────────────────
+    const tituloFormulario = document.getElementById('tituloFormulario');
+    const btnCancelarEdicion = document.getElementById('btnCancelarEdicion');
+    const cardFormulario = document.getElementById('cardFormulario');
+    const btnRegistrarEl = document.getElementById('btnRegistrar');
+
+    function entrarModoEdicion(fila) {
+        idEditando = parseInt(fila.dataset.id);
+        document.getElementById('inputFecha').value = fila.dataset.fecha;
+        document.getElementById('inputMonto').value = fila.dataset.monto;
+        document.getElementById('inputObservaciones').value = fila.dataset.observaciones || '';
+
+        tituloFormulario.innerHTML = `Editando recaudación #${idEditando} — <span id="labelEntidadForm" class="dep-entidad-label-activa">${document.getElementById('labelEntidadTabla').textContent}</span>`;
+        btnRegistrarEl.lastChild.textContent = ' Guardar cambios';
+        btnCancelarEdicion.style.display = '';
+        cardFormulario.classList.add('rec-form-editando');
+        cardFormulario.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function salirModoEdicion() {
+        idEditando = null;
+        document.getElementById('inputFecha').value = '';
+        document.getElementById('inputMonto').value = '';
+        document.getElementById('inputObservaciones').value = '';
+        tituloFormulario.innerHTML = `Registrar recaudación — <span id="labelEntidadForm" class="dep-entidad-label-activa">${document.getElementById('labelEntidadTabla').textContent}</span>`;
+        btnRegistrarEl.lastChild.textContent = ' Registrar recaudación';
+        btnCancelarEdicion.style.display = 'none';
+        cardFormulario.classList.remove('rec-form-editando');
+    }
+
+    btnCancelarEdicion.addEventListener('click', salirModoEdicion);
+
+    function bindEditar() {
+        document.querySelectorAll('.btn-editar-rec').forEach(btn => {
+            btn.onclick = function () {
+                const fila = document.querySelector(`#tbodyRecaudaciones tr[data-id="${this.dataset.id}"]`);
+                if (fila) entrarModoEdicion(fila);
+            };
+        });
     }
 
     // ── Botón Registrar → abre modal ──────────────────────
@@ -522,6 +591,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     monto,
                     observaciones: obs,
                     modo:          'reemplazar',
+                    id:            idEditando,
                 }),
             });
         } catch (e) {
@@ -547,14 +617,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Actualizar balance card
             actualizarBalance({
-                recaudado:  data.total_recaudado,
-                depositado: data.total_depositado,
-                pendiente:  data.pendiente,
+                recaudado_pendiente: data.recaudado_pendiente,
+                depositado:          data.total_depositado,
+                pendiente:           data.pendiente,
             });
 
             // Actualizar pill del botón de entidad
             actualizarPill(entidadActual, {
-                recaudado: data.total_recaudado,
                 pendiente: data.pendiente,
             });
 
@@ -564,13 +633,16 @@ document.addEventListener('DOMContentLoaded', function () {
             if (trVacio) trVacio.remove();
 
             const rec = data.recaudacion;
-            // ¿ya existe fila con ese id?
+            // ¿ya existe fila con ese id? (upsert por fecha, o edición explícita)
             const filaExistente = tbody.querySelector(`tr[data-id="${rec.id}"]`);
 
             const celdaAccion = esAdmin
-                ? `<td><button class="btn-eliminar-rec btn-caja-secundario"
-                      data-id="${rec.id}" style="font-size:.78rem;padding:.25rem .6rem;">
-                      Eliminar</button></td>`
+                ? `<td class="rec-acciones-cell">
+                      <button class="btn-editar-rec btn-caja-secundario"
+                          data-id="${rec.id}" style="font-size:.78rem;padding:.25rem .6rem;">Editar</button>
+                      <button class="btn-eliminar-rec btn-caja-secundario"
+                          data-id="${rec.id}" style="font-size:.78rem;padding:.25rem .6rem;">Eliminar</button>
+                   </td>`
                 : '';
 
             const html = `
@@ -584,19 +656,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (filaExistente) {
                 filaExistente.innerHTML = html;
+                filaExistente.dataset.fecha = rec.fecha_iso;
+                filaExistente.dataset.monto = rec.monto;
+                filaExistente.dataset.observaciones = rec.observaciones || '';
             } else {
                 const tr = document.createElement('tr');
                 tr.dataset.id = rec.id;
+                tr.dataset.fecha = rec.fecha_iso;
+                tr.dataset.monto = rec.monto;
+                tr.dataset.observaciones = rec.observaciones || '';
                 tr.innerHTML  = html;
                 tbody.prepend(tr);
             }
 
-            // Rebindear eventos eliminar
+            actualizarContadorDias(entidadActual);
+
+            // Rebindear eventos editar/eliminar
+            bindEditar();
             bindEliminar();
+
+            const estabaEditando = idEditando !== null;
+            if (estabaEditando) salirModoEdicion();
 
             // Mensaje de éxito
             const okEl = document.getElementById('recExito');
-            okEl.textContent = `Recaudación de ${fmt(rec.monto)} registrada para ${rec.entidad_label} el ${rec.fecha}.`;
+            okEl.textContent = estabaEditando
+                ? `Recaudación #${rec.id} actualizada: ${fmt(rec.monto)} el ${rec.fecha}.`
+                : `Recaudación de ${fmt(rec.monto)} registrada para ${rec.entidad_label} el ${rec.fecha}.`;
             okEl.style.display = '';
             setTimeout(() => { okEl.style.display = 'none'; }, 6000);
 
@@ -627,14 +713,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (d.success) {
                     const fila = document.querySelector(`tr[data-id="${id}"]`);
                     if (fila) fila.remove();
+                    if (idEditando === parseInt(id)) salirModoEdicion();
+                    actualizarContadorDias(entidadActual);
 
                     // Refrescar balance
                     const est = await fetch(`${urlEstado}?entidad=${entidadActual}`);
                     const ed  = await est.json();
                     const totalesEd = {
-                        recaudado:  ed.total_recaudado,
-                        depositado: ed.total_depositado,
-                        pendiente:  ed.pendiente,
+                        recaudado_pendiente: ed.recaudado_pendiente,
+                        depositado:          ed.total_depositado,
+                        pendiente:           ed.pendiente,
                     };
                     actualizarBalance(totalesEd);
                     actualizarPill(entidadActual, totalesEd);
@@ -645,6 +733,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    bindEditar();
     bindEliminar();
 
 }); // DOMContentLoaded

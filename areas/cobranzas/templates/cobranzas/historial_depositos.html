@@ -147,10 +147,36 @@
                 <td>{{ d.observaciones|default:"—" }}</td>
                 <td>{{ d.realizado_por }}</td>
                 <td>{{ d.fecha_registro|date:"d/m/Y H:i" }}</td>
-                <td>
-                    <button type="button" class="btn-ver-ticket {% if d.ticket %}btn-ver-ticket-cargado{% endif %}" data-deposito-id="{{ d.pk }}">
-                        {% if d.ticket %}🧾 Ticket cargado{% else %}🧾 Ver/editar ticket{% endif %}
+                <td class="dep-tickets-cell">
+                    {% if d.entidad == ENTIDAD_PF %}
+                    <button type="button" class="btn-ver-ticket {% if 'ticket_1' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="🧾 Ticket 1 cargado">
+                        {% if 'ticket_1' in d.tickets_cargados %}🧾 Ticket 1 cargado{% else %}🧾 Ticket 1{% endif %}
                     </button>
+                    <button type="button" class="btn-ver-ticket {% if 'ticket_2' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="🧾 Ticket 2 cargado">
+                        {% if 'ticket_2' in d.tickets_cargados %}🧾 Ticket 2 cargado{% else %}🧾 Ticket 2{% endif %}
+                    </button>
+                    {% else %}
+                    {% if d.monto_efectivo_fisico %}
+                    <button type="button" class="btn-ver-ticket {% if 'efectivo_fisico' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                            data-deposito-id="{{ d.pk }}" data-tipo="efectivo_fisico" data-label-cargado="🧾 Efectivo cargado">
+                        {% if 'efectivo_fisico' in d.tickets_cargados %}🧾 Efectivo cargado{% else %}🧾 Ticket efectivo{% endif %}
+                    </button>
+                    {% endif %}
+                    {% if d.monto_ya_en_banco %}
+                    <button type="button" class="btn-ver-ticket {% if 'ya_en_banco' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                            data-deposito-id="{{ d.pk }}" data-tipo="ya_en_banco" data-label-cargado="🧾 Transferencia cargada">
+                        {% if 'ya_en_banco' in d.tickets_cargados %}🧾 Transferencia cargada{% else %}🧾 Ticket transferencia{% endif %}
+                    </button>
+                    {% endif %}
+                    {% if d.monto_saldo_plataforma %}
+                    <button type="button" class="btn-ver-ticket {% if 'saldo_plataforma' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                            data-deposito-id="{{ d.pk }}" data-tipo="saldo_plataforma" data-label-cargado="🧾 Saldo a favor cargado">
+                        {% if 'saldo_plataforma' in d.tickets_cargados %}🧾 Saldo a favor cargado{% else %}🧾 Ticket saldo a favor{% endif %}
+                    </button>
+                    {% endif %}
+                    {% endif %}
                 </td>
                 {% if user.is_staff or user.is_superuser %}
                 <td>

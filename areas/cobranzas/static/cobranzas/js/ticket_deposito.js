@@ -3,7 +3,16 @@
 
     let modalTicketInstance = null;
     let depositoActualId    = null;
+    let tipoActual          = null;
     let botonActivador      = null;
+
+    const TIPO_LABELS = {
+        efectivo_fisico:  'Efectivo físico',
+        ya_en_banco:      'Transferencia al banco',
+        saldo_plataforma: 'Corrección de saldo a favor',
+        ticket_1:         'Ticket 1',
+        ticket_2:         'Ticket 2',
+    };
 
     function getCsrf() {
         return document.cookie.split(';')
@@ -41,14 +50,16 @@
         document.getElementById('ticketExito').style.display = 'none';
     }
 
-    async function abrirModalTicket(depositoId, btn) {
+    async function abrirModalTicket(depositoId, tipo, btn) {
         depositoActualId = depositoId;
+        tipoActual        = tipo;
         botonActivador    = btn || null;
         limpiarModal();
         document.getElementById('ticketDepositoNum').textContent = '#' + depositoId;
+        document.getElementById('ticketTipoLabel').textContent   = TIPO_LABELS[tipo] || tipo;
 
         try {
-            const resp = await fetch(`${window.ticketDepositoUrl}?deposito_id=${depositoId}`);
+            const resp = await fetch(`${window.ticketDepositoUrl}?deposito_id=${depositoId}&tipo=${tipo}`);
             const data = await resp.json();
             if (data.existe) {
                 Object.entries(CAMPOS).forEach(([id, campo]) => {
@@ -76,7 +87,7 @@
     }
 
     async function guardarTicket() {
-        if (!depositoActualId) return;
+        if (!depositoActualId || !tipoActual) return;
         const errEl = document.getElementById('ticketError');
         const okEl  = document.getElementById('ticketExito');
         const btn   = document.getElementById('btnGuardarTicket');
@@ -88,6 +99,7 @@
 
         const formData = new FormData();
         formData.append('deposito_id', depositoActualId);
+        formData.append('tipo', tipoActual);
         Object.entries(CAMPOS).forEach(([id, campo]) => {
             formData.append(campo, document.getElementById(id).value.trim());
         });
@@ -109,7 +121,7 @@
                 okEl.style.display = '';
                 if (botonActivador) {
                     botonActivador.classList.add('btn-ver-ticket-cargado');
-                    botonActivador.textContent = '🧾 Ticket cargado';
+                    botonActivador.textContent = botonActivador.dataset.labelCargado || 'Ticket cargado';
                 }
                 setTimeout(() => {
                     if (modalTicketInstance) modalTicketInstance.hide();
@@ -131,7 +143,7 @@
         document.addEventListener('click', function (ev) {
             const btn = ev.target.closest('.btn-ver-ticket');
             if (btn) {
-                abrirModalTicket(btn.dataset.depositoId, btn);
+                abrirModalTicket(btn.dataset.depositoId, btn.dataset.tipo, btn);
             }
         });
 

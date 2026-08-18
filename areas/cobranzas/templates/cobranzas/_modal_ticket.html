@@ -5,7 +5,10 @@
             <div class="modal-body p-3">
                 <div class="ticket-modal-header">
                     <span class="ticket-modal-icono">🧾</span>
-                    <h5 class="ticket-modal-titulo">Ticket del depósito <span id="ticketDepositoNum"></span></h5>
+                    <h5 class="ticket-modal-titulo">
+                        Ticket del depósito <span id="ticketDepositoNum"></span> —
+                        <span id="ticketTipoLabel" class="ticket-modal-tipo"></span>
+                    </h5>
                 </div>
 
                 <div class="ticket-form-grid">
@@ -94,6 +97,7 @@
 }
 #modalTicket .ticket-modal-icono { font-size: 1.3rem; }
 #modalTicket .ticket-modal-titulo { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary, #111); }
+#modalTicket .ticket-modal-tipo { color: var(--accent, #E85C0D); }
 
 #modalTicket .ticket-form-grid {
     display: grid;
@@ -141,6 +145,7 @@
     margin-top: .3rem;
 }
 
+.dep-tickets-cell { display: flex; flex-direction: column; gap: .3rem; align-items: flex-start; }
 .btn-ver-ticket {
     display: inline-flex;
     align-items: center;

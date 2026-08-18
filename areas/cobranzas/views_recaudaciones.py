@@ -96,12 +96,18 @@ def _totales_por_entidad(entidad: str) -> dict:
         .filter(entidad=entidad)
         .aggregate(t=Sum('monto'))['t'] or Decimal('0')
     )
+    recaudado_pendiente = _recaudado_pendiente(entidad)
     saldo_anterior = _ultima_diferencia(entidad) or Decimal('0')
-    pendiente = _recaudado_pendiente(entidad) - saldo_anterior
+    pendiente = recaudado_pendiente - saldo_anterior
     return {
-        'recaudado':         recaudado,
-        'depositado':        depositado,
-        'pendiente':         pendiente,
+        # 'recaudado' es un acumulado de TODO el historial (crece para
+        # siempre, incluso después de depositado) — no se muestra en
+        # pantalla porque no aporta información accionable, ver
+        # 'recaudado_pendiente' para el número que sí importa día a día.
+        'recaudado':            recaudado,
+        'recaudado_pendiente':  recaudado_pendiente,
+        'depositado':           depositado,
+        'pendiente':            pendiente,
         # 'pendiente' se mantiene con signo (lo usa el cálculo de 'diferencia'
         # en views_depositos.py). Para mostrar en pantalla conviene separarlo
         # en dos valores siempre positivos: lo que falta depositar, o —si se
@@ -126,6 +132,7 @@ def _recaudacion_as_dict(r: RecaudacionDiaria) -> dict:
         'fecha_iso':     str(r.fecha),
         'monto':         float(r.monto),
         'observaciones': r.observaciones or '',
+        'cubierta_por_id': r.cubierta_por_id,
         'registrado_por': (
             r.registrado_por.get_full_name() or r.registrado_por.username
             if r.registrado_por else '—'
@@ -147,13 +154,20 @@ class RecaudacionesView(LoginRequiredMixin, View):
         tot_pf = _totales_por_entidad(RecaudacionDiaria.ENTIDAD_PAGOFACIL)
         tot_rp = _totales_por_entidad(RecaudacionDiaria.ENTIDAD_RAPIPAGO)
 
-        cant_pf = RecaudacionDiaria.objects.filter(entidad=RecaudacionDiaria.ENTIDAD_PAGOFACIL).count()
-        cant_rp = RecaudacionDiaria.objects.filter(entidad=RecaudacionDiaria.ENTIDAD_RAPIPAGO).count()
+        # Cuenta solo días PENDIENTES (no cubiertos por un depósito) — una vez
+        # depositada, esa recaudación ya cumplió su función y no aporta nada
+        # seguir contándola acá; para verla queda el historial completo.
+        cant_pf = RecaudacionDiaria.objects.filter(
+            entidad=RecaudacionDiaria.ENTIDAD_PAGOFACIL, cubierta_por__isnull=True).count()
+        cant_rp = RecaudacionDiaria.objects.filter(
+            entidad=RecaudacionDiaria.ENTIDAD_RAPIPAGO, cubierta_por__isnull=True).count()
 
-        # Últimas recaudaciones de la entidad activa
+        # Recaudaciones pendientes de la entidad activa — las ya cubiertas por
+        # un depósito "desaparecen" de este listado (son historia vieja, se
+        # consultan en el historial completo, no acá donde se opera el día a día).
         ultimas = (
             RecaudacionDiaria.objects
-            .filter(entidad=entidad)
+            .filter(entidad=entidad, cubierta_por__isnull=True)
             .select_related('registrado_por')[:15]
         )
 
@@ -197,14 +211,17 @@ class RecaudacionesView(LoginRequiredMixin, View):
 class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
     """
     POST con JSON:
-      { entidad, fecha, monto, observaciones }
+      { entidad, fecha, monto, observaciones, id (opcional), modo (opcional) }
 
     Comportamiento:
-      - Si ya existe RecaudacionDiaria para (entidad, fecha) → actualiza el monto
-        (se suma, no reemplaza — ver parámetro 'modo' abajo).
-      - Si no existe → crea uno nuevo.
+      - Con 'id' → modo edición explícita: actualiza esa RecaudacionDiaria
+        puntual por PK (puede incluso cambiarle la fecha). No aplica si ya
+        fue cubierta por un depósito.
+      - Sin 'id' → comportamiento de siempre, upsert por (entidad, fecha):
+        si ya existe una recaudación para ese día se actualiza (sumando o
+        reemplazando según 'modo'), si no existe se crea.
 
-    Parámetro opcional 'modo':
+    Parámetro opcional 'modo' (solo aplica al upsert sin 'id'):
       - 'reemplazar' (default): el monto enviado reemplaza al existente.
       - 'sumar': el monto se suma al existente.
     """
@@ -235,45 +252,76 @@ class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
             return JsonResponse({'error': 'El monto debe ser mayor a cero.'}, status=400)
 
         observaciones = data.get('observaciones', '').strip()
-        modo          = data.get('modo', 'reemplazar')  # 'reemplazar' | 'sumar'
+        id_editar     = data.get('id')
 
         with transaction.atomic():
-            existente = RecaudacionDiaria.objects.filter(entidad=entidad, fecha=fecha).first()
-
-            if existente and existente.cubierta_por_id:
-                return JsonResponse({
-                    'error': f'Esta recaudación ya fue cubierta por el depósito '
-                             f'#{existente.cubierta_por_id}, no se puede modificar.'
-                }, status=400)
-
-            if existente:
-                if modo == 'sumar':
-                    existente.monto += monto
-                else:
-                    existente.monto = monto
-                if observaciones:
-                    existente.observaciones = observaciones
-                existente.registrado_por = request.user
-                existente.save()
-                rec = existente
-            else:
-                rec = RecaudacionDiaria.objects.create(
-                    entidad=entidad,
-                    fecha=fecha,
-                    monto=monto,
-                    observaciones=observaciones,
-                    registrado_por=request.user,
+            if id_editar:
+                # ── Edición explícita de un registro puntual ──
+                rec = RecaudacionDiaria.objects.filter(pk=id_editar, entidad=entidad).first()
+                if rec is None:
+                    return JsonResponse({'error': 'No se encontró la recaudación a editar.'}, status=404)
+                if rec.cubierta_por_id:
+                    return JsonResponse({
+                        'error': f'Esta recaudación ya fue cubierta por el depósito '
+                                 f'#{rec.cubierta_por_id}, no se puede editar.'
+                    }, status=400)
+                conflicto = (
+                    RecaudacionDiaria.objects
+                    .filter(entidad=entidad, fecha=fecha)
+                    .exclude(pk=rec.pk)
+                    .first()
                 )
+                if conflicto:
+                    return JsonResponse({
+                        'error': f'Ya existe otra recaudación (#{conflicto.pk}) para esa fecha.'
+                    }, status=400)
+                rec.fecha = fecha
+                rec.monto = monto
+                rec.observaciones = observaciones
+                rec.registrado_por = request.user
+                rec.save()
+                es_nueva = False
+            else:
+                # ── Upsert por (entidad, fecha), comportamiento de siempre ──
+                modo = data.get('modo', 'reemplazar')  # 'reemplazar' | 'sumar'
+                existente = RecaudacionDiaria.objects.filter(entidad=entidad, fecha=fecha).first()
+
+                if existente and existente.cubierta_por_id:
+                    return JsonResponse({
+                        'error': f'Esta recaudación ya fue cubierta por el depósito '
+                                 f'#{existente.cubierta_por_id}, no se puede modificar.'
+                    }, status=400)
+
+                if existente:
+                    if modo == 'sumar':
+                        existente.monto += monto
+                    else:
+                        existente.monto = monto
+                    if observaciones:
+                        existente.observaciones = observaciones
+                    existente.registrado_por = request.user
+                    existente.save()
+                    rec = existente
+                else:
+                    rec = RecaudacionDiaria.objects.create(
+                        entidad=entidad,
+                        fecha=fecha,
+                        monto=monto,
+                        observaciones=observaciones,
+                        registrado_por=request.user,
+                    )
+                es_nueva = not bool(existente)
 
         totales = _totales_por_entidad(entidad)
 
         return JsonResponse({
-            'success':         True,
-            'recaudacion':     _recaudacion_as_dict(rec),
-            'es_nueva':        not bool(existente) if 'existente' in dir() else True,
-            'total_recaudado': float(totales['recaudado']),
-            'total_depositado':float(totales['depositado']),
-            'pendiente':       float(totales['pendiente']),
+            'success':              True,
+            'recaudacion':          _recaudacion_as_dict(rec),
+            'es_nueva':             es_nueva,
+            'total_recaudado':      float(totales['recaudado']),
+            'recaudado_pendiente':  float(totales['recaudado_pendiente']),
+            'total_depositado':     float(totales['depositado']),
+            'pendiente':            float(totales['pendiente']),
         })
 
 
@@ -335,17 +383,70 @@ class EstadoRecaudacionAjax(LoginRequiredMixin, View):
 
         totales = _totales_por_entidad(entidad)
 
-        # Últimas 5 recaudaciones para refresh rápido de la tabla
+        # Últimas 5 recaudaciones PENDIENTES para refresh rápido de la tabla
         ultimas = [
             _recaudacion_as_dict(r)
-            for r in RecaudacionDiaria.objects.filter(entidad=entidad)
+            for r in RecaudacionDiaria.objects.filter(entidad=entidad, cubierta_por__isnull=True)
                                                .select_related('registrado_por')[:5]
         ]
 
         return JsonResponse({
-            'entidad':          entidad,
-            'total_recaudado':  float(totales['recaudado']),
-            'total_depositado': float(totales['depositado']),
-            'pendiente':        float(totales['pendiente']),
-            'ultimas':          ultimas,
+            'entidad':             entidad,
+            'total_recaudado':     float(totales['recaudado']),
+            'recaudado_pendiente': float(totales['recaudado_pendiente']),
+            'total_depositado':    float(totales['depositado']),
+            'pendiente':           float(totales['pendiente']),
+            'ultimas':             ultimas,
+        })
+
+
+# ─────────────────────────────────────────────────────────────
+# HISTORIAL COMPLETO (pendientes + cubiertas)
+# ─────────────────────────────────────────────────────────────
+
+class HistorialRecaudacionesView(LoginRequiredMixin, View):
+    def get(self, request):
+        desde   = request.GET.get('desde',   '').strip()
+        hasta   = request.GET.get('hasta',   '').strip()
+        entidad = request.GET.get('entidad', '').strip()
+        estado  = request.GET.get('estado',  '').strip()  # '', 'pendiente', 'cubierta'
+
+        qs = (
+            RecaudacionDiaria.objects
+            .select_related('registrado_por', 'cubierta_por')
+            .all()
+        )
+
+        if desde:
+            qs = qs.filter(fecha__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha__lte=hasta)
+        if entidad in (RecaudacionDiaria.ENTIDAD_PAGOFACIL, RecaudacionDiaria.ENTIDAD_RAPIPAGO):
+            qs = qs.filter(entidad=entidad)
+        if estado == 'pendiente':
+            qs = qs.filter(cubierta_por__isnull=True)
+        elif estado == 'cubierta':
+            qs = qs.filter(cubierta_por__isnull=False)
+
+        total_filtrado    = qs.aggregate(t=Sum('monto'))['t'] or Decimal('0')
+        total_pf_filtrado = (
+            qs.filter(entidad=RecaudacionDiaria.ENTIDAD_PAGOFACIL)
+            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
+        )
+        total_rp_filtrado = (
+            qs.filter(entidad=RecaudacionDiaria.ENTIDAD_RAPIPAGO)
+            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
+        )
+
+        return render(request, 'cobranzas/historial_recaudaciones.html', {
+            'recaudaciones':      qs[:500],
+            'desde':              desde,
+            'hasta':              hasta,
+            'entidad':            entidad,
+            'estado':             estado,
+            'total_filtrado':     total_filtrado,
+            'total_pf_filtrado':  total_pf_filtrado,
+            'total_rp_filtrado':  total_rp_filtrado,
+            'ENTIDAD_PF':         RecaudacionDiaria.ENTIDAD_PAGOFACIL,
+            'ENTIDAD_RP':         RecaudacionDiaria.ENTIDAD_RAPIPAGO,
         })
