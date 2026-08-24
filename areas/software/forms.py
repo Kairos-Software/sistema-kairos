@@ -45,6 +45,7 @@ class InstalacionForm(forms.ModelForm):
         fields = [
             'vps', 'servicio', 'cliente', 'cliente_texto', 'dominio', 'puerto',
             'ruta_proyecto', 'ruta_service', 'ruta_conf', 'estado', 'descripcion', 'comandos',
+            'usuario_admin', 'contrasena_admin',
         ]
         widgets = {
             'vps':            forms.Select(attrs={'class': 'form-control'}),
@@ -60,6 +61,8 @@ class InstalacionForm(forms.ModelForm):
             'descripcion':    forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
             'comandos':       forms.Textarea(attrs={'rows': 6, 'class': 'form-control code-textarea', 'spellcheck': 'false',
                                                       'placeholder': 'cd /home/deploy/proyecto && git pull && systemctl restart proyecto'}),
+            'usuario_admin':    forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: admin', 'autocomplete': 'off'}),
+            'contrasena_admin': forms.TextInput(attrs={'class': 'form-control', 'type': 'password', 'autocomplete': 'off'}),
         }
 
     def clean(self):

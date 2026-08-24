@@ -130,6 +130,11 @@ class Instalacion(models.Model):
                    help_text='Comandos para actualizar esta instalación puntualmente '
                              '(ej: cd /home/deploy/proyecto && git pull && systemctl restart proyecto)')
 
+    # Acceso de superusuario a esta instalación puntual (no confundir con
+    # el acceso SSH de la VPS, que es a nivel servidor).
+    usuario_admin    = models.CharField('Usuario (superusuario)', max_length=100, blank=True)
+    contrasena_admin = models.CharField('Contraseña', max_length=200, blank=True)
+
     creado_por          = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True,
                                              related_name='instalaciones_creadas')
     fecha_alta          = models.DateTimeField(auto_now_add=True)

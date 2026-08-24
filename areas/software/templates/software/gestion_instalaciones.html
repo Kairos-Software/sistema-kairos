@@ -108,6 +108,7 @@
                 data-ruta-proyecto="{{ inst.ruta_proyecto }}" data-ruta-service="{{ inst.ruta_service }}"
                 data-ruta-conf="{{ inst.ruta_conf }}" data-estado="{{ inst.estado }}"
                 data-descripcion="{{ inst.descripcion }}" data-comandos="{{ inst.comandos }}"
+                data-usuario-admin="{{ inst.usuario_admin }}" data-contrasena-admin="{{ inst.contrasena_admin }}"
                 data-servicio-nombre="{{ inst.servicio.nombre }}" data-vps-nombre="{{ inst.vps.nombre }}"
                 data-cliente-orden="{{ inst.get_cliente_display }}" data-estado-orden="{{ inst.get_estado_display }}"
                 data-fecha-alta="{{ inst.fecha_alta|date:'U' }}">
@@ -121,6 +122,7 @@
                     <div class="acciones-cell">
                         {% if inst.dominio %}<button class="btn-accion btn-qr" data-id="{{ inst.pk }}" data-dominio="{{ inst.dominio }}">QR</button>{% endif %}
                         {% if inst.comandos %}<button class="btn-accion btn-ver-comandos" data-id="{{ inst.pk }}">Comandos</button>{% endif %}
+                        {% if inst.usuario_admin or inst.contrasena_admin %}<button class="btn-accion btn-ver-credenciales" data-id="{{ inst.pk }}">Credenciales</button>{% endif %}
                         {% if puede_editar %}<button class="btn-accion btn-editar" data-id="{{ inst.pk }}">Editar</button>{% endif %}
                         {% if puede_eliminar %}<button class="btn-accion btn-eliminar" data-id="{{ inst.pk }}" data-nombre="{{ inst.servicio.nombre }} — {{ inst.vps.nombre }}">Eliminar</button>{% endif %}
                     </div>
@@ -231,11 +233,27 @@
                         <textarea name="descripcion" id="instDescripcion" class="form-control" rows="2"></textarea>
                     </div>
 
-                    <div class="mb-1">
+                    <div class="mb-2">
                         <label class="form-label">Comandos de actualización</label>
                         <textarea name="comandos" id="instComandos" class="form-control code-textarea" rows="4"
                                   placeholder="cd /home/deploy/proyecto && git pull && systemctl restart proyecto"></textarea>
                         <p class="field-hint">Se pueden ver y copiar rápido desde el botón "Comandos" en la lista.</p>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-1">
+                            <label class="form-label">Usuario (superusuario)</label>
+                            <input type="text" name="usuario_admin" id="instUsuarioAdmin" class="form-control"
+                                   placeholder="Ej: admin" autocomplete="off">
+                        </div>
+                        <div class="col-md-6 mb-1">
+                            <label class="form-label">Contraseña</label>
+                            <div class="input-group-password">
+                                <input type="password" name="contrasena_admin" id="instContrasenaAdmin"
+                                       class="form-control" autocomplete="off">
+                                <button type="button" class="btn-toggle-password" id="btnTogglePasswordInst" tabindex="-1">Ver</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="instErrores" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
@@ -288,6 +306,41 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" id="btnCopiarComandos">Copiar comandos</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Modal ver credenciales ── #}
+<div class="modal fade" id="credencialesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">Credenciales de acceso</h5>
+                    <p class="modal-subtitle" id="credencialesSubtitulo"></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <label class="form-label">Usuario</label>
+                    <div class="input-group-password">
+                        <input type="text" id="credencialesUsuario" class="form-control" readonly>
+                        <button type="button" class="btn-toggle-password" id="btnCopiarUsuarioAdmin">Copiar</button>
+                    </div>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label">Contraseña</label>
+                    <div class="input-group-password">
+                        <input type="password" id="credencialesContrasena" class="form-control" readonly>
+                        <button type="button" class="btn-toggle-password" id="btnVerContrasenaAdmin">Ver</button>
+                        <button type="button" class="btn-toggle-password" id="btnCopiarContrasenaAdmin">Copiar</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>

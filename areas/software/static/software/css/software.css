@@ -324,6 +324,16 @@ textarea.form-control { resize: vertical; min-height: 90px; }
 }
 .cliente-chip-seleccionado button { background: none; border: none; color: inherit; cursor: pointer; font-weight: 700; }
 
+/* ── Contraseña con toggle ver/ocultar + copiar ── */
+.input-group-password { display: flex; gap: 6px; }
+.input-group-password .form-control { flex: 1; min-width: 0; }
+.btn-toggle-password {
+    font-size: .73rem; font-weight: 700; border-radius: 8px; padding: 0 .7rem;
+    border: 1px solid #e0e0ea; background: #fff; color: #666; cursor: pointer;
+    white-space: nowrap; transition: all .15s;
+}
+.btn-toggle-password:hover { background: #111; color: #fff; border-color: #111; }
+
 /* ── QR de instalación ── */
 .qr-imagen { width: 220px; height: 220px; }
 

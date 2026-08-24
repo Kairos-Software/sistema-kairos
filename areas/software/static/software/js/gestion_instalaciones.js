@@ -98,12 +98,20 @@ document.addEventListener('DOMContentLoaded', function () {
         inputCliTxt.disabled = false;
     }
 
+    function resetPasswordUI() {
+        const input = document.getElementById('instContrasenaAdmin');
+        const btn   = document.getElementById('btnTogglePasswordInst');
+        if (input) input.type = 'password';
+        if (btn) btn.textContent = 'Ver';
+    }
+
     function abrirNuevo() {
         if (!form) return;
         form.reset();
         document.getElementById('instPk').value = '';
         document.getElementById('instalacionModalTitulo').textContent = 'Nueva instalación';
         resetClienteUI();
+        resetPasswordUI();
         errores.style.display = 'none';
         modal.show();
     }
@@ -112,6 +120,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!form) return;
         form.reset();
         resetClienteUI();
+        resetPasswordUI();
         document.getElementById('instPk').value = row.dataset.id;
         document.getElementById('instVps').value = row.dataset.vps;
         document.getElementById('instServicio').value = row.dataset.servicio;
@@ -123,6 +132,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('instEstado').value = row.dataset.estado;
         document.getElementById('instDescripcion').value = row.dataset.descripcion;
         document.getElementById('instComandos').value = row.dataset.comandos;
+        document.getElementById('instUsuarioAdmin').value = row.dataset.usuarioAdmin;
+        document.getElementById('instContrasenaAdmin').value = row.dataset.contrasenaAdmin;
 
         if (row.dataset.clienteId) {
             seleccionarCliente(row.dataset.clienteId, row.dataset.clienteNombre);
@@ -232,6 +243,54 @@ document.addEventListener('DOMContentLoaded', function () {
             qrModal.show();
         });
     });
+
+    // ─── Contraseña: mostrar/ocultar y copiar ────────────────────────────
+
+    function wireTogglePassword(btn, input) {
+        btn?.addEventListener('click', () => {
+            const oculto = input.type === 'password';
+            input.type = oculto ? 'text' : 'password';
+            btn.textContent = oculto ? 'Ocultar' : 'Ver';
+        });
+    }
+
+    function wireCopiar(btn, getTexto) {
+        btn?.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(getTexto());
+                const original = btn.textContent;
+                btn.textContent = 'Copiado ✓';
+                setTimeout(() => { btn.textContent = original; }, 1500);
+            } catch { /* clipboard no disponible */ }
+        });
+    }
+
+    wireTogglePassword(document.getElementById('btnTogglePasswordInst'), document.getElementById('instContrasenaAdmin'));
+
+    // ─── Credenciales (ver / copiar) ──────────────────────────────────────
+
+    const credencialesModalEl = document.getElementById('credencialesModal');
+    const credencialesModal   = credencialesModalEl ? new bootstrap.Modal(credencialesModalEl) : null;
+    const inputCredUsuario    = document.getElementById('credencialesUsuario');
+    const inputCredContrasena = document.getElementById('credencialesContrasena');
+    const btnVerCredContrasena = document.getElementById('btnVerContrasenaAdmin');
+
+    document.querySelectorAll('.btn-ver-credenciales').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('tr');
+            document.getElementById('credencialesSubtitulo').textContent =
+                `${row.dataset.servicioNombre} — ${row.dataset.vpsNombre}`;
+            inputCredUsuario.value = row.dataset.usuarioAdmin || '';
+            inputCredContrasena.value = row.dataset.contrasenaAdmin || '';
+            inputCredContrasena.type = 'password';
+            btnVerCredContrasena.textContent = 'Ver';
+            credencialesModal.show();
+        });
+    });
+
+    wireTogglePassword(btnVerCredContrasena, inputCredContrasena);
+    wireCopiar(document.getElementById('btnCopiarUsuarioAdmin'), () => inputCredUsuario.value);
+    wireCopiar(document.getElementById('btnCopiarContrasenaAdmin'), () => inputCredContrasena.value);
 
     document.getElementById('btnImprimirQr')?.addEventListener('click', () => {
         const src    = document.getElementById('qrImagen').src;

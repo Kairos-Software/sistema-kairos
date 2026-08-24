@@ -147,6 +147,8 @@ class InstalacionCrearEditarAjax(LoginRequiredMixin, View):
                 'estado_display': instalacion.get_estado_display(),
                 'descripcion':    instalacion.descripcion,
                 'comandos':       instalacion.comandos,
+                'usuario_admin':    instalacion.usuario_admin,
+                'contrasena_admin': instalacion.contrasena_admin,
             }})
         return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
