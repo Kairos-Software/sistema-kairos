@@ -16,9 +16,9 @@
     /* Margen negativo para cancelar: px-4 Bootstrap (1.5rem) + padding main base.css (1rem) = 2.5rem */
     margin-top: -2rem;
     margin-bottom: -2rem;
-    margin-left: -2.5rem;
-    margin-right: -2.5rem;
-    width: calc(100% + 5rem);
+    margin-left: -1.5rem;
+    margin-right: -1.5rem;
+    width: calc(100% + 3rem);
 }
 
 /* ══════════════════════════════════════
@@ -551,14 +551,39 @@
    RESPONSIVE
    ══════════════════════════════════════ */
 @media (max-width: 900px) {
-    .cobranzas-layout { flex-direction: column; margin-left: -1rem; margin-right: -1rem; width: calc(100% + 2rem); }
-    .cobranzas-sidebar { width: 100%; position: relative; top: 0; height: auto; border-right: none; border-bottom: 1px solid #1e1e1e; }
-    .sidebar-nav ul { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0.5rem; }
-    .sidebar-nav li { margin: 0; }
-    .sidebar-nav a { padding: 0.5rem 0.85rem; font-size: 0.8rem; }
-    .sidebar-nav a.active::before { display: none; }
-    .sidebar-footer { display: none; }
-    .cobranzas-main { padding: 1rem; }
+    .cobranzas-layout { flex-direction: column; }
+
+    .cobranzas-sidebar {
+        position: fixed;
+        top: var(--navbar-height);
+        left: 0;
+        bottom: 0;
+        width: 280px;
+        max-width: 82vw;
+        height: auto;
+        transform: translateX(-100%);
+        transition: transform .28s ease;
+        z-index: 910;
+    }
+    .cobranzas-sidebar.sidebar-open {
+        transform: translateX(0);
+        box-shadow: 12px 0 40px rgba(0,0,0,.35);
+    }
+
+    .cobranzas-main { padding: 1.1rem 0.9rem; }
+
+    /* Última columna (Acciones) siempre visible sin tener que
+       hacer scroll horizontal a ciegas para editar/eliminar. */
+    .table thead th:last-child, .table tbody td:last-child {
+        position: sticky;
+        right: 0;
+        z-index: 1;
+    }
+    .table thead th:last-child { background: #fafafa; box-shadow: -8px 0 10px -8px rgba(0,0,0,.2); }
+    .table tbody td:last-child { background: #fff; box-shadow: -8px 0 10px -8px rgba(0,0,0,.12); }
+}
+@media (max-width: 400px) {
+    .cobranzas-main { padding: 1rem 0.65rem; }
 }
 @media (max-width: 576px) {
     .page-header { flex-direction: column; }

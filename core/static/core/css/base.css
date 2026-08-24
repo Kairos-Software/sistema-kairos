@@ -160,6 +160,56 @@ main {
 @media (max-width: 576px) {
     main { padding: 1.2rem 0.75rem; }
 }
+
+/* ════════════════════════════════════════════════════════════
+   SIDEBAR DE ÁREA (Cobranzas / Software) — drawer en mobile/tablet
+   Markup y clases compartidas entre ambas áreas; el posicionamiento
+   fijo del <aside> en sí (.software-sidebar / .cobranzas-sidebar)
+   se define en el CSS propio de cada área.
+   ════════════════════════════════════════════════════════════ */
+body.sidebar-lock-scroll { overflow: hidden; }
+
+.area-sidebar-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    background: var(--gk-dark);
+    color: #fff;
+    border: 1px solid var(--gk-orange);
+    border-radius: 10px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    min-height: 44px;
+}
+.area-sidebar-toggle svg { flex-shrink: 0; }
+.area-sidebar-toggle:active { background: #1a1a1a; }
+
+.area-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: var(--navbar-height) 0 0 0;
+    background: rgba(0,0,0,0);
+    pointer-events: none;
+    transition: background 0.25s ease;
+    z-index: 900;
+}
+.area-sidebar-backdrop.show {
+    background: rgba(0,0,0,0.5);
+    pointer-events: auto;
+}
+
+@media (max-width: 900px) {
+    .area-sidebar-toggle { display: flex; }
+    .area-sidebar-backdrop { display: block; }
+}
 /* ── Dropdown de Áreas ── */
 .dropdown-menu {
     background: #111;

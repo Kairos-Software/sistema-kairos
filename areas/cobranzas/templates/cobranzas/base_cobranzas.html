@@ -12,8 +12,16 @@
 {% block content %}
 <div class="cobranzas-layout">
 
+    <button type="button" class="area-sidebar-toggle" data-sidebar-toggle aria-expanded="false" aria-controls="cobranzasSidebar">
+        <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
+            <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        Menú de Cobranzas
+    </button>
+    <div class="area-sidebar-backdrop" data-sidebar-backdrop></div>
+
     {# ══ SIDEBAR ══ #}
-    <aside class="cobranzas-sidebar">
+    <aside class="cobranzas-sidebar" id="cobranzasSidebar" data-sidebar>
 
         <div class="sidebar-header">
             <h5>Cobranzas</h5>
