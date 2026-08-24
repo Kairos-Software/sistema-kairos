@@ -226,7 +226,15 @@ class Turno(models.Model):
 
     def total_retiros(self):
         from django.db.models import Sum
-        return self.retiros.filter(activo=True).aggregate(t=Sum('monto'))['t'] or 0
+        return self.retiros.filter(
+            activo=True, tipo=RetiroCaja.TIPO_RETIRO
+        ).aggregate(t=Sum('monto'))['t'] or 0
+
+    def total_ingresos(self):
+        from django.db.models import Sum
+        return self.retiros.filter(
+            activo=True, tipo=RetiroCaja.TIPO_INGRESO
+        ).aggregate(t=Sum('monto'))['t'] or 0
 
     def total_general(self):
         """Suma de todos los cobros sin importar el método."""
@@ -239,7 +247,8 @@ class Turno(models.Model):
 
     def efectivo_esperado(self):
         """Cuánto efectivo debería haber en caja al cierre."""
-        return self.monto_inicial + self.total_efectivo() - self.total_retiros()
+        return (self.monto_inicial + self.total_efectivo()
+                + self.total_ingresos() - self.total_retiros())
 
     def total_adicionales(self):
         from django.db.models import Sum
@@ -251,13 +260,23 @@ class Turno(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────
-# RETIRO DE CAJA
-# Salidas de efectivo durante un turno (gastos, depósitos, etc.)
-# Reducen el efectivo esperado al cierre.
+# MOVIMIENTO DE CAJA (retiro o ingreso)
+# Salidas y entradas de efectivo durante un turno, fuera de los
+# cobros normales (depósitos al banco, gastos, un aporte extra de
+# efectivo, etc.). Los retiros reducen el efectivo esperado al
+# cierre; los ingresos lo aumentan — ver Turno.efectivo_esperado().
 # ─────────────────────────────────────────────────────────────
 
 class RetiroCaja(models.Model):
+    TIPO_RETIRO  = 'retiro'
+    TIPO_INGRESO = 'ingreso'
+    TIPOS = [
+        (TIPO_RETIRO,  'Retiro'),
+        (TIPO_INGRESO, 'Ingreso'),
+    ]
+
     turno       = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='retiros')
+    tipo        = models.CharField(max_length=10, choices=TIPOS, default=TIPO_RETIRO)
     motivo      = models.CharField(max_length=200)
     monto       = models.DecimalField(max_digits=12, decimal_places=2)
     fecha       = models.DateTimeField(auto_now_add=True)
@@ -270,7 +289,7 @@ class RetiroCaja(models.Model):
         ordering = ['-fecha']
 
     def __str__(self):
-        return f"Retiro ${self.monto} — {self.motivo[:40]} (Turno #{self.turno.numero})"
+        return f"{self.get_tipo_display()} ${self.monto} — {self.motivo[:40]} (Turno #{self.turno.numero})"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -401,6 +420,7 @@ class CierreDiario(models.Model):
     total_credito       = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_qr            = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_retiros       = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_ingresos      = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_general       = models.DecimalField(max_digits=12, decimal_places=2, default=0,
                                                help_text="Suma de todos los métodos de pago")
     total_adicionales   = models.DecimalField(max_digits=12, decimal_places=2, default=0,

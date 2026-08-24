@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function () {
             await navigator.clipboard.writeText(texto);
             const btn = document.getElementById('btnCopiarComandos');
             const original = btn.textContent;
-            btn.textContent = 'Copiado ✓';
+            btn.textContent = 'Copiado';
             setTimeout(() => { btn.textContent = original; }, 1500);
         } catch { /* clipboard no disponible */ }
     });
@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 await navigator.clipboard.writeText(getTexto());
                 const original = btn.textContent;
-                btn.textContent = 'Copiado ✓';
+                btn.textContent = 'Copiado';
                 setTimeout(() => { btn.textContent = original; }, 1500);
             } catch { /* clipboard no disponible */ }
         });

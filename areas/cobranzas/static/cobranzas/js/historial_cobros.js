@@ -318,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res  = await postJSON(LIMPIEZA_URL, {});
             const data = await res.json();
             if (data.success) {
-                el('limpiezaExito').textContent = `✓ Se eliminaron ${data.eliminados} cobro(s) de ${data.periodo}.`;
+                el('limpiezaExito').textContent = `Se eliminaron ${data.eliminados} cobro(s) de ${data.periodo}.`;
                 el('limpiezaExito').style.display = '';
                 btn.textContent = 'Hecho';
                 setTimeout(() => location.reload(), 2000);
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const diff     = asignado - total;
         const balEl    = el('editBalanceMonto');
         if (Math.abs(diff) < 0.01) {
-            balEl.textContent = '✓ Cubierto';
+            balEl.textContent = 'Cubierto';
             balEl.className = 'edit-balance-ok';
         } else if (diff < 0) {
             balEl.textContent = `Faltan ${fmt(Math.abs(diff))}`;

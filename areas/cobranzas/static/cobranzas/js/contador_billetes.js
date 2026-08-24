@@ -54,7 +54,7 @@
 
         panel.innerHTML = `
             <div class="cbp-header" id="cbpHeader">
-                <span class="cbp-icon">💵</span>
+                <span class="cbp-icon"><i class="bi bi-cash" aria-hidden="true"></i></span>
                 <h6>Contador de Billetes</h6>
                 <div class="cbp-header-acciones">
                     <button class="cbp-btn-minimizar" id="cbpMinimizar" title="Minimizar">

@@ -711,7 +711,7 @@ function actualizarBalance() {
     const balLabel = document.getElementById('balanceLabel');
 
     if (Math.abs(pendiente) < 0.01) {
-        balMonto.textContent = '✓ Cubierto';
+        balMonto.textContent = 'Cubierto';
         balMonto.className   = 'cobro-balance-ok';
         balLabel.textContent = 'Estado';
     } else if (pendiente > 0) {

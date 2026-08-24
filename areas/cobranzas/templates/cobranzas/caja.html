@@ -150,12 +150,13 @@
             </svg>
             Resumen
         </button>
-        <button class="caja-tab-btn" data-tab="retiros" data-scope="abierta">
+        <button class="caja-tab-btn" data-tab="movimientos" data-scope="abierta">
             <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
-                <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5 3v7M5 10L2.5 7.5M5 10l2.5-2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M11 13V6M11 6l2.5 2.5M11 6L8.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Retiros
-            <span class="caja-tab-badge" id="tabBadgeRetiros" style="display:none;">0</span>
+            Movimientos
+            <span class="caja-tab-badge" id="tabBadgeMovimientos" style="display:none;">0</span>
         </button>
         <button class="caja-tab-btn caja-tab-cierre" data-tab="cierre" data-scope="abierta">
             <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
@@ -210,6 +211,10 @@
                     <span>QR</span>
                     <strong id="turnoTotQR">$ 0,00</strong>
                 </div>
+                <div class="caja-total-row caja-total-ingresos">
+                    <span>Ingresos de caja</span>
+                    <strong id="turnoTotIngresos">$ 0,00</strong>
+                </div>
                 <div class="caja-total-row caja-total-retiros">
                     <span>Retiros de caja</span>
                     <strong id="turnoTotRetiros">$ 0,00</strong>
@@ -228,11 +233,12 @@
                 </div>
             </div>
             <div class="caja-resumen-acciones">
-                <button type="button" class="btn-caja-secundario" onclick="cajaSwitchTab('retiros','abierta')">
+                <button type="button" class="btn-caja-secundario" onclick="cajaSwitchTab('movimientos','abierta')">
                     <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
-                        <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M5 3v7M5 10L2.5 7.5M5 10l2.5-2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M11 13V6M11 6l2.5 2.5M11 6L8.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    Registrar retiro
+                    Registrar movimiento
                 </button>
                 <button type="button" class="btn-caja-peligro" style="margin-top:0;" onclick="cajaSwitchTab('cierre','abierta')">
                     <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
@@ -246,17 +252,34 @@
         </div>
     </div>
 
-    {# ── Tab: Retiros ── #}
-    <div class="caja-tab-panel" id="tabRetiros" style="display:none;">
+    {# ── Tab: Movimientos ── #}
+    <div class="caja-tab-panel" id="tabMovimientos" style="display:none;">
         <div class="caja-card" style="margin-bottom:0;">
-            <h2 class="caja-card-titulo">Retiros de caja</h2>
+            <h2 class="caja-card-titulo">Movimientos de caja</h2>
             <p class="caja-card-desc">
-                Registrá salidas de efectivo durante el turno (depósitos, gastos, etc.).
-                Reducen el efectivo esperado al cierre.
+                Registrá salidas (depósitos, gastos, etc.) o entradas de efectivo durante el turno
+                que no sean cobros. Los retiros reducen el efectivo esperado al cierre, los ingresos lo aumentan.
             </p>
+            <div class="caja-field" style="margin-bottom:.8rem;">
+                <label class="caja-label">Tipo de movimiento</label>
+                <div class="caja-tipo-toggle" id="movTipoToggle">
+                    <button type="button" class="caja-tipo-btn caja-tipo-btn-activo" data-tipo="retiro">
+                        <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                            <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Retiro
+                    </button>
+                    <button type="button" class="caja-tipo-btn" data-tipo="ingreso">
+                        <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                            <path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Ingreso
+                    </button>
+                </div>
+            </div>
             <div class="caja-retiros-form">
                 <div class="caja-field">
-                    <label class="caja-label">Motivo</label>
+                    <label class="caja-label" id="movMotivoLabel">Motivo</label>
                     <input type="text" id="retiroMotivo" class="caja-input-text"
                            placeholder="Ej: Depósito banco, gasto limpieza..." maxlength="200">
                 </div>
@@ -271,11 +294,11 @@
                 <div>
                     <div id="retiroError" class="alerta-inline alerta-error" style="display:none;"></div>
                     <button type="button" class="btn-caja-principal" id="btnRegistrarRetiro">
-                        + Registrar retiro
+                        + Registrar movimiento
                     </button>
                 </div>
             </div>
-            <div class="caja-retiros-divider"><span>Retiros del turno</span></div>
+            <div class="caja-retiros-divider"><span>Movimientos del turno</span></div>
             <div id="listaRetiros" class="caja-retiros-lista"></div>
         </div>
     </div>
@@ -291,7 +314,7 @@
             <div class="caja-field">
                 <label class="caja-label">
                     Efectivo físico contado
-                    <span class="caja-hint">(fondo + cobros - retiros)</span>
+                    <span class="caja-hint">(fondo + cobros + ingresos - retiros)</span>
                 </label>
                 <div class="caja-input-wrap">
                     <span class="caja-signo">$</span>
@@ -333,7 +356,7 @@
     <div class="modal-dialog">
         <div class="modal-content caja-modal">
             <div class="modal-body p-4">
-                <div class="caja-modal-icono">✅</div>
+                <div class="caja-modal-icono ui-icon-box"><i class="bi bi-check-circle" aria-hidden="true"></i></div>
                 <h5 class="caja-modal-titulo">Turno cerrado</h5>
                 <div id="cierreTurnoDetalle" class="caja-modal-detalle"></div>
                 <div class="d-flex gap-2 mt-3">
@@ -376,9 +399,9 @@
             'cierre-diario':'tabCierreDiario',
         },
         abierta: {
-            'resumen': 'tabResumen',
-            'retiros': 'tabRetiros',
-            'cierre':  'tabCierre',
+            'resumen':     'tabResumen',
+            'movimientos': 'tabMovimientos',
+            'cierre':      'tabCierre',
         },
     };
 
@@ -439,7 +462,7 @@
                 </div>`;
                 banner.style.display = '';
             } else {
-                banner.innerHTML = '<div class="cierre-sin-pendientes">✓ No hay turnos pendientes de cierre diario.</div>';
+                banner.innerHTML = '<div class="cierre-sin-pendientes"><i class="bi bi-check-circle" aria-hidden="true"></i> No hay turnos pendientes de cierre diario.</div>';
                 banner.style.display = '';
             }
         } catch(e) {

@@ -24,7 +24,7 @@
 
         <a href="?entidad={{ ENTIDAD_PF }}" data-entidad="{{ ENTIDAD_PF }}"
            class="dep-entidad-btn {% if entidad == ENTIDAD_PF %}dep-entidad-activa{% endif %}">
-            <span class="dep-entidad-icono">💳</span>
+            <span class="dep-entidad-icono ui-icon-box"><i class="bi bi-credit-card" aria-hidden="true"></i></span>
             <span class="dep-entidad-nombre">PagoFácil</span>
             <span class="dep-entidad-sub">
                 {{ cant_pf }} día{{ cant_pf|pluralize }} pendiente{{ cant_pf|pluralize }} de depositar
@@ -42,7 +42,7 @@
 
         <a href="?entidad={{ ENTIDAD_RP }}" data-entidad="{{ ENTIDAD_RP }}"
            class="dep-entidad-btn {% if entidad == ENTIDAD_RP %}dep-entidad-activa{% endif %}">
-            <span class="dep-entidad-icono">🏦</span>
+            <span class="dep-entidad-icono ui-icon-box"><i class="bi bi-bank" aria-hidden="true"></i></span>
             <span class="dep-entidad-nombre">RapiPago</span>
             <span class="dep-entidad-sub">
                 {{ cant_rp }} día{{ cant_rp|pluralize }} pendiente{{ cant_rp|pluralize }} de depositar
@@ -114,7 +114,7 @@
 
     {% if recaudacion_hoy %}
     <div class="alerta-inline alerta-warn" id="alertaYaExiste">
-        ⚠️ Ya existe una recaudación para hoy ({{ hoy|date:"d/m/Y" }}):
+        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Ya existe una recaudación para hoy ({{ hoy|date:"d/m/Y" }}):
         <strong>${{ recaudacion_hoy.monto|floatformat:2 }}</strong>.
         Si registrás un nuevo monto para la misma fecha, <strong>reemplazará</strong> al existente.
     </div>
@@ -230,7 +230,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content caja-modal">
             <div class="modal-body p-4">
-                <div class="caja-modal-icono">💳</div>
+                <div class="caja-modal-icono ui-icon-box"><i class="bi bi-credit-card" aria-hidden="true"></i></div>
                 <h5 class="caja-modal-titulo">Confirmar recaudación</h5>
 
                 <div class="caja-modal-fila mt-3">

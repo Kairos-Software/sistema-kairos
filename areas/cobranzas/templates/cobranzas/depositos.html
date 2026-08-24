@@ -17,7 +17,7 @@
     </div>
     <div class="page-header-actions">
         <a href="{% url 'cobranzas:depositos_historial' %}" class="btn-historial">
-            📋 Ver historial completo
+            <i class="bi bi-clock-history" aria-hidden="true"></i> Ver historial completo
         </a>
     </div>
 </div>
@@ -29,7 +29,7 @@
 
         <button class="dep-entidad-btn {% if entidad == ENTIDAD_PF %}dep-entidad-activa{% endif %}"
                 data-entidad="{{ ENTIDAD_PF }}" data-label="PagoFácil">
-            <span class="dep-entidad-icono">💳</span>
+            <span class="dep-entidad-icono ui-icon-box"><i class="bi bi-credit-card" aria-hidden="true"></i></span>
             <span class="dep-entidad-nombre">PagoFácil</span>
             <span class="dep-entidad-cant">{{ cant_pf }} depósito{{ cant_pf|pluralize }}</span>
             <span class="dep-pendiente-pill {% if tot_pf.pendiente > 0 %}pill-alerta{% elif tot_pf.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
@@ -41,7 +41,7 @@
 
         <button class="dep-entidad-btn {% if entidad == ENTIDAD_RP %}dep-entidad-activa{% endif %}"
                 data-entidad="{{ ENTIDAD_RP }}" data-label="RapiPago">
-            <span class="dep-entidad-icono">🏦</span>
+            <span class="dep-entidad-icono ui-icon-box"><i class="bi bi-bank" aria-hidden="true"></i></span>
             <span class="dep-entidad-nombre">RapiPago</span>
             <span class="dep-entidad-cant">{{ cant_rp }} depósito{{ cant_rp|pluralize }}</span>
             <span class="dep-pendiente-pill {% if tot_rp.pendiente > 0 %}pill-alerta{% elif tot_rp.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
@@ -264,30 +264,30 @@
                     <td class="dep-tickets-cell">
                         {% if d.entidad == ENTIDAD_PF %}
                         <button type="button" class="btn-ver-ticket {% if 'ticket_1' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                                data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="🧾 Ticket 1 cargado">
-                            {% if 'ticket_1' in d.tickets_cargados %}🧾 Ticket 1 cargado{% else %}🧾 Ticket 1{% endif %}
+                                data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="Ticket 1 cargado">
+                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_1' in d.tickets_cargados %}Ticket 1 cargado{% else %}Ticket 1{% endif %}
                         </button>
                         <button type="button" class="btn-ver-ticket {% if 'ticket_2' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                                data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="🧾 Ticket 2 cargado">
-                            {% if 'ticket_2' in d.tickets_cargados %}🧾 Ticket 2 cargado{% else %}🧾 Ticket 2{% endif %}
+                                data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="Ticket 2 cargado">
+                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_2' in d.tickets_cargados %}Ticket 2 cargado{% else %}Ticket 2{% endif %}
                         </button>
                         {% else %}
                         {% if d.monto_efectivo_fisico %}
                         <button type="button" class="btn-ver-ticket {% if 'efectivo_fisico' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                                data-deposito-id="{{ d.pk }}" data-tipo="efectivo_fisico" data-label-cargado="🧾 Efectivo cargado">
-                            {% if 'efectivo_fisico' in d.tickets_cargados %}🧾 Efectivo cargado{% else %}🧾 Ticket efectivo{% endif %}
+                                data-deposito-id="{{ d.pk }}" data-tipo="efectivo_fisico" data-label-cargado="Efectivo cargado">
+                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'efectivo_fisico' in d.tickets_cargados %}Efectivo cargado{% else %}Ticket efectivo{% endif %}
                         </button>
                         {% endif %}
                         {% if d.monto_ya_en_banco %}
                         <button type="button" class="btn-ver-ticket {% if 'ya_en_banco' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                                data-deposito-id="{{ d.pk }}" data-tipo="ya_en_banco" data-label-cargado="🧾 Transferencia cargada">
-                            {% if 'ya_en_banco' in d.tickets_cargados %}🧾 Transferencia cargada{% else %}🧾 Ticket transferencia{% endif %}
+                                data-deposito-id="{{ d.pk }}" data-tipo="ya_en_banco" data-label-cargado="Transferencia cargada">
+                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ya_en_banco' in d.tickets_cargados %}Transferencia cargada{% else %}Ticket transferencia{% endif %}
                         </button>
                         {% endif %}
                         {% if d.monto_saldo_plataforma %}
                         <button type="button" class="btn-ver-ticket {% if 'saldo_plataforma' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                                data-deposito-id="{{ d.pk }}" data-tipo="saldo_plataforma" data-label-cargado="🧾 Saldo a favor cargado">
-                            {% if 'saldo_plataforma' in d.tickets_cargados %}🧾 Saldo a favor cargado{% else %}🧾 Ticket saldo a favor{% endif %}
+                                data-deposito-id="{{ d.pk }}" data-tipo="saldo_plataforma" data-label-cargado="Saldo a favor cargado">
+                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'saldo_plataforma' in d.tickets_cargados %}Saldo a favor cargado{% else %}Ticket saldo a favor{% endif %}
                         </button>
                         {% endif %}
                         {% endif %}
@@ -357,7 +357,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content caja-modal">
             <div class="modal-body p-4">
-                <div class="caja-modal-icono">🏦</div>
+                <div class="caja-modal-icono ui-icon-box"><i class="bi bi-bank" aria-hidden="true"></i></div>
                 <h5 class="caja-modal-titulo">Confirmar depósito</h5>
 
                 <div class="caja-modal-fila mt-3">
@@ -1116,12 +1116,12 @@
                 <td>${data.realizado_por}</td>
                 <td class="dep-tickets-cell">
                     ${entidadActual === '{{ ENTIDAD_PF }}' ? `
-                        <button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="ticket_1" data-label-cargado="🧾 Ticket 1 cargado">🧾 Ticket 1</button>
-                        <button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="ticket_2" data-label-cargado="🧾 Ticket 2 cargado">🧾 Ticket 2</button>
+                        <button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="ticket_1" data-label-cargado="Ticket 1 cargado"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket 1</button>
+                        <button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="ticket_2" data-label-cargado="Ticket 2 cargado"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket 2</button>
                     ` : `
-                        ${data.monto_efectivo_fisico > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="efectivo_fisico" data-label-cargado="🧾 Efectivo cargado">🧾 Ticket efectivo</button>` : ''}
-                        ${data.monto_ya_en_banco > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="ya_en_banco" data-label-cargado="🧾 Transferencia cargada">🧾 Ticket transferencia</button>` : ''}
-                        ${data.monto_saldo_plataforma > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="saldo_plataforma" data-label-cargado="🧾 Saldo a favor cargado">🧾 Ticket saldo a favor</button>` : ''}
+                        ${data.monto_efectivo_fisico > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="efectivo_fisico" data-label-cargado="Efectivo cargado"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket efectivo</button>` : ''}
+                        ${data.monto_ya_en_banco > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="ya_en_banco" data-label-cargado="Transferencia cargada"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket transferencia</button>` : ''}
+                        ${data.monto_saldo_plataforma > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="saldo_plataforma" data-label-cargado="Saldo a favor cargado"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket saldo a favor</button>` : ''}
                     `}
                 </td>
             `;

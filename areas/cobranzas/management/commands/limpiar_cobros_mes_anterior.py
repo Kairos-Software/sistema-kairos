@@ -92,6 +92,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f'✓ Se eliminaron {eliminados} registro(s) de cobros de {mes_nombre} {anio_anterior}.'
+                f'Se eliminaron {eliminados} registro(s) de cobros de {mes_nombre} {anio_anterior}.'
             )
         )

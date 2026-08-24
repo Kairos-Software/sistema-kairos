@@ -390,7 +390,7 @@
                 </p>
                 <div id="editItemsLista" class="edit-items-lista"></div>
                 <p style="font-size:.75rem;color:#999;margin-top:.4rem;">
-                    ⚠ Podés modificar montos y canal. No podés cambiar el servicio — si es incorrecto, eliminá el cobro y hacé uno nuevo.
+                    <i class="bi bi-info-circle" aria-hidden="true"></i> Podés modificar montos y canal. No podés cambiar el servicio — si es incorrecto, eliminá el cobro y hacé uno nuevo.
                 </p>
 
                 {# Pagos #}
@@ -516,7 +516,7 @@
                 </div>
                 <div id="elimFiltroError" class="alerta-inline alerta-error" style="display:none;margin-top:.6rem;"></div>
                 <p class="eliminar-warning" style="margin-top:.75rem;">
-                    ⚠ Esta acción no se puede deshacer. Se borrarán los cobros que coincidan, incluyendo sus ítems y pagos.
+                    Esta acción no se puede deshacer. Se borrarán los cobros que coincidan, incluyendo sus ítems y pagos.
                 </p>
             </div>
             <div class="modal-footer">
@@ -842,7 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res  = await postJSON(LIMPIEZA_URL, {});
             const data = await res.json();
             if (data.success) {
-                el('limpiezaExito').textContent = `✓ Se eliminaron ${data.eliminados} cobro(s) de ${data.periodo}.`;
+                el('limpiezaExito').textContent = `Se eliminaron ${data.eliminados} cobro(s) de ${data.periodo}.`;
                 el('limpiezaExito').style.display = '';
                 btn.textContent = 'Hecho';
                 setTimeout(() => location.reload(), 2000);
@@ -1022,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const diff     = asignado - total;
         const balEl    = el('editBalanceMonto');
         if (Math.abs(diff) < 0.01) {
-            balEl.textContent = '✓ Cubierto';
+            balEl.textContent = 'Cubierto';
             balEl.className = 'edit-balance-ok';
         } else if (diff < 0) {
             balEl.textContent = `Faltan ${fmt(Math.abs(diff))}`;

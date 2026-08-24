@@ -28,7 +28,7 @@
         </a>
         <button type="button" class="deposito-reminder__btn-ok" id="depositoReminderDismiss"
                 title="Marcar como realizado por hoy">
-            ✓ Ya deposité
+            Ya deposité
         </button>
     </div>
 
@@ -53,7 +53,7 @@
 <div class="cobr-pronto-grid">
 
     <a href="{% url 'cobranzas:caja' %}" class="cobr-acceso-card">
-        <div class="cobr-pronto-icon">💰</div>
+        <div class="cobr-pronto-icon"><i class="bi bi-cash-stack" aria-hidden="true"></i></div>
         <div class="cobr-pronto-info">
             <strong>Caja</strong>
             <span>Abrir / cerrar turno</span>
@@ -61,7 +61,7 @@
     </a>
 
     <a href="{% url 'cobranzas:gestion_cobros' %}" class="cobr-acceso-card">
-        <div class="cobr-pronto-icon">🧾</div>
+        <div class="cobr-pronto-icon"><i class="bi bi-receipt" aria-hidden="true"></i></div>
         <div class="cobr-pronto-info">
             <strong>Nuevo cobro</strong>
             <span>Registrar boletas</span>
@@ -69,7 +69,7 @@
     </a>
 
     <a href="{% url 'cobranzas:gestion_servicios' %}" class="cobr-acceso-card">
-        <div class="cobr-pronto-icon">⚙️</div>
+        <div class="cobr-pronto-icon"><i class="bi bi-gear" aria-hidden="true"></i></div>
         <div class="cobr-pronto-info">
             <strong>Servicios</strong>
             <span>ABM de servicios</span>
@@ -77,7 +77,7 @@
     </a>
 
     <a href="{% url 'cobranzas:caja_grande' %}" class="cobr-acceso-card">
-        <div class="cobr-pronto-icon">🏦</div>
+        <div class="cobr-pronto-icon"><i class="bi bi-bank" aria-hidden="true"></i></div>
         <div class="cobr-pronto-info">
             <strong>Caja Grande</strong>
             <span>Acumulado global</span>
@@ -85,7 +85,7 @@
     </a>
 
     <a href="{% url 'cobranzas:depositos' %}" class="cobr-acceso-card">
-        <div class="cobr-pronto-icon">💳</div>
+        <div class="cobr-pronto-icon"><i class="bi bi-credit-card" aria-hidden="true"></i></div>
         <div class="cobr-pronto-info">
             <strong>Depósitos</strong>
             <span>PagoFácil / RapiPago</span>
@@ -93,7 +93,7 @@
     </a>
 
     <div class="cobr-pronto-card">
-        <div class="cobr-pronto-icon">📊</div>
+        <div class="cobr-pronto-icon"><i class="bi bi-bar-chart" aria-hidden="true"></i></div>
         <div class="cobr-pronto-info">
             <strong>Reportes</strong>
             <span>Próximamente</span>
@@ -107,7 +107,7 @@
     'use strict';
 
     // ────────────────────────────────────────────────────────
-    // ★ CONFIGURACIÓN — editá esto para probar o ajustar ★
+    // CONFIGURACIÓN — editá esto para probar o ajustar
     // ────────────────────────────────────────────────────────
 
     // Días en que debe aparecer el recordatorio.

@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('turnoTotCredito').textContent             = fmt(t.total_credito);
         document.getElementById('turnoTotQR').textContent                  = fmt(t.total_qr);
         document.getElementById('turnoTotRetiros').textContent             = fmt(t.total_retiros);
+        document.getElementById('turnoTotIngresos').textContent            = fmt(t.total_ingresos);
         document.getElementById('turnoTotGeneral').textContent             = fmt(t.total_general);
         document.getElementById('turnoTotAdicionales').textContent         = fmt(t.total_adicionales);
         document.getElementById('turnoEfEsperado').textContent             = fmt(t.efectivo_esperado);
@@ -127,31 +128,53 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // ── RETIROS ───────────────────────────────────────────────
+    // ── MOVIMIENTOS (retiros e ingresos) ────────────────────────
     const retirosPorId = {};
+    let movTipoActual = 'retiro';
+
+    document.querySelectorAll('.caja-tipo-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            movTipoActual = btn.dataset.tipo;
+            document.querySelectorAll('.caja-tipo-btn').forEach(b => {
+                b.classList.toggle('caja-tipo-btn-activo', b.dataset.tipo === movTipoActual);
+            });
+            const btnRegistrar = document.getElementById('btnRegistrarRetiro');
+            btnRegistrar.textContent = movTipoActual === 'ingreso' ? '+ Registrar ingreso' : '+ Registrar retiro';
+        });
+    });
 
     function limpiarRetiros() {
         Object.keys(retirosPorId).forEach(k => delete retirosPorId[k]);
         renderizarRetiros();
+        movTipoActual = 'retiro';
+        document.querySelectorAll('.caja-tipo-btn').forEach(b => {
+            b.classList.toggle('caja-tipo-btn-activo', b.dataset.tipo === 'retiro');
+        });
+        const btnRegistrar = document.getElementById('btnRegistrarRetiro');
+        if (btnRegistrar) btnRegistrar.textContent = '+ Registrar retiro';
     }
 
     function renderizarRetiros() {
         const lista = document.getElementById('listaRetiros');
         const items = Object.values(retirosPorId);
         if (!items.length) {
-            lista.innerHTML = '<p class="caja-sin-retiros">Sin retiros registrados en este turno.</p>';
+            lista.innerHTML = '<p class="caja-sin-retiros">Sin movimientos registrados en este turno.</p>';
             return;
         }
-        lista.innerHTML = items.map(r => `
-            <div class="caja-retiro-item" data-id="${r.id}">
+        lista.innerHTML = items.map(r => {
+            const esIngreso = r.tipo === 'ingreso';
+            return `
+            <div class="caja-retiro-item ${esIngreso ? 'caja-mov-ingreso' : 'caja-mov-retiro'}" data-id="${r.id}">
+                <span class="caja-mov-tipo-pill">${esIngreso ? 'Ingreso' : 'Retiro'}</span>
                 <div class="caja-retiro-info">
                     <span class="caja-retiro-motivo">${r.motivo}</span>
                     <span class="caja-retiro-fecha">${r.fecha}</span>
                 </div>
-                <strong class="caja-retiro-monto">${fmt(r.monto)}</strong>
-                <button class="caja-retiro-anular" data-id="${r.id}" title="Anular">✕</button>
+                <strong class="caja-retiro-monto">${esIngreso ? '+' : '−'}${fmt(r.monto)}</strong>
+                <button class="caja-retiro-anular" data-id="${r.id}" title="Anular" aria-label="Anular retiro"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     document.getElementById('btnRegistrarRetiro').addEventListener('click', async () => {
@@ -163,20 +186,22 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!motivo) { errEl.textContent = 'El motivo es obligatorio.'; errEl.style.display = ''; return; }
         if (monto <= 0) { errEl.textContent = 'El monto debe ser mayor a cero.'; errEl.style.display = ''; return; }
 
-        const data = await ajax(URLS.retiro, { motivo, monto });
+        const data = await ajax(URLS.retiro, { tipo: movTipoActual, motivo, monto });
         if (data.success) {
-            retirosPorId[data.retiro_id] = { id: data.retiro_id, motivo: data.motivo, monto: data.monto, fecha: data.fecha };
+            retirosPorId[data.retiro_id] = { id: data.retiro_id, tipo: data.tipo, motivo: data.motivo, monto: data.monto, fecha: data.fecha };
             renderizarRetiros();
             document.getElementById('retiroMotivo').value = '';
             document.getElementById('retiroMonto').value  = '';
 
             turnoActual.total_retiros     = data.total_retiros;
+            turnoActual.total_ingresos    = data.total_ingresos;
             turnoActual.efectivo_esperado = data.efectivo_esperado;
-            document.getElementById('turnoTotRetiros').textContent = fmt(data.total_retiros);
-            document.getElementById('turnoEfEsperado').textContent = fmt(data.efectivo_esperado);
+            document.getElementById('turnoTotRetiros').textContent  = fmt(data.total_retiros);
+            document.getElementById('turnoTotIngresos').textContent = fmt(data.total_ingresos);
+            document.getElementById('turnoEfEsperado').textContent  = fmt(data.efectivo_esperado);
             actualizarDiferenciaPreview();
         } else {
-            errEl.textContent = data.error || 'Error al registrar retiro.';
+            errEl.textContent = data.error || 'Error al registrar el movimiento.';
             errEl.style.display = '';
         }
     });
@@ -185,16 +210,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const btn = e.target.closest('.caja-retiro-anular');
         if (!btn) return;
         const id = parseInt(btn.dataset.id);
-        if (!confirm('¿Anular este retiro?')) return;
+        if (!confirm('¿Anular este movimiento?')) return;
 
         const data = await ajax(URLS.retiro, { id }, 'DELETE');
         if (data.success) {
             delete retirosPorId[id];
             renderizarRetiros();
             turnoActual.total_retiros     = data.total_retiros;
+            turnoActual.total_ingresos    = data.total_ingresos;
             turnoActual.efectivo_esperado = data.efectivo_esperado;
-            document.getElementById('turnoTotRetiros').textContent = fmt(data.total_retiros);
-            document.getElementById('turnoEfEsperado').textContent = fmt(data.efectivo_esperado);
+            document.getElementById('turnoTotRetiros').textContent  = fmt(data.total_retiros);
+            document.getElementById('turnoTotIngresos').textContent = fmt(data.total_ingresos);
+            document.getElementById('turnoEfEsperado').textContent  = fmt(data.efectivo_esperado);
             actualizarDiferenciaPreview();
         }
     });
@@ -225,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
             monto.textContent = fmt(Math.abs(diff));
             resEl.classList.add('caja-dif-faltante');
         } else {
-            label.textContent = 'Sin diferencia ✓';
+            label.textContent = 'Sin diferencia';
             monto.textContent = '$ 0,00';
             resEl.classList.add('caja-dif-ok');
         }
@@ -331,6 +358,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="caja-ci-item"><span>Crédito</span><strong>${fmt(data.total_credito)}</strong></div>
                 <div class="caja-ci-item"><span>QR</span><strong>${fmt(data.total_qr)}</strong></div>
                 <div class="caja-ci-item"><span>Retiros</span><strong>${fmt(data.total_retiros)}</strong></div>
+                <div class="caja-ci-item"><span>Ingresos</span><strong>${fmt(data.total_ingresos)}</strong></div>
                 <div class="caja-ci-item caja-ci-general"><span>Total general</span><strong>${fmt(data.total_general)}</strong></div>
                 <div class="caja-ci-item caja-ci-adicionales"><span>Nuestros adicionales</span><strong>${fmt(data.total_adicionales)}</strong></div>
                 <div class="caja-ci-item caja-ci-esperado"><span>Efectivo esperado en caja</span><strong>${fmt(data.efectivo_esperado)}</strong></div>
@@ -375,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('cierreExitoPanel').style.display   = '';
             document.getElementById('cierreExitoPanel').innerHTML = `
                 <div class="caja-cierre-exito">
-                    <div class="caja-cierre-exito-ico">✅</div>
+                    <div class="caja-cierre-exito-ico"><i class="bi bi-check-circle" aria-hidden="true"></i></div>
                     <h3>Cierre #${data.cierre_id} ejecutado</h3>
                     <div class="caja-modal-fila"><span>Turnos cerrados</span><strong>${data.cant_turnos}</strong></div>
                     <div class="caja-modal-fila"><span>Total recaudado</span><strong>${fmt(data.total_general)}</strong></div>

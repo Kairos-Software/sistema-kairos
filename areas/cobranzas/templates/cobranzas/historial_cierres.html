@@ -93,6 +93,7 @@
                 <th>Crédito</th>
                 <th>QR</th>
                 <th>Retiros</th>
+                <th>Ingresos</th>
                 <th>Total general</th>
                 <th>Adicionales</th>
                 <th>Ef. Físico</th>
@@ -120,6 +121,7 @@
                 <td>${{ c.total_credito|floatformat:2 }}</td>
                 <td>${{ c.total_qr|floatformat:2 }}</td>
                 <td>${{ c.total_retiros|floatformat:2 }}</td>
+                <td>${{ c.total_ingresos|floatformat:2 }}</td>
                 <td><strong>${{ c.total_general|floatformat:2 }}</strong></td>
                 <td class="texto-adicionales"><strong>${{ c.total_adicionales|floatformat:2 }}</strong></td>
                 <td>${{ c.efectivo_fisico|floatformat:2 }}</td>

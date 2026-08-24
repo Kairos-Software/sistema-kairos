@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function () {
             reader.onload = e => {
                 if (!imgPreviewCont) return;
                 const item = document.createElement('div'); item.className = 'img-preview-item'; item.dataset.index = idx;
-                item.innerHTML = `<img src="${e.target.result}"><button type="button" class="img-preview-remove" data-index="${idx}">✕</button><span class="img-preview-name">${f.name}</span>`;
+                item.innerHTML = `<img src="${e.target.result}"><button type="button" class="img-preview-remove" data-index="${idx}" aria-label="Quitar imagen"><i class="bi bi-x-lg" aria-hidden="true"></i></button><span class="img-preview-name">${f.name}</span>`;
                 item.querySelector('.img-preview-remove').addEventListener('click', ev => { imagenesSeleccionadas[parseInt(ev.currentTarget.dataset.index)] = null; item.remove(); actualizarPlaceholder(); });
                 imgPreviewCont.appendChild(item);
                 actualizarPlaceholder();
@@ -387,7 +387,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     modal?.hide(); location.reload();
                 } else {
                     const err = Object.entries(data.errors||{}).map(([k,v])=>`${k}: ${v.join(', ')}`).join(' | ');
-                    if (formError) { formError.textContent = '⚠ ' + (err||'Error al guardar.'); formError.style.display = 'block'; }
+                    if (formError) { formError.textContent = err || 'Error al guardar.'; formError.style.display = 'block'; }
                 }
             } catch (e) { if (formError) { formError.textContent = 'Error de conexión.'; formError.style.display = 'block'; } }
             finally { btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar cliente'; }

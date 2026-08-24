@@ -665,7 +665,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const pk = document.getElementById('servicioPk')?.value;
             if (!pk && !idCodigo.value) {
                 if (formError) {
-                    formError.textContent  = '⚠ Seleccioná un prefijo para generar el código.';
+                    formError.textContent  = 'Seleccioná un prefijo para generar el código.';
                     formError.style.display = 'block';
                 }
                 return;
@@ -695,7 +695,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             formError.style.backgroundColor = '#d4edda';
                             formError.style.color = '#155724';
                             formError.style.borderColor = '#c3e6cb';
-                            formError.textContent = `✓ Servicio ${data.servicio.codigo} guardado. Podés seguir cargando.`;
+                            formError.textContent = `Servicio ${data.servicio.codigo} guardado. Podés seguir cargando.`;
                             setTimeout(() => {
                                 if (formError) formError.style.display = 'none';
                                 formError.style.backgroundColor = '';
@@ -711,7 +711,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         .map(([k, v]) => `${k}: ${v.join(', ')}`)
                         .join(' | ');
                     if (formError) {
-                        formError.textContent  = '⚠ ' + (err || 'Error al guardar.');
+                        formError.textContent  = err || 'Error al guardar.';
                         formError.style.display = 'block';
                     }
                 }
@@ -848,7 +848,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (importarResumen) {
                         importarResumen.className = 'alerta-inline alerta-exito';
                         importarResumen.textContent =
-                            `✓ ${data.total} servicio(s) procesados: ${data.creados} nuevo(s), ${data.actualizados} actualizado(s).`;
+                            `${data.total} servicio(s) procesados: ${data.creados} nuevo(s), ${data.actualizados} actualizado(s).`;
                     }
                     setTimeout(() => location.reload(), 1500);
                 } else {

@@ -128,6 +128,7 @@
 .caja-total-gral:hover { background: #eeeef5; }
 
 .caja-total-retiros strong { color: #ef4444; }
+.caja-total-ingresos strong { color: #16a34a; }
 .caja-total-adicionales strong { color: #16a34a; }
 
 .caja-total-efectivo-esperado {
@@ -364,13 +365,41 @@
 .caja-dif-faltante { color: #dc2626; }
 .caja-dif-ok       { color: #6366f1; }
 
-/* ── Retiros lista ────────────────────────────────────────── */
+/* ── Selector de tipo (retiro/ingreso) ───────────────────────── */
+.caja-tipo-toggle {
+    display: inline-flex;
+    border: 1.5px solid #eeeef5;
+    border-radius: 9px;
+    padding: 3px;
+    gap: 3px;
+    background: #fafafa;
+}
+.caja-tipo-btn {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .4rem .9rem;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: #888;
+    font-size: .84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .12s;
+}
+.caja-tipo-btn:hover { color: #555; }
+.caja-tipo-btn-activo[data-tipo="retiro"] { background: #fee2e2; color: #dc2626; }
+.caja-tipo-btn-activo[data-tipo="ingreso"] { background: #dcfce7; color: #16a34a; }
+
+/* ── Retiros/Ingresos lista ───────────────────────────────── */
 .caja-retiro-item {
     display: flex;
     align-items: center;
     gap: .6rem;
     padding: .55rem .8rem;
     border: 1px solid #eeeef5;
+    border-left: 3px solid #eeeef5;
     border-radius: 8px;
     margin-bottom: .4rem;
     font-size: .85rem;
@@ -379,6 +408,23 @@
 }
 
 .caja-retiro-item:hover { background: #f5f5f8; }
+
+.caja-mov-retiro  { border-left-color: #ef4444; }
+.caja-mov-ingreso { border-left-color: #16a34a; }
+
+.caja-mov-tipo-pill {
+    flex-shrink: 0;
+    font-size: .68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .18rem .5rem;
+    border-radius: 20px;
+}
+.caja-mov-retiro .caja-mov-tipo-pill  { background: #fee2e2; color: #dc2626; }
+.caja-mov-ingreso .caja-mov-tipo-pill { background: #dcfce7; color: #16a34a; }
+
+.caja-mov-ingreso .caja-retiro-monto { color: #16a34a; }
 
 .caja-retiro-info {
     flex: 1;

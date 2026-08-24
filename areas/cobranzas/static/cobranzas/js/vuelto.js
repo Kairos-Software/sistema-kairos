@@ -139,7 +139,7 @@
             monto.textContent = '$ 0,00 — Justo';
             label.textContent = 'Sin vuelto';
             res.className = 'vp-resultado vp-resultado-justo';
-            mini.textContent = 'Justo ✓';
+            mini.textContent = 'Importe justo';
             mini.className = 'vp-mini-total vp-mini-ok';
         }
     }

@@ -150,30 +150,30 @@
                 <td class="dep-tickets-cell">
                     {% if d.entidad == ENTIDAD_PF %}
                     <button type="button" class="btn-ver-ticket {% if 'ticket_1' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="🧾 Ticket 1 cargado">
-                        {% if 'ticket_1' in d.tickets_cargados %}🧾 Ticket 1 cargado{% else %}🧾 Ticket 1{% endif %}
+                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="Ticket 1 cargado">
+                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_1' in d.tickets_cargados %}Ticket 1 cargado{% else %}Ticket 1{% endif %}
                     </button>
                     <button type="button" class="btn-ver-ticket {% if 'ticket_2' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="🧾 Ticket 2 cargado">
-                        {% if 'ticket_2' in d.tickets_cargados %}🧾 Ticket 2 cargado{% else %}🧾 Ticket 2{% endif %}
+                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="Ticket 2 cargado">
+                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_2' in d.tickets_cargados %}Ticket 2 cargado{% else %}Ticket 2{% endif %}
                     </button>
                     {% else %}
                     {% if d.monto_efectivo_fisico %}
                     <button type="button" class="btn-ver-ticket {% if 'efectivo_fisico' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                            data-deposito-id="{{ d.pk }}" data-tipo="efectivo_fisico" data-label-cargado="🧾 Efectivo cargado">
-                        {% if 'efectivo_fisico' in d.tickets_cargados %}🧾 Efectivo cargado{% else %}🧾 Ticket efectivo{% endif %}
+                            data-deposito-id="{{ d.pk }}" data-tipo="efectivo_fisico" data-label-cargado="Efectivo cargado">
+                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'efectivo_fisico' in d.tickets_cargados %}Efectivo cargado{% else %}Ticket efectivo{% endif %}
                     </button>
                     {% endif %}
                     {% if d.monto_ya_en_banco %}
                     <button type="button" class="btn-ver-ticket {% if 'ya_en_banco' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                            data-deposito-id="{{ d.pk }}" data-tipo="ya_en_banco" data-label-cargado="🧾 Transferencia cargada">
-                        {% if 'ya_en_banco' in d.tickets_cargados %}🧾 Transferencia cargada{% else %}🧾 Ticket transferencia{% endif %}
+                            data-deposito-id="{{ d.pk }}" data-tipo="ya_en_banco" data-label-cargado="Transferencia cargada">
+                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ya_en_banco' in d.tickets_cargados %}Transferencia cargada{% else %}Ticket transferencia{% endif %}
                     </button>
                     {% endif %}
                     {% if d.monto_saldo_plataforma %}
                     <button type="button" class="btn-ver-ticket {% if 'saldo_plataforma' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                            data-deposito-id="{{ d.pk }}" data-tipo="saldo_plataforma" data-label-cargado="🧾 Saldo a favor cargado">
-                        {% if 'saldo_plataforma' in d.tickets_cargados %}🧾 Saldo a favor cargado{% else %}🧾 Ticket saldo a favor{% endif %}
+                            data-deposito-id="{{ d.pk }}" data-tipo="saldo_plataforma" data-label-cargado="Saldo a favor cargado">
+                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'saldo_plataforma' in d.tickets_cargados %}Saldo a favor cargado{% else %}Ticket saldo a favor{% endif %}
                     </button>
                     {% endif %}
                     {% endif %}
@@ -351,11 +351,11 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content caja-modal">
             <div class="modal-body p-4 text-center">
-                <div class="caja-modal-icono">🗑️</div>
+                <div class="caja-modal-icono ui-icon-box"><i class="bi bi-trash" aria-hidden="true"></i></div>
                 <h5 class="caja-modal-titulo">Eliminar depósito(s)</h5>
                 <p id="elimTexto" style="margin:.8rem 0 0;color:#777;font-size:.9rem;"></p>
                 <p style="font-size:.8rem;color:#dc2626;margin-top:.5rem;font-weight:600;">
-                    ⚠ Esta acción es irreversible.
+                    Esta acción es irreversible.
                 </p>
                 <div id="elimError" class="caja-error-msg mt-2" style="display:none;"></div>
                 <div class="d-flex gap-2 mt-4 justify-content-center">
