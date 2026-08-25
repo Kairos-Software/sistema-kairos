@@ -13,16 +13,11 @@
     margin-inline: auto;
 }
 
-/* Antes de agregar la primera boleta no mostramos un carrito vacío que
-   desperdicie media pantalla: el buscador queda centrado y más cómodo. */
-.cobro-layout.cobro-layout--vacio {
-    grid-template-columns: minmax(0, 760px);
-    justify-content: center;
-}
-.cobro-layout--vacio .cobro-panel-carrito { display: none; }
-
+/* En escritorio conservamos siempre las dos columnas: búsqueda a la
+   izquierda y estado del cobro a la derecha. En anchos menores se apilan. */
 @media (max-width: 1180px) {
     .cobro-layout { grid-template-columns: 1fr; }
+    .cobro-layout--vacio .cobro-panel-carrito { display: none; }
 }
 
 /* ── Paneles base ── */
@@ -1252,9 +1247,14 @@
     margin-top: .75rem;
 }
 
-/* El importe ya está visible y editable en el buscador superior. Evitamos
-   repetir el mismo dato en un segundo campo de solo lectura. */
-#smartResultado .cobro-field-full { display: none; }
+/* En PC mantenemos el resumen de importe de la composición original para
+   poder verificarlo antes de agregar la boleta. En pantallas angostas se
+   omite porque el mismo valor ya está visible en el buscador superior. */
+#smartResultado .cobro-field-full { display: block; }
+
+@media (max-width: 1180px) {
+    #smartResultado .cobro-field-full { display: none; }
+}
 
 /* Ajustes finales del flujo operativo en celulares. Se ubican después de
    los estilos del buscador inteligente para asegurar la cascada correcta. */

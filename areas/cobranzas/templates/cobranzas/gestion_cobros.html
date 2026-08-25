@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}?v=20260825-1">
+<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}?v=20260825-3">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -414,7 +414,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260825-1"></script>
+<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260825-3"></script>
 <script>
     window.cobroBuscarUrl    = "{% url 'cobranzas:cobro_buscar_servicio' %}";
     window.cobroConfirmarUrl = "{% url 'cobranzas:cobro_confirmar' %}";

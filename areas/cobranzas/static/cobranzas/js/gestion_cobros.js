@@ -243,6 +243,7 @@ elSmartImporte.addEventListener('input', () => {
 
 // Botón buscar
 document.getElementById('btnSmartBuscar').addEventListener('click', async () => {
+    ocultarDropdownPrefijos();
     smartOcultarError();
     smartLimpiarResultado();
 
