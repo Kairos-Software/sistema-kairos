@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}">
+<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}?v=20260824-3">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -29,7 +29,7 @@
 </div>
 
 
-<div class="cobro-layout">
+<div class="cobro-layout cobro-layout--vacio" id="cobroLayout">
 
     {# ══ COLUMNA IZQUIERDA: buscador ══ #}
     <div class="cobro-panel cobro-panel-buscar">
@@ -187,7 +187,7 @@
                 <input type="text" id="inputBuscarServicio"
                        placeholder="Código, descripción, proveedor..."
                        class="cobro-search-input" autocomplete="off">
-                <button type="button" class="cobro-search-clear" id="btnLimpiarBusqueda" style="display:none;">×</button>
+                <button type="button" class="cobro-search-clear" id="btnLimpiarBusqueda" style="display:none;" aria-label="Limpiar búsqueda"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
             </div>
 
             <div id="buscarPlaceholder" class="cobro-estado-vacio">
@@ -300,6 +300,13 @@
                 </svg>
                 Boletas cargadas
                 <span class="cobro-badge-count" id="badgeCount">0</span>
+                <button type="button" class="cobro-btn-sin-adicional" id="btnToggleAdicional"
+                        title="Activalo si esta operación es para alguien a quien no le querés cobrar el adicional (familiar, conocido, etc.)">
+                    <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
+                        <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    Sin adicional
+                </button>
             </div>
 
             <div id="listaItems" class="cobro-items-lista"></div>
@@ -407,7 +414,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/gestion_cobros.js' %}"></script>
+<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260824-3"></script>
 <script>
     window.cobroBuscarUrl    = "{% url 'cobranzas:cobro_buscar_servicio' %}";
     window.cobroConfirmarUrl = "{% url 'cobranzas:cobro_confirmar' %}";

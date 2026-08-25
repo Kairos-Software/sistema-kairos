@@ -92,8 +92,78 @@ textarea {
     }
 
     .area-sidebar-toggle {
-        width: auto;
-        margin: .85rem .9rem 0;
+        display: flex !important;
+        position: relative;
+        z-index: 20;
+        width: calc(100% - 1.5rem) !important;
+        min-height: 48px;
+        margin: .75rem .75rem 0 !important;
+        padding: .75rem 1rem !important;
+        color: #fff !important;
+        background: #151515 !important;
+        border: 1px solid #303030 !important;
+        border-radius: 9px !important;
+        box-shadow: 0 2px 8px rgba(17, 17, 17, .12);
+    }
+
+    /*
+     * Drawer único para Software y Cobranzas. Los !important aíslan este
+     * comportamiento de reglas históricas específicas de cada pantalla.
+     */
+    .app-main--area [data-sidebar] {
+        position: fixed !important;
+        inset: var(--navbar-height) auto 0 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        width: min(300px, 86vw) !important;
+        max-width: 86vw !important;
+        height: calc(100dvh - var(--navbar-height)) !important;
+        margin: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translate3d(-105%, 0, 0) !important;
+        transition: transform .24s ease, visibility 0s linear .24s !important;
+        z-index: 1050 !important;
+    }
+
+    .app-main--area [data-sidebar].sidebar-open {
+        visibility: visible;
+        pointer-events: auto;
+        transform: translate3d(0, 0, 0) !important;
+        transition-delay: 0s !important;
+        box-shadow: 14px 0 40px rgba(0, 0, 0, .38) !important;
+    }
+
+    .app-main--area [data-sidebar] .sidebar-nav {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .app-main--area [data-sidebar] .sidebar-nav ul {
+        display: block !important;
+        width: 100% !important;
+        columns: auto !important;
+    }
+
+    .app-main--area [data-sidebar] .sidebar-nav li {
+        display: block !important;
+        width: auto !important;
+    }
+
+    .app-main--area [data-sidebar] .sidebar-nav a,
+    .app-main--area [data-sidebar] .sidebar-nav button {
+        display: flex !important;
+        width: 100% !important;
+        min-height: 44px;
+    }
+
+    .area-sidebar-backdrop {
+        display: block !important;
+        inset: var(--navbar-height) 0 0 !important;
+        z-index: 1040 !important;
     }
 
     .page-header,

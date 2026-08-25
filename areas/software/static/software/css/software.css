@@ -385,6 +385,13 @@ textarea.form-control { resize: vertical; min-height: 90px; }
     white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow-y: auto; margin: 0;
 }
 
+/* Notas: texto libre/prosa, no código — tipografía normal y más aire. */
+.nota-contenido-view {
+    background: #fafafa; color: #333; border: 1px solid #e8e8ee;
+    font-family: 'Nunito', sans-serif; font-size: .88rem; line-height: 1.6;
+    max-height: 55vh;
+}
+
 /* ── Panel de backup ── */
 .backup-panel {
     display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;

@@ -31,6 +31,9 @@ const estado = {
     // Secuencias
     pagoIdSeq:                0,
     itemIdSeq:                0,
+    // Si está activo, las boletas se cargan sin cobrar el adicional
+    // (ej: familiar, conocido) — ver btnToggleAdicional.
+    sinAdicional:             false,
 };
 
 const CANALES = {
@@ -319,13 +322,14 @@ document.getElementById('btnSmartAgregar').addEventListener('click', () => {
 
     estado.itemIdSeq++;
     estado.items.push({
-        _id:             estado.itemIdSeq,
-        servicio_id:     s.id,
-        codigo:          s.codigo,
-        descripcion:     s.descripcion,
-        proveedor:       s.proveedor || '',
-        monto_factura:   importe,
-        monto_adicional: adicional,
+        _id:                      estado.itemIdSeq,
+        servicio_id:              s.id,
+        codigo:                   s.codigo,
+        descripcion:              s.descripcion,
+        proveedor:                s.proveedor || '',
+        monto_factura:            importe,
+        monto_adicional:          estado.sinAdicional ? 0 : adicional,
+        monto_adicional_original: adicional,
         canal,
         _modo:           'inteligente',   // solo para trazabilidad interna, no se envía
     });
@@ -506,13 +510,14 @@ document.getElementById('btnAgregarItem').addEventListener('click', () => {
 
     estado.itemIdSeq++;
     estado.items.push({
-        _id:             estado.itemIdSeq,
-        servicio_id:     s.id,
-        codigo:          s.codigo,
-        descripcion:     s.descripcion,
-        proveedor:       s.proveedor || '',
-        monto_factura:   importe,
-        monto_adicional: s.adicional,
+        _id:                      estado.itemIdSeq,
+        servicio_id:              s.id,
+        codigo:                   s.codigo,
+        descripcion:              s.descripcion,
+        proveedor:                s.proveedor || '',
+        monto_factura:            importe,
+        monto_adicional:          estado.sinAdicional ? 0 : s.adicional,
+        monto_adicional_original: s.adicional,
         canal,
         _modo:           'texto',
     });
@@ -533,9 +538,11 @@ document.getElementById('btnAgregarItem').addEventListener('click', () => {
 const carritoVacio     = document.getElementById('carritoVacio');
 const carritoContenido = document.getElementById('carritoContenido');
 const listaItems       = document.getElementById('listaItems');
+const cobroLayout      = document.getElementById('cobroLayout');
 
 function renderCarrito() {
     const hay = estado.items.length > 0;
+    cobroLayout.classList.toggle('cobro-layout--vacio', !hay);
     carritoVacio.style.display     = hay ? 'none' : '';
     carritoContenido.style.display = hay ? ''     : 'none';
     if (!hay) return;
@@ -547,7 +554,7 @@ function renderCarrito() {
             <div class="cobro-item-header">
                 <span class="codigo-badge">${esc(item.codigo)}</span>
                 <span class="cobro-item-canal cobro-canal-${item.canal}">${CANALES[item.canal]}</span>
-                <button class="cobro-item-remove" data-iid="${item._id}" title="Quitar boleta">×</button>
+                <button class="cobro-item-remove" data-iid="${item._id}" title="Quitar boleta" aria-label="Quitar boleta"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
             </div>
             <div class="cobro-item-desc">${esc(item.descripcion)}</div>
             <div class="cobro-item-montos">
@@ -616,6 +623,20 @@ function renderCarrito() {
     sincronizarPago();
 }
 
+// ── Toggle "Sin adicional en esta operación" ──────────────────
+// Zera (o restaura) el adicional de todas las boletas ya cargadas y
+// determina si las próximas boletas que se agreguen entran sin adicional.
+const btnToggleAdicional = document.getElementById('btnToggleAdicional');
+btnToggleAdicional.addEventListener('click', () => {
+    estado.sinAdicional = !estado.sinAdicional;
+    btnToggleAdicional.classList.toggle('cobro-btn-sin-adicional-activo', estado.sinAdicional);
+
+    estado.items.forEach(item => {
+        item.monto_adicional = estado.sinAdicional ? 0 : item.monto_adicional_original;
+    });
+    renderCarrito();
+});
+
 function actualizarTotales() {
     const totFacturas  = estado.items.reduce((s, i) => s + i.monto_factura, 0);
     const totAdicional = estado.items.reduce((s, i) => s + i.monto_adicional, 0);
@@ -667,7 +688,7 @@ function renderPagos() {
                        placeholder="0,00" min="0" step="0.01">
             </div>
             ${estado.pagos.length > 1
-                ? `<button class="cobro-pago-remove" data-pago-id="${p.id}">×</button>`
+                ? `<button class="cobro-pago-remove" data-pago-id="${p.id}" aria-label="Quitar método de pago"><i class="bi bi-x-lg" aria-hidden="true"></i></button>`
                 : '<span></span>'}
         </div>
     `).join('');
@@ -831,6 +852,8 @@ function resetear() {
     estado.textoServicioSeleccionado = null;
     estado.pagoIdSeq                 = 0;
     estado.itemIdSeq                 = 0;
+    estado.sinAdicional              = false;
+    btnToggleAdicional.classList.remove('cobro-btn-sin-adicional-activo');
 
     // Limpiar tab inteligente
     elSmartPrefijo.value  = '';
@@ -864,4 +887,4 @@ function resetear() {
 // INIT
 // ════════════════════════════════════════════════════════════
 agregarFilaPago('efectivo', 0);
-elSmartPrefijo.focus();
+if (!window.matchMedia('(pointer: coarse)').matches) elSmartPrefijo.focus();

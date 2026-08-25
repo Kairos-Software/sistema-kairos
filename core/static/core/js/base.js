@@ -52,14 +52,17 @@ document.addEventListener('DOMContentLoaded', function () {
             sidebar.classList.add('sidebar-open');
             backdrop.classList.add('show');
             toggle.setAttribute('aria-expanded', 'true');
+            sidebar.setAttribute('aria-hidden', 'false');
             document.body.classList.add('sidebar-lock-scroll');
         }
         function cerrarSidebar() {
             sidebar.classList.remove('sidebar-open');
             backdrop.classList.remove('show');
             toggle.setAttribute('aria-expanded', 'false');
+            sidebar.setAttribute('aria-hidden', window.innerWidth <= 991 ? 'true' : 'false');
             document.body.classList.remove('sidebar-lock-scroll');
         }
+        cerrarSidebar();
         toggle.addEventListener('click', () => {
             sidebar.classList.contains('sidebar-open') ? cerrarSidebar() : abrirSidebar();
         });
@@ -69,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (event.key === 'Escape' && sidebar.classList.contains('sidebar-open')) cerrarSidebar();
         });
         window.addEventListener('resize', () => {
-            if (window.innerWidth > 900) cerrarSidebar();
+            cerrarSidebar();
         });
     }
 

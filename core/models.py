@@ -55,6 +55,12 @@ PERMISOS_CHOICES = [
     ('crear_scripts',    'Crear scripts'),
     ('editar_scripts',   'Editar scripts'),
     ('eliminar_scripts', 'Eliminar scripts'),
+
+    # ── Módulo: Software (notas) ──────────────────────────────────────
+    ('ver_notas',      'Ver notas'),
+    ('crear_notas',    'Crear notas'),
+    ('editar_notas',   'Editar notas'),
+    ('eliminar_notas', 'Eliminar notas'),
 ]
 
 CODIGOS_PERMISOS = {codigo for codigo, _ in PERMISOS_CHOICES}

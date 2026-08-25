@@ -4,6 +4,7 @@ from . import views_vps
 from . import views_servicios
 from . import views_instalaciones
 from . import views_scripts
+from . import views_notas
 from . import views_backup
 
 app_name = 'software'
@@ -37,4 +38,9 @@ urlpatterns = [
     path('scripts/acciones/', views_scripts.ScriptCrearEditarAjax.as_view(), name='script_acciones'),
     path('scripts/eliminar/', views_scripts.ScriptEliminarAjax.as_view(), name='script_eliminar'),
     path('scripts/<int:pk>/descargar/', views_scripts.ScriptDescargarAjax.as_view(), name='script_descargar'),
+
+    # ── Notas ────────────────────────────────────────────────────
+    path('notas/', views_notas.GestionNotasView.as_view(), name='gestion_notas'),
+    path('notas/acciones/', views_notas.NotaCrearEditarAjax.as_view(), name='nota_acciones'),
+    path('notas/eliminar/', views_notas.NotaEliminarAjax.as_view(), name='nota_eliminar'),
 ]

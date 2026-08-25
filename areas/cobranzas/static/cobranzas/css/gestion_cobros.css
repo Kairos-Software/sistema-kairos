@@ -5,11 +5,23 @@
 /* ── Layout dos columnas ── */
 .cobro-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 1.25rem;
     align-items: start;
+    width: 100%;
+    max-width: 1180px;
+    margin-inline: auto;
 }
-@media (max-width: 860px) {
+
+/* Antes de agregar la primera boleta no mostramos un carrito vacío que
+   desperdicie media pantalla: el buscador queda centrado y más cómodo. */
+.cobro-layout.cobro-layout--vacio {
+    grid-template-columns: minmax(0, 760px);
+    justify-content: center;
+}
+.cobro-layout--vacio .cobro-panel-carrito { display: none; }
+
+@media (max-width: 1180px) {
     .cobro-layout { grid-template-columns: 1fr; }
 }
 
@@ -49,6 +61,32 @@
     border-radius: 20px;
     letter-spacing: 0;
 }
+
+/* ── Toggle "Sin adicional" ── */
+.cobro-btn-sin-adicional {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .28rem .6rem;
+    border: 1.5px solid #ddd;
+    border-radius: 20px;
+    background: #fff;
+    color: #888;
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+    transition: all .15s;
+}
+.cobro-btn-sin-adicional:hover { border-color: #bbb; color: #555; }
+.cobro-btn-sin-adicional svg { flex-shrink: 0; opacity: .55; }
+.cobro-btn-sin-adicional-activo {
+    background: #fee2e2;
+    border-color: #dc2626;
+    color: #dc2626;
+}
+.cobro-btn-sin-adicional-activo svg { opacity: 1; }
 
 /* ── Buscador ── */
 .cobro-search-wrap {
@@ -871,6 +909,7 @@
     .hist-resumen-grid { grid-template-columns: 1fr; }
     .cobro-input-grande { font-size: .92rem; }
 }
+
 /* ═══════════════════════════════════════════════════════════
    ADICIONES A gestion_cobros.css
    Pegar al final del archivo existente.
@@ -1194,4 +1233,48 @@
     border-top-color: #22c55e;
     background: #fafffe;
     margin-top: .75rem;
+}
+
+/* El importe ya está visible y editable en el buscador superior. Evitamos
+   repetir el mismo dato en un segundo campo de solo lectura. */
+#smartResultado .cobro-field-full { display: none; }
+
+/* Ajustes finales del flujo operativo en celulares. Se ubican después de
+   los estilos del buscador inteligente para asegurar la cascada correcta. */
+@media (max-width: 520px) {
+    .cobro-panel-header {
+        flex-wrap: wrap;
+        padding-inline: .8rem;
+    }
+    .cobro-tab-panel { padding-inline: .7rem; }
+    .cobro-smart-fields { align-items: stretch; }
+    .cobro-pago-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
+    .cobro-pago-row .cobro-pago-metodo {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+    }
+    .cobro-pago-monto-wrap { min-height: 44px; }
+    .cobro-item-montos { align-items: flex-end; }
+    .cobro-item-subtotal {
+        width: 100%;
+        margin: .25rem 0 0;
+        padding-top: .35rem;
+        border-top: 1px solid #eee;
+        text-align: left;
+    }
+}
+
+@media (max-width: 380px) {
+    .cobro-smart-fields { flex-direction: column; }
+    .cobro-input-prefijo,
+    .cobro-prefijo-dropdown {
+        width: 100%;
+        min-width: 100%;
+    }
+    .cobro-input-prefijo { text-align: left; }
 }

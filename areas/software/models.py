@@ -238,3 +238,30 @@ class Script(models.Model):
     def save(self, *args, **kwargs):
         self.categoria = self.categoria.strip() or self.CATEGORIA_OTRO
         super().save(*args, **kwargs)
+
+
+# ─────────────────────────────────────────────────────────────
+# NOTA
+# Almacén de documentos de texto libre (tareas pendientes,
+# correcciones a hacer, apuntes por cliente/servicio, etc).
+# Solo texto: sin relación obligatoria a VPS/servicio/instalación.
+# ─────────────────────────────────────────────────────────────
+
+class Nota(models.Model):
+    titulo    = models.CharField(max_length=150, help_text='Ej: Tareas Kai-Cart')
+    contenido = models.TextField(blank=True)
+
+    creado_por          = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+                                             related_name='notas_creadas')
+    fecha_creacion       = models.DateTimeField('Fecha de emisión', auto_now_add=True)
+    modificado_por       = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+                                              related_name='notas_modificadas')
+    fecha_modificacion   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering            = ['-fecha_modificacion']
+        verbose_name        = 'Nota'
+        verbose_name_plural = 'Notas'
+
+    def __str__(self):
+        return self.titulo

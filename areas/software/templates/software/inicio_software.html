@@ -29,6 +29,10 @@
         <strong>{{ cant_scripts }}</strong>
         <span>Scripts guardados</span>
     </a>
+    <a href="{% url 'software:gestion_notas' %}" class="software-home-card">
+        <strong>{{ cant_notas }}</strong>
+        <span>Notas y tareas</span>
+    </a>
 </div>
 
 {% if user.is_superuser %}

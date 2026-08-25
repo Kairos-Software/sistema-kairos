@@ -1,0 +1,196 @@
+{% extends 'software/base_software.html' %}
+
+{% block title %}Notas - Software{% endblock %}
+
+{% block software_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Notas y <span>Tareas</span></h1>
+        <p class="page-subtitle">
+            {{ notas.paginator.count|default:0 }} nota{{ notas.paginator.count|pluralize }} guardada{{ notas.paginator.count|pluralize }}
+        </p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'software:index' %}" class="btn-volver">← Volver</a>
+        {% if puede_crear %}
+        <button class="btn-nuevo" id="btnNuevaNota">
+            <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
+                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nueva nota
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% if sin_permiso %}
+<div class="alerta-inline alerta-error">No tenés permiso para ver las notas.</div>
+{% else %}
+
+<form method="get" class="filtros-bar" id="formFiltros">
+    <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="5.5" stroke="#bbb" stroke-width="1.5"/>
+            <path d="M13.5 13.5L17 17" stroke="#bbb" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por título o contenido..."
+               class="search-input" autocomplete="off">
+        {% if q %}
+        <button type="button" class="search-clear"
+                onclick="document.querySelector('[name=q]').value='';document.getElementById('formFiltros').submit()">×</button>
+        {% endif %}
+    </div>
+    {% if q %}
+    <a href="{% url 'software:gestion_notas' %}" class="btn-limpiar">× Limpiar</a>
+    {% endif %}
+
+    <select name="orden" class="filtro-select" title="Ordenar tabla" onchange="this.form.submit()">
+        <option value="modificacion_desc" {% if orden == 'modificacion_desc' %}selected{% endif %}>Modificadas recientemente</option>
+        <option value="modificacion_asc" {% if orden == 'modificacion_asc' %}selected{% endif %}>Modificadas hace más tiempo</option>
+        <option value="creacion_desc" {% if orden == 'creacion_desc' %}selected{% endif %}>Más nuevas primero</option>
+        <option value="creacion_asc" {% if orden == 'creacion_asc' %}selected{% endif %}>Más antiguas primero</option>
+        <option value="titulo_asc" {% if orden == 'titulo_asc' %}selected{% endif %}>Título A → Z</option>
+        <option value="titulo_desc" {% if orden == 'titulo_desc' %}selected{% endif %}>Título Z → A</option>
+    </select>
+</form>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Título</th>
+                <th>Emitida</th>
+                <th>Por</th>
+                <th>Última modificación</th>
+                <th>Por</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tbodyNotas">
+            {% for nota in notas %}
+            <tr data-id="{{ nota.pk }}"
+                data-titulo="{{ nota.titulo }}" data-contenido="{{ nota.contenido }}">
+                <td><strong>{{ nota.titulo }}</strong></td>
+                <td>{{ nota.fecha_creacion|date:'d/m/Y H:i' }}</td>
+                <td>{{ nota.creado_por.username|default:'—' }}</td>
+                <td>{{ nota.fecha_modificacion|date:'d/m/Y H:i' }}</td>
+                <td>{{ nota.modificado_por.username|default:nota.creado_por.username|default:'—' }}</td>
+                <td>
+                    <div class="acciones-cell">
+                        <button class="btn-accion btn-ver" data-id="{{ nota.pk }}">Ver</button>
+                        {% if puede_editar %}<button class="btn-accion btn-editar" data-id="{{ nota.pk }}">Editar</button>{% endif %}
+                        {% if puede_eliminar %}<button class="btn-accion btn-eliminar" data-id="{{ nota.pk }}" data-nombre="{{ nota.titulo }}">Eliminar</button>{% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="empty-state">{% if q %}Sin resultados para "{{ q }}"{% else %}No hay notas guardadas.{% endif %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if notas.has_other_pages %}
+<div class="paginacion">
+    {% if notas.has_previous %}<a href="?page={{ notas.previous_page_number }}&q={{ q }}&orden={{ orden }}" class="pag-btn">← Anterior</a>{% endif %}
+    <span class="pag-info">Página {{ notas.number }} de {{ notas.paginator.num_pages }}</span>
+    {% if notas.has_next %}<a href="?page={{ notas.next_page_number }}&q={{ q }}&orden={{ orden }}" class="pag-btn">Siguiente →</a>{% endif %}
+</div>
+{% endif %}
+
+{# ── Modal ver contenido (solo lectura) ── #}
+<div class="modal fade" id="verNotaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="verNotaTitulo"></h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre class="script-contenido-view nota-contenido-view" id="verNotaContenido"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnCopiarNota">Copiar contenido</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if puede_crear or puede_editar %}
+<div class="modal fade" id="notaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="formNota">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="notaModalTitulo">Nueva nota</h5>
+                        <p class="modal-subtitle">Almacén de texto libre — tareas y correcciones pendientes</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body modal-body-compact">
+                    <input type="hidden" name="pk" id="notaPk">
+
+                    <div class="mb-2">
+                        <label class="form-label">Título <span class="field-required">*</span></label>
+                        <input type="text" name="titulo" id="notaTitulo" class="form-control" placeholder="Ej: Tareas Kai-Cart" required>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label">Contenido</label>
+                        <textarea name="contenido" id="notaContenido" class="form-control" rows="14"
+                                  placeholder="Correcciones pendientes, apuntes, tareas..."></textarea>
+                    </div>
+
+                    <div id="notaErrores" class="alerta-inline alerta-error mt-3" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-nuevo">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if puede_eliminar %}
+<div class="modal fade" id="eliminarNotaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">Eliminar nota</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Confirmás eliminar <strong id="eliminarNotaNombre"></strong>?</p>
+                <p class="eliminar-warning">Esta acción no se puede deshacer.</p>
+                <div id="eliminarNotaError" class="alerta-inline alerta-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn-nuevo" style="background:#c0392b;" id="btnConfirmarEliminarNota">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% load static %}
+<script>
+    window.softwareUrls = {
+        notaAcciones: "{% url 'software:nota_acciones' %}",
+        notaEliminar: "{% url 'software:nota_eliminar' %}",
+    };
+</script>
+<script src="{% static 'software/js/gestion_notas.js' %}"></script>
+{% endblock %}

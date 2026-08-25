@@ -1,5 +1,5 @@
 from django import forms
-from .models import VPS, ServicioSoftware, Instalacion, Script
+from .models import VPS, ServicioSoftware, Instalacion, Script, Nota
 
 
 class VPSForm(forms.ModelForm):
@@ -101,3 +101,14 @@ class ScriptForm(forms.ModelForm):
         if not contenido and not archivo:
             raise forms.ValidationError('Cargá el contenido del script o subí un archivo.')
         return cleaned
+
+
+class NotaForm(forms.ModelForm):
+    class Meta:
+        model  = Nota
+        fields = ['titulo', 'contenido']
+        widgets = {
+            'titulo':    forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Tareas Kai-Cart'}),
+            'contenido': forms.Textarea(attrs={'rows': 14, 'class': 'form-control',
+                                                'placeholder': 'Correcciones pendientes, apuntes, tareas...'}),
+        }

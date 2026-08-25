@@ -1,7 +1,7 @@
 # views_backup.py
 #
 # Exportar / importar TODA la DB del área de software (VPS, catálogo de
-# servicios, instalaciones y scripts) como medida de seguridad — un
+# servicios, instalaciones, scripts y notas) como medida de seguridad — un
 # backup/restore point antes de hacer cambios grandes o pruebas en el
 # entorno real.
 #
@@ -27,15 +27,17 @@ from django.utils import timezone
 from django.views import View
 from openpyxl import Workbook, load_workbook
 
-from .models import VPS, ServicioSoftware, Instalacion, Script
+from .models import VPS, ServicioSoftware, Instalacion, Script, Nota
 
 # Orden con dependencias resueltas: VPS/Servicios primero (sin FKs entre
-# sí), Instalaciones/Scripts después (referencian a las anteriores).
+# sí), Instalaciones/Scripts después (referencian a las anteriores). Notas
+# es independiente (sin FKs a las demás), puede ir en cualquier posición.
 HOJAS = {
     'VPS': VPS,
     'Servicios': ServicioSoftware,
     'Instalaciones': Instalacion,
     'Scripts': Script,
+    'Notas': Nota,
 }
 
 
@@ -161,6 +163,7 @@ class SoftwareImportarAjax(View):
             # de VPS/ServicioSoftware vía FK, Instalacion los protege).
             Instalacion.objects.all().delete()
             Script.objects.all().delete()
+            Nota.objects.all().delete()
             VPS.objects.all().delete()
             ServicioSoftware.objects.all().delete()
 
