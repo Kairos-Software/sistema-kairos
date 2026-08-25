@@ -11,6 +11,7 @@ CAMBIO: resolver_adicional ahora consulta los campos estructurados
 """
 import json
 from datetime import date
+from decimal import Decimal
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -20,8 +21,9 @@ from django.utils.dateparse import parse_datetime
 from django.db import transaction
 from django.db.models import Q, Sum
 
-from .models import Servicio, Cobro, ItemCobro, PagoCobro, Turno
+from .models import Servicio, Cobro, ItemCobro, PagoCobro, Turno, ExtraccionCajaGrande
 from .views_caja import get_turno_abierto
+from .views_caja_grande import get_pendiente_caja_grande
 
 
 # ═══════════════════════════════════════════════════════════
@@ -48,6 +50,57 @@ def resolver_adicional(familia: str, valor_boleta: float):
     if len(fijos) > 1:
         return {'servicio': None, 'tipo': 'conflicto', 'conflicto': fijos}
     return {'servicio': None, 'tipo': 'no_encontrado'}
+
+
+# ═══════════════════════════════════════════════════════════
+# EXTRACCIONES (familia EX) — validación de efectivo disponible
+#
+# En una extracción el cliente transfiere el importe y recibe ese mismo
+# monto en efectivo desde la caja (ver Turno.total_extracciones()). Si la
+# caja del turno no tiene suficiente efectivo en ese momento, el faltante
+# se cubre con el efectivo de Caja Grande (lo recaudado y todavía no
+# depositado). Si tampoco alcanza ahí, se rechaza el cobro.
+# ═══════════════════════════════════════════════════════════
+
+def _verificar_extraccion_caja_grande(turno, items_data):
+    """
+    Devuelve (monto_cubierto_por_caja_grande, efectivo_turno_antes, error).
+    - error es un string si el cobro debe rechazarse (no hay efectivo
+      suficiente ni en la caja del turno ni en Caja Grande).
+    - Si no hay extracción en items_data, o la caja del turno ya alcanza
+      sola, devuelve (Decimal('0'), efectivo_turno, None).
+    """
+    ids = [i.get('servicio_id') for i in items_data if i.get('servicio_id')]
+    familias = dict(Servicio.objects.filter(pk__in=ids).values_list('pk', 'familia'))
+
+    monto_extraccion = sum(
+        (Decimal(str(i.get('monto_servicio', 0) or 0))
+         for i in items_data
+         if (familias.get(i.get('servicio_id')) or '').strip().upper() == 'EX'),
+        Decimal('0')
+    )
+
+    efectivo_turno = turno.efectivo_esperado()
+
+    if monto_extraccion <= 0:
+        return Decimal('0'), efectivo_turno, None
+
+    faltante = monto_extraccion - efectivo_turno
+    if faltante <= 0:
+        return Decimal('0'), efectivo_turno, None
+
+    pendiente_cg = get_pendiente_caja_grande()
+    if pendiente_cg < faltante:
+        max_extraible = efectivo_turno + pendiente_cg
+        if max_extraible < 0:
+            max_extraible = Decimal('0')
+        return None, efectivo_turno, (
+            f'No hay suficiente efectivo para esta extracción. Entre la caja del turno '
+            f'y Caja Grande, ahora mismo se puede entregar como máximo ${max_extraible:,.2f}. '
+            f'Ingresá un monto menor.'
+        )
+
+    return faltante, efectivo_turno, None
 
 
 # ═══════════════════════════════════════════════════════════
@@ -208,6 +261,10 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
                 'error': f'Los pagos (${total_pagos:,.2f}) no cubren el total (${total_items:,.2f}).'
             }, status=400)
 
+        monto_cg, efectivo_turno_antes, error_extraccion = _verificar_extraccion_caja_grande(turno, items_data)
+        if error_extraccion:
+            return JsonResponse({'error': error_extraccion}, status=400)
+
         with transaction.atomic():
             cobro = Cobro.objects.create(
                 turno=turno,
@@ -234,6 +291,13 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
                         metodo=pago['metodo'],
                         monto=monto_pago,
                     )
+            if monto_cg > 0:
+                ExtraccionCajaGrande.objects.create(
+                    cobro=cobro,
+                    turno=turno,
+                    monto=monto_cg,
+                    efectivo_turno_antes=efectivo_turno_antes,
+                )
 
         totales_por_metodo = {p.get_metodo_display(): float(p.monto) for p in cobro.pagos.all()}
         return JsonResponse({
@@ -245,6 +309,7 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
             'pagos':             totales_por_metodo,
             'fecha':             cobro.fecha_cierre.strftime('%d/%m/%Y %H:%M'),
             'turno_numero':      turno.numero,
+            'monto_caja_grande_usado': float(monto_cg),
         })
 
 

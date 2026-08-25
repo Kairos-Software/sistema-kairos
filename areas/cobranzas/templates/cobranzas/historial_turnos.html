@@ -123,6 +123,7 @@
                 <th>QR</th>
                 <th>Total retiros</th>
                 <th>Total ingresos</th>
+                <th>Total extracciones</th>
                 <th>Total general</th>
                 <th>PagoFácil</th>
                 <th>Rapipago</th>
@@ -159,6 +160,7 @@
                 <td>${% with val=t.total_qr %}{{ val|floatformat:2 }}{% endwith %}</td>
                 <td>${{ t.total_retiros|floatformat:2 }}</td>
                 <td>${{ t.total_ingresos|floatformat:2 }}</td>
+                <td>${{ t.total_extracciones|floatformat:2 }}</td>
                 <td><strong>${{ t.total_general|floatformat:2 }}</strong></td>
                 <td>${% with val=t.total_pf %}{{ val|floatformat:2 }}{% endwith %}</td>
                 <td>${% with val=t.total_rp %}{{ val|floatformat:2 }}{% endwith %}</td>

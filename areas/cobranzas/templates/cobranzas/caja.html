@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}?v=20260825-1">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -219,6 +219,10 @@
                     <span>Retiros de caja</span>
                     <strong id="turnoTotRetiros">$ 0,00</strong>
                 </div>
+                <div class="caja-total-row caja-total-extracciones">
+                    <span>Extracciones (efectivo entregado)</span>
+                    <strong id="turnoTotExtracciones">$ 0,00</strong>
+                </div>
                 <div class="caja-total-row caja-total-gral">
                     <span>Total general</span>
                     <strong id="turnoTotGeneral">$ 0,00</strong>
@@ -314,7 +318,7 @@
             <div class="caja-field">
                 <label class="caja-label">
                     Efectivo físico contado
-                    <span class="caja-hint">(fondo + cobros + ingresos - retiros)</span>
+                    <span class="caja-hint">(fondo + cobros + ingresos - retiros - extracciones)</span>
                 </label>
                 <div class="caja-input-wrap">
                     <span class="caja-signo">$</span>
@@ -378,7 +382,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/caja.js' %}"></script>
+<script src="{% static 'cobranzas/js/caja.js' %}?v=20260825-1"></script>
 <script>
     window.cajaUrls = {
         estado:              "{% url 'cobranzas:caja_estado' %}",

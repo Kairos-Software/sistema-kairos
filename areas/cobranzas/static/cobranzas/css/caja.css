@@ -129,6 +129,7 @@
 
 .caja-total-retiros strong { color: #ef4444; }
 .caja-total-ingresos strong { color: #16a34a; }
+.caja-total-extracciones strong { color: #ef4444; }
 .caja-total-adicionales strong { color: #16a34a; }
 
 .caja-total-efectivo-esperado {
@@ -465,6 +466,82 @@
     background: rgba(220,38,38,.08);
     color: #dc2626;
 }
+
+.caja-retiro-editar {
+    background: none;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    padding: .2rem .4rem;
+    border-radius: 6px;
+    font-size: .85rem;
+    line-height: 1;
+    transition: all .12s;
+}
+
+.caja-retiro-editar:hover {
+    background: rgba(232,92,13,.1);
+    color: #e85c0d;
+}
+
+/* ── Edición inline de un movimiento ─────────────────────── */
+.caja-retiro-item-editando {
+    flex-direction: column;
+    align-items: stretch;
+    background: #fffaf5;
+    border-color: rgba(232,92,13,.3);
+}
+
+.caja-retiro-edit-form {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.caja-retiro-edit-tipos.caja-tipo-toggle { flex-shrink: 0; }
+
+.caja-retiro-edit-motivo {
+    flex: 1;
+    min-width: 140px;
+}
+
+.caja-retiro-edit-monto-wrap {
+    max-width: 130px;
+    flex-shrink: 0;
+}
+
+.caja-retiro-edit-error {
+    font-size: .78rem;
+    color: #dc2626;
+    font-weight: 600;
+    margin: .4rem 0 0;
+}
+
+.caja-retiro-edit-acciones {
+    display: flex;
+    justify-content: flex-end;
+    gap: .3rem;
+    margin-top: .5rem;
+}
+
+.caja-retiro-guardar,
+.caja-retiro-cancelar {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: .3rem .6rem;
+    border-radius: 6px;
+    font-size: .85rem;
+    line-height: 1;
+    transition: all .12s;
+}
+
+.caja-retiro-guardar { color: #16a34a; }
+.caja-retiro-guardar:hover { background: rgba(22,163,74,.1); }
+
+.caja-retiro-cancelar { color: #999; }
+.caja-retiro-cancelar:hover { background: rgba(0,0,0,.06); color: #555; }
 
 .caja-sin-retiros {
     font-size: .82rem;

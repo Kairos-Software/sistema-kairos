@@ -245,10 +245,28 @@ class Turno(models.Model):
             .aggregate(t=Sum('monto'))['t'] or 0
         )
 
+    def total_extracciones(self):
+        """
+        Efectivo entregado al cliente por servicios de familia EX
+        (Extracciones/Retiro de Efectivo): el cliente transfiere el importe
+        de la boleta y recibe ese mismo monto en efectivo desde la caja.
+        Ese efectivo sale físicamente sin importar el método de pago
+        elegido para el cobro, así que se descuenta siempre del esperado.
+        No incluye el adicional (eso se lo queda el negocio).
+        """
+        from django.db.models import Sum
+        return (
+            ItemCobro.objects
+            .filter(cobro__turno=self, cobro__estado=Cobro.ESTADO_CERRADO,
+                    servicio__familia__iexact='EX')
+            .aggregate(t=Sum('monto_servicio'))['t'] or 0
+        )
+
     def efectivo_esperado(self):
         """Cuánto efectivo debería haber en caja al cierre."""
         return (self.monto_inicial + self.total_efectivo()
-                + self.total_ingresos() - self.total_retiros())
+                + self.total_ingresos() - self.total_retiros()
+                - self.total_extracciones())
 
     def total_adicionales(self):
         from django.db.models import Sum
@@ -421,6 +439,8 @@ class CierreDiario(models.Model):
     total_qr            = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_retiros       = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_ingresos      = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_extracciones  = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+                                               help_text="Efectivo entregado por servicios de extracción (familia EX)")
     total_general       = models.DecimalField(max_digits=12, decimal_places=2, default=0,
                                                help_text="Suma de todos los métodos de pago")
     total_adicionales   = models.DecimalField(max_digits=12, decimal_places=2, default=0,
@@ -721,3 +741,35 @@ class GastoGanancia(models.Model):
 
     def __str__(self):
         return f"Gasto ${self.monto} — {self.persona} — {self.fecha:%d/%m/%Y}"
+
+
+# ─────────────────────────────────────────────────────────────
+# EXTRACCIÓN CUBIERTA CON CAJA GRANDE
+#
+# Cuando una extracción (ItemCobro de familia EX) es más grande que el
+# efectivo disponible en la caja del turno en ese momento, el faltante se
+# cubre con el efectivo de Caja Grande (ver views_cobros._verificar_
+# extraccion_caja_grande). Cada vez que eso pasa queda un registro acá
+# para poder auditar/rastrear cuánto y cuándo se usó Caja Grande para
+# tapar un faltante de caja diaria.
+# ─────────────────────────────────────────────────────────────
+
+class ExtraccionCajaGrande(models.Model):
+    cobro   = models.ForeignKey(Cobro, on_delete=models.CASCADE,
+                                 related_name='extracciones_caja_grande')
+    turno   = models.ForeignKey(Turno, on_delete=models.CASCADE,
+                                 related_name='extracciones_caja_grande')
+    monto   = models.DecimalField(max_digits=12, decimal_places=2,
+                 help_text="Cuánto de la extracción se cubrió con el efectivo de Caja Grande "
+                           "(no el total de la extracción, solo la parte que faltaba en la caja del turno)")
+    efectivo_turno_antes = models.DecimalField(max_digits=12, decimal_places=2,
+                 help_text="Efectivo esperado del turno justo antes de esta extracción")
+    fecha   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name        = 'Extracción cubierta con Caja Grande'
+        verbose_name_plural = 'Extracciones cubiertas con Caja Grande'
+
+    def __str__(self):
+        return f"Caja Grande usada ${self.monto} — Cobro #{self.cobro_id} (Turno #{self.turno.numero})"

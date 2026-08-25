@@ -831,6 +831,16 @@ function mostrarExito(data) {
         <div class="cobro-exito-fila"><span>Facturas</span><strong>${fmt(data.total_boletas)}</strong></div>
         <div class="cobro-exito-fila"><span>Adicionales</span><strong>${fmt(data.total_adicionales)}</strong></div>
         <div class="cobro-exito-fila cobro-exito-total"><span>Total cobrado</span><strong>${fmt(data.total_general)}</strong></div>
+        ${data.monto_caja_grande_usado > 0 ? `
+        <div class="cobro-exito-fila cobro-exito-caja-grande">
+            <span class="cobro-exito-caja-grande-label">
+                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M2 6.5 8 3l6 3.5M3.5 7.5v4.5M6.5 7.5v4.5M9.5 7.5v4.5M12.5 7.5v4.5M2 13h12"
+                          stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Cubierto con Caja Grande
+            </span><strong>${fmt(data.monto_caja_grande_usado)}</strong>
+        </div>` : ''}
     `;
     document.getElementById('exitoPagos').innerHTML = Object.entries(data.pagos)
         .map(([m, v]) => `<div class="cobro-exito-fila"><span>${m}</span><strong>${fmt(v)}</strong></div>`)

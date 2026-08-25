@@ -77,9 +77,15 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('turnoTotQR').textContent                  = fmt(t.total_qr);
         document.getElementById('turnoTotRetiros').textContent             = fmt(t.total_retiros);
         document.getElementById('turnoTotIngresos').textContent            = fmt(t.total_ingresos);
+        document.getElementById('turnoTotExtracciones').textContent        = fmt(t.total_extracciones);
         document.getElementById('turnoTotGeneral').textContent             = fmt(t.total_general);
         document.getElementById('turnoTotAdicionales').textContent         = fmt(t.total_adicionales);
         document.getElementById('turnoEfEsperado').textContent             = fmt(t.efectivo_esperado);
+
+        Object.keys(retirosPorId).forEach(k => delete retirosPorId[k]);
+        (t.retiros || []).forEach(r => { retirosPorId[r.id] = r; });
+        editandoId = null;
+        renderizarRetiros();
 
         // Pre-completar efectivo declarado con el esperado solo si está vacío
         const inputDecl = document.getElementById('inputEfectivoDeclarado');
@@ -131,6 +137,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── MOVIMIENTOS (retiros e ingresos) ────────────────────────
     const retirosPorId = {};
     let movTipoActual = 'retiro';
+    let editandoId = null;
+
+    function escAttr(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
 
     document.querySelectorAll('.caja-tipo-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -162,6 +173,28 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         lista.innerHTML = items.map(r => {
+            if (editandoId === r.id) {
+                return `
+                <div class="caja-retiro-item caja-retiro-item-editando" data-id="${r.id}">
+                    <div class="caja-retiro-edit-form">
+                        <div class="caja-tipo-toggle caja-retiro-edit-tipos">
+                            <button type="button" class="caja-tipo-btn caja-retiro-edit-tipo ${r.tipo !== 'ingreso' ? 'caja-tipo-btn-activo' : ''}" data-tipo="retiro">Retiro</button>
+                            <button type="button" class="caja-tipo-btn caja-retiro-edit-tipo ${r.tipo === 'ingreso' ? 'caja-tipo-btn-activo' : ''}" data-tipo="ingreso">Ingreso</button>
+                        </div>
+                        <input type="text" class="caja-input-text caja-retiro-edit-motivo" value="${escAttr(r.motivo)}" maxlength="200" placeholder="Motivo">
+                        <div class="caja-input-wrap caja-retiro-edit-monto-wrap">
+                            <span class="caja-signo">$</span>
+                            <input type="number" class="caja-input caja-retiro-edit-monto" value="${r.monto}" min="0.01" step="0.01">
+                        </div>
+                    </div>
+                    <p class="caja-retiro-edit-error" style="display:none;"></p>
+                    <div class="caja-retiro-edit-acciones">
+                        <button class="caja-retiro-guardar" data-id="${r.id}" title="Guardar cambios" aria-label="Guardar cambios"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                        <button class="caja-retiro-cancelar" data-id="${r.id}" title="Cancelar" aria-label="Cancelar edición"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                    </div>
+                </div>
+            `;
+            }
             const esIngreso = r.tipo === 'ingreso';
             return `
             <div class="caja-retiro-item ${esIngreso ? 'caja-mov-ingreso' : 'caja-mov-retiro'}" data-id="${r.id}">
@@ -171,7 +204,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     <span class="caja-retiro-fecha">${r.fecha}</span>
                 </div>
                 <strong class="caja-retiro-monto">${esIngreso ? '+' : '−'}${fmt(r.monto)}</strong>
-                <button class="caja-retiro-anular" data-id="${r.id}" title="Anular" aria-label="Anular retiro"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                <button class="caja-retiro-editar" data-id="${r.id}" title="Editar" aria-label="Editar movimiento"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                <button class="caja-retiro-anular" data-id="${r.id}" title="Anular" aria-label="Anular movimiento"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
             </div>
         `;
         }).join('');
@@ -207,22 +241,77 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('listaRetiros').addEventListener('click', async (e) => {
-        const btn = e.target.closest('.caja-retiro-anular');
-        if (!btn) return;
-        const id = parseInt(btn.dataset.id);
-        if (!confirm('¿Anular este movimiento?')) return;
+        const btnTipoEdit = e.target.closest('.caja-retiro-edit-tipo');
+        if (btnTipoEdit) {
+            btnTipoEdit.parentElement.querySelectorAll('.caja-retiro-edit-tipo').forEach(b => {
+                b.classList.toggle('caja-tipo-btn-activo', b === btnTipoEdit);
+            });
+            return;
+        }
 
-        const data = await ajax(URLS.retiro, { id }, 'DELETE');
-        if (data.success) {
-            delete retirosPorId[id];
+        const btnEditar = e.target.closest('.caja-retiro-editar');
+        if (btnEditar) {
+            editandoId = parseInt(btnEditar.dataset.id);
             renderizarRetiros();
-            turnoActual.total_retiros     = data.total_retiros;
-            turnoActual.total_ingresos    = data.total_ingresos;
-            turnoActual.efectivo_esperado = data.efectivo_esperado;
-            document.getElementById('turnoTotRetiros').textContent  = fmt(data.total_retiros);
-            document.getElementById('turnoTotIngresos').textContent = fmt(data.total_ingresos);
-            document.getElementById('turnoEfEsperado').textContent  = fmt(data.efectivo_esperado);
-            actualizarDiferenciaPreview();
+            return;
+        }
+
+        const btnCancelar = e.target.closest('.caja-retiro-cancelar');
+        if (btnCancelar) {
+            editandoId = null;
+            renderizarRetiros();
+            return;
+        }
+
+        const btnGuardar = e.target.closest('.caja-retiro-guardar');
+        if (btnGuardar) {
+            const id = parseInt(btnGuardar.dataset.id);
+            const item = btnGuardar.closest('.caja-retiro-item-editando');
+            const tipo = item.querySelector('.caja-retiro-edit-tipo.caja-tipo-btn-activo').dataset.tipo;
+            const motivo = item.querySelector('.caja-retiro-edit-motivo').value.trim();
+            const monto = parseFloat(item.querySelector('.caja-retiro-edit-monto').value) || 0;
+            const errEl = item.querySelector('.caja-retiro-edit-error');
+
+            if (!motivo) { errEl.textContent = 'El motivo es obligatorio.'; errEl.style.display = ''; return; }
+            if (monto <= 0) { errEl.textContent = 'El monto debe ser mayor a cero.'; errEl.style.display = ''; return; }
+
+            const data = await ajax(URLS.retiro, { id, tipo, motivo, monto }, 'PUT');
+            if (data.success) {
+                editandoId = null;
+                retirosPorId[id] = { id, tipo: data.tipo, motivo: data.motivo, monto: data.monto, fecha: data.fecha };
+                renderizarRetiros();
+                turnoActual.total_retiros     = data.total_retiros;
+                turnoActual.total_ingresos    = data.total_ingresos;
+                turnoActual.efectivo_esperado = data.efectivo_esperado;
+                document.getElementById('turnoTotRetiros').textContent  = fmt(data.total_retiros);
+                document.getElementById('turnoTotIngresos').textContent = fmt(data.total_ingresos);
+                document.getElementById('turnoEfEsperado').textContent  = fmt(data.efectivo_esperado);
+                actualizarDiferenciaPreview();
+            } else {
+                errEl.textContent = data.error || 'Error al editar el movimiento.';
+                errEl.style.display = '';
+            }
+            return;
+        }
+
+        const btnAnular = e.target.closest('.caja-retiro-anular');
+        if (btnAnular) {
+            const id = parseInt(btnAnular.dataset.id);
+            if (!confirm('¿Anular este movimiento?')) return;
+
+            const data = await ajax(URLS.retiro, { id }, 'DELETE');
+            if (data.success) {
+                delete retirosPorId[id];
+                if (editandoId === id) editandoId = null;
+                renderizarRetiros();
+                turnoActual.total_retiros     = data.total_retiros;
+                turnoActual.total_ingresos    = data.total_ingresos;
+                turnoActual.efectivo_esperado = data.efectivo_esperado;
+                document.getElementById('turnoTotRetiros').textContent  = fmt(data.total_retiros);
+                document.getElementById('turnoTotIngresos').textContent = fmt(data.total_ingresos);
+                document.getElementById('turnoEfEsperado').textContent  = fmt(data.efectivo_esperado);
+                actualizarDiferenciaPreview();
+            }
         }
     });
 
@@ -359,6 +448,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="caja-ci-item"><span>QR</span><strong>${fmt(data.total_qr)}</strong></div>
                 <div class="caja-ci-item"><span>Retiros</span><strong>${fmt(data.total_retiros)}</strong></div>
                 <div class="caja-ci-item"><span>Ingresos</span><strong>${fmt(data.total_ingresos)}</strong></div>
+                <div class="caja-ci-item"><span>Extracciones</span><strong>${fmt(data.total_extracciones)}</strong></div>
                 <div class="caja-ci-item caja-ci-general"><span>Total general</span><strong>${fmt(data.total_general)}</strong></div>
                 <div class="caja-ci-item caja-ci-adicionales"><span>Nuestros adicionales</span><strong>${fmt(data.total_adicionales)}</strong></div>
                 <div class="caja-ci-item caja-ci-esperado"><span>Efectivo esperado en caja</span><strong>${fmt(data.efectivo_esperado)}</strong></div>

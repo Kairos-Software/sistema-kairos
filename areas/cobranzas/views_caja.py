@@ -34,6 +34,17 @@ def _resumen_turno(turno):
     tot_efe   = float(turno.total_efectivo())
     tot_ret   = float(turno.total_retiros())
     tot_ing   = float(turno.total_ingresos())
+    tot_ext   = float(turno.total_extracciones())
+    retiros = [
+        {
+            'id':     r.pk,
+            'tipo':   r.tipo,
+            'motivo': r.motivo,
+            'monto':  float(r.monto),
+            'fecha':  r.fecha.strftime('%d/%m/%Y %H:%M'),
+        }
+        for r in turno.retiros.filter(activo=True).order_by('fecha')
+    ]
     return {
         'id':                   turno.pk,
         'numero':               turno.numero,
@@ -48,10 +59,12 @@ def _resumen_turno(turno):
         'total_qr':             float(turno.total_qr()),
         'total_retiros':        tot_ret,
         'total_ingresos':       tot_ing,
+        'total_extracciones':   tot_ext,
         'total_general':        float(turno.total_general()),
         'total_adicionales':    float(turno.total_adicionales()),
         'efectivo_esperado':    float(turno.efectivo_esperado()),
         'cant_cobros':          turno.cobros.filter(estado=Cobro.ESTADO_CERRADO).count(),
+        'retiros':              retiros,
     }
 
 
@@ -280,6 +293,50 @@ class RetiroCajaAjax(LoginRequiredMixin, View):
             'total_ingresos':    float(turno.total_ingresos()),
         })
 
+    def put(self, request):
+        """Edita un movimiento (retiro o ingreso) ya registrado, por si el cajero se equivocó."""
+        turno = get_turno_abierto()
+        if not turno:
+            return JsonResponse({'error': 'No hay turno abierto.'}, status=400)
+
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+        tipo = data.get('tipo', RetiroCaja.TIPO_RETIRO).strip()
+        if tipo not in (RetiroCaja.TIPO_RETIRO, RetiroCaja.TIPO_INGRESO):
+            return JsonResponse({'error': 'Tipo de movimiento inválido.'}, status=400)
+
+        motivo = data.get('motivo', '').strip()
+        if not motivo:
+            return JsonResponse({'error': 'El motivo es obligatorio.'}, status=400)
+
+        try:
+            monto = Decimal(str(data.get('monto', 0)))
+            if monto <= 0:
+                raise ValueError
+        except (ValueError, Exception):
+            return JsonResponse({'error': 'El monto debe ser mayor a cero.'}, status=400)
+
+        retiro = get_object_or_404(RetiroCaja, pk=data.get('id'), turno=turno, activo=True)
+        retiro.tipo   = tipo
+        retiro.motivo = motivo
+        retiro.monto  = monto
+        retiro.save()
+
+        return JsonResponse({
+            'success':           True,
+            'retiro_id':         retiro.pk,
+            'tipo':              retiro.tipo,
+            'monto':             float(retiro.monto),
+            'motivo':            retiro.motivo,
+            'fecha':             retiro.fecha.strftime('%d/%m/%Y %H:%M'),
+            'efectivo_esperado': float(turno.efectivo_esperado()),
+            'total_retiros':     float(turno.total_retiros()),
+            'total_ingresos':    float(turno.total_ingresos()),
+        })
+
     def delete(self, request):
         """Anula un movimiento (retiro o ingreso) por su ID."""
         turno = get_turno_abierto()
@@ -380,10 +437,16 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
             RetiroCaja.objects.filter(turno_id__in=ids_turnos, activo=True, tipo=RetiroCaja.TIPO_INGRESO)
             .aggregate(t=Sum('monto'))['t'] or 0
         )
+        tot_ext   = float(
+            ItemCobro.objects.filter(
+                cobro__turno_id__in=ids_turnos, cobro__estado=Cobro.ESTADO_CERRADO,
+                servicio__familia__iexact='EX',
+            ).aggregate(t=Sum('monto_servicio'))['t'] or 0
+        )
         tot_general = tot_efe + tot_tra + tot_deb + tot_cre + tot_qr
 
         monto_inicial_dia = float(turnos.first().monto_inicial)
-        efectivo_esperado_dia = monto_inicial_dia + tot_efe + tot_ing - tot_ret
+        efectivo_esperado_dia = monto_inicial_dia + tot_efe + tot_ing - tot_ret - tot_ext
 
         resumen_turnos = []
         for t in turnos:
@@ -405,6 +468,7 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
             'total_qr':           tot_qr,
             'total_retiros':      tot_ret,
             'total_ingresos':     tot_ing,
+            'total_extracciones': tot_ext,
             'total_general':      tot_general,
             'total_adicionales':  tot_adicionales,
             'efectivo_esperado':  efectivo_esperado_dia,
@@ -487,10 +551,16 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
             RetiroCaja.objects.filter(turno_id__in=ids_turnos, activo=True, tipo=RetiroCaja.TIPO_INGRESO)
             .aggregate(t=Sum('monto'))['t'] or 0
         )
+        tot_ext  = Decimal(
+            ItemCobro.objects.filter(
+                cobro__turno_id__in=ids_turnos, cobro__estado=Cobro.ESTADO_CERRADO,
+                servicio__familia__iexact='EX',
+            ).aggregate(t=Sum('monto_servicio'))['t'] or 0
+        )
         tot_general = tot_efe + tot_tra + tot_deb + tot_cre + tot_qr
 
         monto_inicial_dia = turnos.order_by('fecha_apertura').first().monto_inicial
-        ef_esperado = monto_inicial_dia + tot_efe + tot_ing - tot_ret
+        ef_esperado = monto_inicial_dia + tot_efe + tot_ing - tot_ret - tot_ext
         diferencia  = efectivo_fisico - ef_esperado
 
         with transaction.atomic():
@@ -506,6 +576,7 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
                 total_qr            = tot_qr,
                 total_retiros       = tot_ret,
                 total_ingresos      = tot_ing,
+                total_extracciones  = tot_ext,
                 total_general       = tot_general,
                 total_adicionales   = tot_adicionales,
                 efectivo_fisico     = efectivo_fisico,
@@ -799,8 +870,8 @@ def export_turnos_csv(request):
     writer.writerow([
         'Número', 'Cajero', 'Fecha apertura', 'Fecha cierre', 'Estado',
         'Fondo inicial', 'Total efectivo', 'Total transferencia', 'Total débito',
-        'Total crédito', 'Total QR', 'Total retiros', 'Total ingresos', 'Total general',
-        'Total PagoFácil', 'Total Rapipago', 'Total Otro canal',
+        'Total crédito', 'Total QR', 'Total retiros', 'Total ingresos', 'Total extracciones',
+        'Total general', 'Total PagoFácil', 'Total Rapipago', 'Total Otro canal',
         'Efectivo declarado', 'Diferencia', 'Cierre diario ID'
     ])
 
@@ -819,6 +890,7 @@ def export_turnos_csv(request):
             float(getattr(t, 'total_qr', 0)),
             float(t.total_retiros()),
             float(t.total_ingresos()),
+            float(t.total_extracciones()),
             float(t.total_general()),
             float(getattr(t, 'total_pf', 0)),
             float(getattr(t, 'total_rp', 0)),

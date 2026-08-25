@@ -715,6 +715,23 @@
     color: #111;
 }
 .cobro-exito-fecha { font-size: .7rem; color: #bbb; margin: .1rem 0 0; }
+.cobro-exito-caja-grande {
+    margin-top: .25rem;
+    padding-top: .25rem;
+    border-top: 1px dashed #f0c36d;
+    color: #92660a;
+    font-weight: 700;
+}
+.cobro-exito-caja-grande-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+}
+.cobro-exito-caja-grande-label svg {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+}
 
 /* ════════════════════════════════════════════════════════════
    HISTORIAL DE COBROS
