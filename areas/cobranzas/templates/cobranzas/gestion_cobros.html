@@ -74,7 +74,7 @@
                     <div id="smartPrefijoDropdown" class="cobro-prefijo-dropdown" style="display:none;"></div>
                 </div>
                 <div class="cobro-smart-field cobro-smart-field-importe">
-                    <label class="cobro-label-secundario">Importe de la factura</label>
+                    <label class="cobro-label-secundario">Importe de la factura <span style="font-weight:400;text-transform:none;">(si es boleta de terceros)</span></label>
                     <div class="cobro-input-grande-wrap">
                         <span class="cobro-signo-grande">$</span>
                         <input type="number" id="smartImporte"
@@ -86,14 +86,22 @@
             </div>
 
             <p class="cobro-hint-texto">
-                Escribí el prefijo del servicio (ej: <strong>EX</strong> para el código "EX1")
-                y el monto de la boleta. El sistema detecta el servicio y el adicional automáticamente.
+                Escribí el prefijo del servicio (ej: <strong>EX</strong> para el código "EX1").
+                Para boletas de terceros (luz, SUBE…) agregá también el importe de la boleta;
+                para trámites de precio fijo alcanza con el prefijo. El sistema detecta el
+                servicio automáticamente.
             </p>
 
             <div id="smartBuscando" class="cobro-buscando" style="display:none;">
                 <span class="cobro-spinner"></span> Buscando servicio...
             </div>
             <div id="smartError" class="alerta-inline alerta-error" style="display:none; margin-bottom:.6rem;"></div>
+
+            {# Selector cuando un prefijo tiene varios servicios fijos (ej. ACN1/ACN2/ACN3) #}
+            <div id="smartOpciones" style="display:none; margin-bottom:.6rem;">
+                <p class="cobro-hint-texto" id="smartOpcionesMsg" style="margin:0 0 .4rem;"></p>
+                <div id="smartOpcionesLista" class="cobro-lista-resultados" style="padding:0;max-height:220px;"></div>
+            </div>
 
             <button type="button" class="btn-cobro-agregar" id="btnSmartBuscar">
                 <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
@@ -125,7 +133,7 @@
 
                 <div class="cobro-carga-fields">
                     <div class="cobro-field-full">
-                        <label class="cobro-label-principal">
+                        <label class="cobro-label-principal" id="smartImporteConfirmLabel">
                             Importe de la factura
                             <span class="cobro-requerido">*</span>
                         </label>
@@ -137,7 +145,7 @@
                                    class="cobro-input-grande"
                                    readonly>
                         </div>
-                        <p class="cobro-hint-texto" style="margin-top:.2rem;">
+                        <p class="cobro-hint-texto" style="margin-top:.2rem;" id="smartImporteConfirmHint">
                             Este es el importe que ingresaste. Si es incorrecto, usá el botón de cerrar para volver a buscar.
                         </p>
                     </div>
@@ -414,7 +422,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260825-3"></script>
+<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260828-4"></script>
 <script>
     window.cobroBuscarUrl    = "{% url 'cobranzas:cobro_buscar_servicio' %}";
     window.cobroConfirmarUrl = "{% url 'cobranzas:cobro_confirmar' %}";

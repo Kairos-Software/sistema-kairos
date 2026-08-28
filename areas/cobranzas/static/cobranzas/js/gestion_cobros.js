@@ -186,6 +186,8 @@ function smartLimpiarResultado() {
     elSmartResultado.style.display = 'none';
     estado.smartServicio           = null;
     estado.smartImporte            = 0;
+    const op = document.getElementById('smartOpciones');
+    if (op) op.style.display = 'none';
 }
 
 // Navegación del dropdown de prefijos + Enter en prefijo → foco a importe
@@ -241,6 +243,66 @@ elSmartImporte.addEventListener('input', () => {
     smartLimpiarResultado();
 });
 
+const elSmartImporteConfirmLabel = document.getElementById('smartImporteConfirmLabel');
+const elSmartImporteConfirmHint  = document.getElementById('smartImporteConfirmHint');
+const elSmartOpciones      = document.getElementById('smartOpciones');
+const elSmartOpcionesMsg   = document.getElementById('smartOpcionesMsg');
+const elSmartOpcionesLista = document.getElementById('smartOpcionesLista');
+const SMART_HINT_RANGO = 'Este es el importe que ingresaste. Si es incorrecto, usá el botón de cerrar para volver a buscar.';
+const SMART_HINT_FIJO  = 'Servicio de precio fijo — se cobra este monto, no hace falta el importe de una boleta.';
+
+// Muestra el panel "servicio detectado".
+//   FIJO : servicio.monto ES el precio del servicio → va a "factura", sin adicional.
+//   RANGO: servicio.monto es el adicional del tramo; "factura" = importe ingresado.
+function smartMostrarResultado(s, tipo, importe) {
+    const esFijo    = tipo === 'fijo';
+    const monto     = parseFloat(s.monto);
+    const factura   = esFijo ? monto : (importe || 0);
+    const adicional = esFijo ? 0 : monto;
+
+    estado.smartServicio = { ...s, _tipo: tipo };
+    estado.smartImporte  = factura;
+
+    document.getElementById('smartSrvCodigo').textContent      = s.codigo;
+    document.getElementById('smartSrvDescripcion').textContent = s.descripcion;
+    document.getElementById('smartSrvProveedor').textContent   = s.proveedor || '';
+    document.getElementById('smartSrvAdicional').textContent   =
+        adicional.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    elSmartImporteConfirm.value = factura.toFixed(2);
+    if (elSmartImporteConfirmLabel) {
+        elSmartImporteConfirmLabel.textContent = esFijo ? 'Precio del servicio' : 'Importe de la factura';
+    }
+    if (elSmartImporteConfirmHint) {
+        elSmartImporteConfirmHint.textContent = esFijo ? SMART_HINT_FIJO : SMART_HINT_RANGO;
+    }
+
+    document.getElementById('smartSubtotalMonto').textContent = fmt(factura + adicional);
+    if (elSmartOpciones) elSmartOpciones.style.display = 'none';
+    elSmartResultado.style.display = '';
+}
+
+// Cuando un prefijo tiene varios servicios fijos: mostrar botones para elegir.
+function smartMostrarOpciones(mensaje, opciones) {
+    if (!elSmartOpciones) return;
+    elSmartOpcionesMsg.textContent = mensaje || 'Elegí el servicio:';
+    elSmartOpcionesLista.innerHTML = opciones.map(o => `
+        <div class="cobro-resultado-item" tabindex="0" data-op-id="${o.id}">
+            <div class="cobro-resultado-top">
+                <span class="codigo-badge">${esc(o.codigo)}</span>
+                <span class="cobro-resultado-adicional">${fmt(o.monto)}</span>
+            </div>
+            <div class="cobro-resultado-desc">${esc(o.descripcion)}</div>
+        </div>
+    `).join('');
+    elSmartOpcionesLista.querySelectorAll('.cobro-resultado-item').forEach((el, i) => {
+        const elegir = () => smartMostrarResultado(opciones[i], 'fijo', 0);
+        el.addEventListener('click', elegir);
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') elegir(); });
+    });
+    elSmartOpciones.style.display = '';
+}
+
 // Botón buscar
 document.getElementById('btnSmartBuscar').addEventListener('click', async () => {
     ocultarDropdownPrefijos();
@@ -248,16 +310,13 @@ document.getElementById('btnSmartBuscar').addEventListener('click', async () => 
     smartLimpiarResultado();
 
     const prefijo = elSmartPrefijo.value.trim().toUpperCase();
-    const importe = parseFloat(elSmartImporte.value);
+    const importeRaw = elSmartImporte.value.trim();
+    const importe = parseFloat(importeRaw);
+    const hayImporte = importeRaw !== '' && !isNaN(importe) && importe > 0;
 
     if (!prefijo) {
         smartMostrarError('Ingresá el prefijo del servicio (ej: EX).');
         elSmartPrefijo.focus();
-        return;
-    }
-    if (!importe || importe <= 0) {
-        smartMostrarError('Ingresá un importe de factura válido.');
-        elSmartImporte.focus();
         return;
     }
 
@@ -265,34 +324,22 @@ document.getElementById('btnSmartBuscar').addEventListener('click', async () => 
     document.getElementById('btnSmartBuscar').disabled = true;
 
     try {
-        const url  = `${window.cobroBuscarUrl}?prefijo=${encodeURIComponent(prefijo)}&valor=${encodeURIComponent(importe)}`;
+        let url = `${window.cobroBuscarUrl}?prefijo=${encodeURIComponent(prefijo)}`;
+        if (hayImporte) url += `&valor=${encodeURIComponent(importe)}`;
         const res  = await fetch(url);
         const data = await res.json();
 
         if (!data.encontrado) {
-            smartMostrarError(data.mensaje || 'No se encontró ningún servicio para ese prefijo e importe.');
+            if (data.elegir && data.opciones && data.opciones.length) {
+                smartMostrarOpciones(data.mensaje, data.opciones);
+            } else {
+                smartMostrarError(data.mensaje || 'No se encontró ningún servicio para ese prefijo.');
+                if (data.necesita_importe) elSmartImporte.focus();
+            }
             return;
         }
 
-        // ── Servicio encontrado ──
-        const s        = data.servicio;
-        const adicional = parseFloat(s.monto);
-
-        estado.smartServicio = s;
-        estado.smartImporte  = importe;
-
-        document.getElementById('smartSrvCodigo').textContent      = s.codigo;
-        document.getElementById('smartSrvDescripcion').textContent = s.descripcion;
-        document.getElementById('smartSrvProveedor').textContent   = s.proveedor || '';
-        document.getElementById('smartSrvAdicional').textContent   =
-            adicional.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-        elSmartImporteConfirm.value = importe.toFixed(2);
-
-        // Subtotal
-        document.getElementById('smartSubtotalMonto').textContent = fmt(importe + adicional);
-
-        elSmartResultado.style.display = '';
+        smartMostrarResultado(data.servicio, data.tipo, importe);
 
     } catch (err) {
         smartMostrarError('Error de red. Intentá de nuevo.');
@@ -314,12 +361,18 @@ document.getElementById('btnSmartLimpiar').addEventListener('click', () => {
 
 // Agregar boleta desde modo inteligente
 document.getElementById('btnSmartAgregar').addEventListener('click', () => {
-    const s       = estado.smartServicio;
-    const importe = estado.smartImporte;
-    if (!s || !importe || importe <= 0) return;
+    const s = estado.smartServicio;
+    if (!s) return;
 
     const canal     = document.getElementById('smartCanal').value;
-    const adicional = parseFloat(s.monto);
+    const monto     = parseFloat(s.monto);
+    const esFijo    = s._tipo === 'fijo';
+    const factura   = esFijo ? monto : estado.smartImporte;
+    const adicional = esFijo ? 0 : monto;
+
+    // Rango: hace falta un importe válido. Fijo: alcanza con que el monto sea > 0.
+    if (!esFijo && (!factura || factura <= 0)) return;
+    if (factura + adicional <= 0) return;
 
     estado.itemIdSeq++;
     estado.items.push({
@@ -328,7 +381,7 @@ document.getElementById('btnSmartAgregar').addEventListener('click', () => {
         codigo:                   s.codigo,
         descripcion:              s.descripcion,
         proveedor:                s.proveedor || '',
-        monto_factura:            importe,
+        monto_factura:            factura,
         monto_adicional:          estado.sinAdicional ? 0 : adicional,
         monto_adicional_original: adicional,
         canal,
@@ -409,22 +462,26 @@ async function buscarServicios(q) {
             return;
         }
 
-        // Nota: el "monto" del servicio es nuestro adicional
-        listaResultados.innerHTML = data.servicios.map(s => `
+        // "monto" del servicio: en fijo es el precio; en rango es el adicional del tramo.
+        listaResultados.innerHTML = data.servicios.map(s => {
+            const esFijo = (s.tipo_precio || 'fijo') === 'fijo';
+            const infoDerecha = esFijo ? `${fmt(s.monto)} (fijo)` : `+${fmt(s.monto)} adicional`;
+            return `
             <div class="cobro-resultado-item" tabindex="0"
                  data-id="${s.id}"
                  data-codigo="${esc(s.codigo)}"
                  data-descripcion="${esc(s.descripcion)}"
-                 data-adicional="${s.monto}"
+                 data-monto="${s.monto}"
+                 data-tipo="${esc(s.tipo_precio || 'fijo')}"
                  data-proveedor="${esc(s.proveedor || '')}">
                 <div class="cobro-resultado-top">
                     <span class="codigo-badge">${esc(s.codigo)}</span>
-                    <span class="cobro-resultado-adicional">+${fmt(s.monto)} adicional</span>
+                    <span class="cobro-resultado-adicional">${infoDerecha}</span>
                 </div>
                 <div class="cobro-resultado-desc">${esc(s.descripcion)}</div>
                 ${s.proveedor ? `<div class="cobro-resultado-proveedor">${esc(s.proveedor)}</div>` : ''}
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
 
         mostrarEstadoBusqueda('resultados');
 
@@ -433,7 +490,8 @@ async function buscarServicios(q) {
                 id:          parseInt(el.dataset.id),
                 codigo:      el.dataset.codigo,
                 descripcion: el.dataset.descripcion,
-                adicional:   parseFloat(el.dataset.adicional),
+                monto:       parseFloat(el.dataset.monto),
+                tipo:        el.dataset.tipo || 'fijo',
                 proveedor:   el.dataset.proveedor,
             });
             el.addEventListener('click', abrir);
@@ -451,14 +509,21 @@ const agrImporte = document.getElementById('agrImporte');
 function seleccionarServicio(s) {
     estado.textoServicioSeleccionado = s;
 
+    const esFijo    = s.tipo === 'fijo';
+    // Fijo: monto es el precio del servicio (va a factura, sin adicional).
+    // Rango: monto es el adicional del tramo.
+    const adicional = esFijo ? 0 : s.monto;
+
     document.getElementById('agrCodigo').textContent      = s.codigo;
     document.getElementById('agrDescripcion').textContent = s.descripcion;
     document.getElementById('agrProveedor').textContent   = s.proveedor || '';
     document.getElementById('agrAdicional').textContent   =
-        parseFloat(s.adicional).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        adicional.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    agrImporte.value = '';
-    document.getElementById('subtotalPreview').style.visibility = 'hidden';
+    // Servicio fijo: precargar el precio (queda editable). Rango: en blanco,
+    // lo tipea el cajero.
+    agrImporte.value = esFijo ? s.monto.toFixed(2) : '';
+    agrImporte.dispatchEvent(new Event('input'));
     panelAgregar.style.display = '';
 
     // Marca el ítem seleccionado en la lista
@@ -478,12 +543,13 @@ function cerrarPanelCarga() {
 agrImporte.addEventListener('input', () => {
     const s = estado.textoServicioSeleccionado;
     if (!s) return;
-    const importe  = parseFloat(agrImporte.value) || 0;
-    const subtotal = importe + s.adicional;
-    const preview  = document.getElementById('subtotalPreview');
-    const monto    = document.getElementById('subtotalPreviewMonto');
-    if (importe > 0) {
-        monto.textContent = fmt(subtotal);
+    const importe   = parseFloat(agrImporte.value) || 0;
+    const adicional = s.tipo === 'fijo' ? 0 : s.monto;
+    const subtotal  = importe + adicional;
+    const preview   = document.getElementById('subtotalPreview');
+    const montoEl   = document.getElementById('subtotalPreviewMonto');
+    if (subtotal > 0) {
+        montoEl.textContent = fmt(subtotal);
         preview.style.visibility = '';
     } else {
         preview.style.visibility = 'hidden';
@@ -499,8 +565,12 @@ document.getElementById('btnAgregarItem').addEventListener('click', () => {
     const s = estado.textoServicioSeleccionado;
     if (!s) return;
 
-    const importe = parseFloat(agrImporte.value);
-    if (!importe || importe <= 0) {
+    const importe   = parseFloat(agrImporte.value) || 0;
+    const esFijo    = s.tipo === 'fijo';
+    const adicional = esFijo ? 0 : s.monto;
+    // Rango: hace falta un importe > 0. Fijo: alcanza con que el total sea > 0.
+    const invalido = esFijo ? (importe + adicional <= 0) : (importe <= 0);
+    if (invalido) {
         agrImporte.focus();
         agrImporte.classList.add('cobro-input-error');
         setTimeout(() => agrImporte.classList.remove('cobro-input-error'), 1200);
@@ -517,8 +587,8 @@ document.getElementById('btnAgregarItem').addEventListener('click', () => {
         descripcion:              s.descripcion,
         proveedor:                s.proveedor || '',
         monto_factura:            importe,
-        monto_adicional:          estado.sinAdicional ? 0 : s.adicional,
-        monto_adicional_original: s.adicional,
+        monto_adicional:          estado.sinAdicional ? 0 : adicional,
+        monto_adicional_original: adicional,
         canal,
         _modo:           'texto',
     });

@@ -30,25 +30,57 @@ from .views_caja_grande import get_pendiente_caja_grande
 # LÓGICA DE RANGOS
 # ═══════════════════════════════════════════════════════════
 
-def resolver_adicional(familia: str, valor_boleta: float):
-    familia = familia.strip().upper()
+def resolver_adicional(clave: str, valor_boleta=None):
+    """
+    Resuelve qué Servicio corresponde a lo que el cajero escribió en
+    "Prefijo/Código" (puede ser un prefijo de familia o el código completo).
 
+    - tipo 'fijo': no depende del importe. Se resuelve si hay exactamente
+      un servicio fijo en la familia, o si `clave` es el código exacto de
+      un servicio fijo (ej. "ACN2"). Si la familia tiene varios fijos
+      distintos, devuelve tipo 'elegir' con la lista.
+    - tipo 'rango': necesita `valor_boleta` para elegir el tramo por
+      rango_desde/rango_hasta. Si no viene el importe y la familia solo
+      tiene tramos rango, devuelve tipo 'necesita_importe'.
+    """
+    clave = clave.strip().upper()
+
+    # Código exacto de un servicio fijo (ej. "ACN2", "EC1") → directo.
+    exacto_fijo = Servicio.objects.filter(
+        activo=True, codigo=clave, tipo_precio=Servicio.TIPO_FIJO,
+    ).first()
+    if exacto_fijo:
+        return {'servicio': exacto_fijo, 'tipo': 'fijo'}
+
+    familia = clave
     fijos = list(Servicio.objects.filter(
         activo=True, familia=familia, tipo_precio=Servicio.TIPO_FIJO,
     ))
-    rangos_coinciden = list(Servicio.objects.filter(
+    rangos_familia = Servicio.objects.filter(
         activo=True, familia=familia, tipo_precio=Servicio.TIPO_RANGO,
-        rango_desde__lte=valor_boleta, rango_hasta__gte=valor_boleta,
-    ))
+    )
 
-    if len(rangos_coinciden) == 1:
-        return {'servicio': rangos_coinciden[0], 'tipo': 'rango'}
-    if len(rangos_coinciden) > 1:
-        return {'servicio': None, 'tipo': 'conflicto', 'conflicto': rangos_coinciden}
+    if valor_boleta is not None:
+        rangos_coinciden = list(rangos_familia.filter(
+            rango_desde__lte=valor_boleta, rango_hasta__gte=valor_boleta,
+        ))
+        if len(rangos_coinciden) == 1:
+            return {'servicio': rangos_coinciden[0], 'tipo': 'rango'}
+        if len(rangos_coinciden) > 1:
+            return {'servicio': None, 'tipo': 'conflicto', 'conflicto': rangos_coinciden}
+
     if len(fijos) == 1:
         return {'servicio': fijos[0], 'tipo': 'fijo'}
     if len(fijos) > 1:
-        return {'servicio': None, 'tipo': 'conflicto', 'conflicto': fijos}
+        # No es un error de carga: una familia puede tener varios trámites
+        # fijos (ej. ACN1/ACN2/ACN3). El cajero tiene que elegir cuál.
+        return {'servicio': None, 'tipo': 'elegir', 'opciones': fijos}
+
+    # Sin servicio fijo. Si la familia tiene tramos rango pero todavía no
+    # sabemos el importe de la boleta, hay que pedirlo.
+    if rangos_familia.exists() and valor_boleta is None:
+        return {'servicio': None, 'tipo': 'necesita_importe'}
+
     return {'servicio': None, 'tipo': 'no_encontrado'}
 
 
@@ -173,26 +205,48 @@ class BuscarServicioAjax(LoginRequiredMixin, View):
         prefijo   = request.GET.get('prefijo', '').strip()
         valor_raw = request.GET.get('valor', '').strip()
 
-        if prefijo and valor_raw:
-            try:
-                valor = float(valor_raw.replace(',', '.'))
-            except ValueError:
-                return JsonResponse({'error': 'El valor de boleta debe ser un número.'}, status=400)
+        if prefijo:
+            valor = None
+            if valor_raw:
+                try:
+                    valor = float(valor_raw.replace(',', '.'))
+                except ValueError:
+                    return JsonResponse({'error': 'El valor de boleta debe ser un número.'}, status=400)
 
             resultado = resolver_adicional(prefijo, valor)
 
-            if resultado['tipo'] == 'no_encontrado':
+            if resultado['tipo'] == 'necesita_importe':
                 return JsonResponse({
                     'encontrado': False,
-                    'mensaje': f'No se encontró ningún servicio activo con prefijo "{prefijo.upper()}" '
-                               f'que cubra el valor ${valor:,.2f}.',
+                    'necesita_importe': True,
+                    'mensaje': f'El servicio con prefijo "{prefijo.upper()}" se cobra según el '
+                               f'importe de la boleta. Ingresá el importe y buscá de nuevo.',
+                })
+            if resultado['tipo'] == 'no_encontrado':
+                detalle = f' que cubra el valor ${valor:,.2f}' if valor is not None else ''
+                return JsonResponse({
+                    'encontrado': False,
+                    'mensaje': f'No se encontró ningún servicio activo con prefijo '
+                               f'"{prefijo.upper()}"{detalle}.',
+                })
+            if resultado['tipo'] == 'elegir':
+                # Varios servicios fijos en la familia — el cajero elige uno.
+                return JsonResponse({
+                    'encontrado': False,
+                    'elegir': True,
+                    'mensaje': f'Con "{prefijo.upper()}" hay varios servicios. Elegí cuál:',
+                    'opciones': [
+                        {'id': s.pk, 'codigo': s.codigo, 'descripcion': s.descripcion,
+                         'monto': str(s.monto)}
+                        for s in resultado['opciones']
+                    ],
                 })
             if resultado['tipo'] == 'conflicto':
                 codigos = ', '.join(s.codigo for s in resultado['conflicto'])
                 return JsonResponse({
                     'encontrado': False,
-                    'mensaje': f'Conflicto: varios servicios ({codigos}) coinciden con ese valor. '
-                               f'Revisá los rangos cargados.',
+                    'mensaje': f'Hay rangos superpuestos ({codigos}) para ese importe. '
+                               f'Revisá los rangos cargados en ABM Servicios.',
                 })
             s = resultado['servicio']
             return JsonResponse({
@@ -222,7 +276,9 @@ class BuscarServicioAjax(LoginRequiredMixin, View):
             qs = qs.filter(
                 Q(codigo__icontains=q) | Q(descripcion__icontains=q) | Q(proveedor__icontains=q)
             )
-        servicios = list(qs.values('id', 'codigo', 'descripcion', 'monto', 'proveedor')[:20])
+        servicios = list(qs.values(
+            'id', 'codigo', 'descripcion', 'monto', 'tipo_precio', 'proveedor'
+        )[:20])
         return JsonResponse({'servicios': servicios})
 
 

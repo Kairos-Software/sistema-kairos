@@ -446,8 +446,10 @@
                 <p class="ayuda-seccion-titulo" style="margin-top:1rem;"><i class="bi bi-box-seam" aria-hidden="true"></i> Servicios "Fijo" (costo propio)</p>
                 <p class="ayuda-texto">
                     Para servicios propios de costo fijo (fotocopias, trámites, gestiones, desarrollo de
-                    software, etc.). El sistema ignora el valor de la boleta y siempre cobra el monto
-                    cargado en el servicio.
+                    software, etc.). El sistema ignora el valor de la boleta y siempre cobra el
+                    <strong>monto</strong> cargado en el servicio. Al cobrar, el cajero escribe solo
+                    el prefijo (ej. <code class="ayuda-code">AP</code>) y el sistema trae el servicio
+                    directo, sin pedir importe.
                 </p>
 
                 <div class="ayuda-advertencia">
@@ -468,7 +470,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/gestion_servicios.js' %}"></script>
+<script src="{% static 'cobranzas/js/gestion_servicios.js' %}?v=20260828-1"></script>
 <script>
     window.servicioAccionesUrl   = "{% url 'cobranzas:servicio_acciones' %}";
     window.servicioEliminarUrl   = "{% url 'cobranzas:servicio_eliminar' %}";
