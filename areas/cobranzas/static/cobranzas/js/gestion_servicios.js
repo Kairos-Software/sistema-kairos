@@ -60,16 +60,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const idCodigo                = document.getElementById('id_codigo');
 
     // Tipo de precio / rango
-    const selectTipoPrecio = document.getElementById('id_tipo_precio');
-    const wrapRangoDesde   = document.getElementById('wrapRangoDesde');
-    const wrapRangoHasta   = document.getElementById('wrapRangoHasta');
-    const inputRangoDesde  = document.getElementById('id_rango_desde');
-    const inputRangoHasta  = document.getElementById('id_rango_hasta');
+    const selectTipoPrecio  = document.getElementById('id_tipo_precio');
+    const wrapRangoDesde    = document.getElementById('wrapRangoDesde');
+    const wrapRangoHasta    = document.getElementById('wrapRangoHasta');
+    const inputRangoDesde   = document.getElementById('id_rango_desde');
+    const inputRangoHasta   = document.getElementById('id_rango_hasta');
+    const wrapAdicionalFijo = document.getElementById('wrapAdicionalFijo');
+    const inputAdicionalFijo= document.getElementById('id_adicional_fijo');
+    const hintMonto         = document.getElementById('hintMonto');
 
     function actualizarVisibilidadRango() {
         const esRango = selectTipoPrecio?.value === 'rango';
         if (wrapRangoDesde) wrapRangoDesde.style.display = esRango ? '' : 'none';
         if (wrapRangoHasta) wrapRangoHasta.style.display = esRango ? '' : 'none';
+        // El adicional propio solo aplica a los servicios "Fijo".
+        if (wrapAdicionalFijo) wrapAdicionalFijo.style.display = esRango ? 'none' : '';
+        if (hintMonto) {
+            hintMonto.textContent = esRango
+                ? 'Adicional a cobrar en este tramo (nuestra ganancia).'
+                : 'Precio base del servicio (lo que cuesta). La ganancia va en "Adicional".';
+        }
     }
 
     if (selectTipoPrecio) {
@@ -484,8 +494,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('id_proveedor').value   = '';
         idCodigo.value = '';
         if (selectTipoPrecio) selectTipoPrecio.value = 'fijo';
-        if (inputRangoDesde)  inputRangoDesde.value  = '';
-        if (inputRangoHasta)  inputRangoHasta.value  = '';
+        if (inputRangoDesde)   inputRangoDesde.value   = '';
+        if (inputRangoHasta)   inputRangoHasta.value   = '';
+        if (inputAdicionalFijo) inputAdicionalFijo.value = '';
         actualizarVisibilidadRango();
 
         // Resetear selector de código: restaurar último prefijo si corresponde
@@ -516,6 +527,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('id_proveedor').value       = servicio.proveedor || '';
         document.getElementById('id_activo').checked        = servicio.activo === true;
         document.getElementById('id_monto').value           = parseMonto(servicio.monto);
+        if (inputAdicionalFijo) inputAdicionalFijo.value = servicio.adicional_fijo != null ? parseMonto(servicio.adicional_fijo) : '';
         if (selectTipoPrecio) selectTipoPrecio.value = servicio.tipo_precio || 'fijo';
         if (inputRangoDesde)  inputRangoDesde.value  = servicio.rango_desde != null ? parseMonto(servicio.rango_desde) : '';
         if (inputRangoHasta)  inputRangoHasta.value  = servicio.rango_hasta != null ? parseMonto(servicio.rango_hasta) : '';
@@ -549,6 +561,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const estadoText  = servicio.activo ? 'Activo' : 'Inactivo';
         const montoFmt    = parseFloat(servicio.monto).toFixed(2);
         const proveedor   = servicio.proveedor || '—';
+        const esRango     = (servicio.tipo_precio || 'fijo') === 'rango';
+        const adicFijo    = parseFloat(servicio.adicional_fijo || 0);
+        const rangoCell   = esRango
+            ? `<span class="rango-badge">$${parseFloat(servicio.rango_desde || 0).toFixed(0)} – $${parseFloat(servicio.rango_hasta || 0).toFixed(0)}</span>`
+            : `<span class="rango-badge rango-badge-fijo">Fijo</span>${adicFijo ? ` <span class="rango-badge" style="margin-left:.25rem;">+$${adicFijo.toFixed(0)} adic.</span>` : ''}`;
 
         const accionesHtml = tieneAcciones ? `
             <td>
@@ -571,15 +588,17 @@ document.addEventListener('DOMContentLoaded', function () {
         tr.dataset.monto       = montoFmt;
         tr.dataset.proveedor   = servicio.proveedor || '';
         tr.dataset.activo      = servicio.activo ? 'true' : 'false';
-        tr.dataset.tipoPrecio  = servicio.tipo_precio || 'fijo';
-        tr.dataset.rangoDesde  = servicio.rango_desde != null ? servicio.rango_desde : '';
-        tr.dataset.rangoHasta  = servicio.rango_hasta != null ? servicio.rango_hasta : '';
-        tr.dataset.search      = `${servicio.codigo.toLowerCase()} ${servicio.descripcion.toLowerCase()} ${(servicio.proveedor || '').toLowerCase()}`;
+        tr.dataset.tipoPrecio    = servicio.tipo_precio || 'fijo';
+        tr.dataset.adicionalFijo = adicFijo.toFixed(2);
+        tr.dataset.rangoDesde    = servicio.rango_desde != null ? servicio.rango_desde : '';
+        tr.dataset.rangoHasta    = servicio.rango_hasta != null ? servicio.rango_hasta : '';
+        tr.dataset.search        = `${servicio.codigo.toLowerCase()} ${servicio.descripcion.toLowerCase()} ${(servicio.proveedor || '').toLowerCase()}`;
 
         tr.innerHTML = `
             <td><span class="codigo-badge">${servicio.codigo}</span></td>
             <td>${servicio.descripcion}</td>
             <td><strong>$${montoFmt}</strong></td>
+            <td>${rangoCell}</td>
             <td>${proveedor}</td>
             <td><span class="estado-badge ${estadoClass}">${estadoText}</span></td>
             ${accionesHtml}
@@ -594,6 +613,7 @@ document.addEventListener('DOMContentLoaded', function () {
             poblarFormulario({
                 id: servicio.id, codigo: servicio.codigo,
                 descripcion: servicio.descripcion, monto: servicio.monto,
+                adicional_fijo: servicio.adicional_fijo,
                 proveedor: servicio.proveedor, activo: servicio.activo === true,
                 tipo_precio: servicio.tipo_precio, rango_desde: servicio.rango_desde,
                 rango_hasta: servicio.rango_hasta
@@ -641,15 +661,16 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener('click', () => {
             const row = btn.closest('tr');
             poblarFormulario({
-                id:          row.dataset.id,
-                codigo:      row.dataset.codigo,
-                descripcion: row.dataset.descripcion,
-                monto:       row.dataset.monto,
-                proveedor:   row.dataset.proveedor,
-                activo:      row.dataset.activo === 'true',
-                tipo_precio: row.dataset.tipoPrecio,
-                rango_desde: row.dataset.rangoDesde || null,
-                rango_hasta: row.dataset.rangoHasta || null
+                id:             row.dataset.id,
+                codigo:         row.dataset.codigo,
+                descripcion:    row.dataset.descripcion,
+                monto:          row.dataset.monto,
+                adicional_fijo: row.dataset.adicionalFijo || 0,
+                proveedor:      row.dataset.proveedor,
+                activo:         row.dataset.activo === 'true',
+                tipo_precio:    row.dataset.tipoPrecio,
+                rango_desde:    row.dataset.rangoDesde || null,
+                rango_hasta:    row.dataset.rangoHasta || null
             });
             modal?.show();
         });

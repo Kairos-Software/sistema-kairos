@@ -82,7 +82,12 @@ class Servicio(models.Model):
     codigo      = models.CharField(max_length=20, unique=True)
     descripcion = models.CharField(max_length=300)
     monto       = models.DecimalField(max_digits=12, decimal_places=2,
-                                       help_text="Precio fijo, o adicional a cobrar cuando tipo_precio='rango'")
+                                       help_text="tipo_precio='fijo': precio base del servicio (lo que cuesta). "
+                                                 "tipo_precio='rango': adicional a cobrar en ese tramo.")
+    adicional_fijo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'),
+                                       help_text="Solo tipo_precio='fijo': nuestra ganancia por operación. "
+                                                 "Se cobra ADEMÁS del monto (el cliente paga monto + adicional_fijo). "
+                                                 "En tipo_precio='rango' no se usa (la ganancia es el campo 'monto').")
     activo      = models.BooleanField(default=True)
     proveedor   = models.CharField(max_length=100, blank=True)
 

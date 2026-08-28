@@ -41,9 +41,10 @@
                 <div>
                     <h5 class="modal-title">Importar servicios desde CSV</h5>
                     <p class="modal-subtitle">
-                        Columnas esperadas: codigo, descripcion, monto, activo, proveedor,
-                        tipo_precio, rango_desde, rango_hasta. Se actualiza por código
-                        (si ya existe, se pisa; si no, se crea).
+                        Columnas esperadas: codigo, descripcion, monto, adicional_fijo, activo,
+                        proveedor, tipo_precio, rango_desde, rango_hasta. La columna
+                        <code>adicional_fijo</code> es opcional (si falta, queda en 0). Se actualiza
+                        por código (si ya existe, se pisa; si no, se crea).
                     </p>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -153,6 +154,7 @@
                 data-proveedor="{{ servicio.proveedor }}"
                 data-activo="{{ servicio.activo|yesno:'true,false' }}"
                 data-tipo-precio="{{ servicio.tipo_precio }}"
+                data-adicional-fijo="{{ servicio.adicional_fijo|floatformat:2 }}"
                 data-rango-desde="{{ servicio.rango_desde|default_if_none:'' }}"
                 data-rango-hasta="{{ servicio.rango_hasta|default_if_none:'' }}"
                 data-search="{{ servicio.codigo|lower }} {{ servicio.descripcion|lower }} {{ servicio.proveedor|lower }}">
@@ -164,6 +166,7 @@
                         <span class="rango-badge">${{ servicio.rango_desde|floatformat:0 }} – ${{ servicio.rango_hasta|floatformat:0 }}</span>
                     {% else %}
                         <span class="rango-badge rango-badge-fijo">Fijo</span>
+                        {% if servicio.adicional_fijo %}<span class="rango-badge" style="margin-left:.25rem;">+${{ servicio.adicional_fijo|floatformat:0 }} adic.</span>{% endif %}
                     {% endif %}
                 </td>
                 <td>{{ servicio.proveedor|default:'—' }}</td>
@@ -352,6 +355,11 @@
                             <input type="number" class="form-control" name="monto" id="id_monto" step="0.01" placeholder="0.00">
                             <span class="codigo-hint" id="hintMonto"></span>
                         </div>
+                        <div class="col-md-4" id="wrapAdicionalFijo">
+                            <label class="form-label">Adicional / ganancia ($)</label>
+                            <input type="number" class="form-control" name="adicional_fijo" id="id_adicional_fijo" step="0.01" placeholder="0.00">
+                            <span class="codigo-hint">Se cobra ADEMÁS del monto. Ej: monto 4000 + adicional 200 → el cliente paga 4200. 0 si no cobrás nada extra.</span>
+                        </div>
                         <div class="col-md-4">
                             <label class="form-label">Proveedor</label>
                             <input type="text" class="form-control" name="proveedor" id="id_proveedor"
@@ -443,13 +451,16 @@
                     monto de la boleta, y el sistema encuentra automáticamente el tramo que corresponde.
                 </p>
 
-                <p class="ayuda-seccion-titulo" style="margin-top:1rem;"><i class="bi bi-box-seam" aria-hidden="true"></i> Servicios "Fijo" (costo propio)</p>
+                <p class="ayuda-seccion-titulo" style="margin-top:1rem;"><i class="bi bi-box-seam" aria-hidden="true"></i> Servicios "Fijo" (precio propio)</p>
                 <p class="ayuda-texto">
-                    Para servicios propios de costo fijo (fotocopias, trámites, gestiones, desarrollo de
-                    software, etc.). El sistema ignora el valor de la boleta y siempre cobra el
-                    <strong>monto</strong> cargado en el servicio. Al cobrar, el cajero escribe solo
-                    el prefijo (ej. <code class="ayuda-code">AP</code>) y el sistema trae el servicio
-                    directo, sin pedir importe.
+                    Para servicios propios de precio fijo (fotocopias, trámites, gestiones, antecedentes,
+                    desarrollo de software, etc.). Se cargan dos montos: el <strong>Monto</strong>
+                    (precio base / lo que cuesta) y el <strong>Adicional / ganancia</strong> (lo que
+                    ganás vos, se cobra ADEMÁS del monto). El cliente paga la suma de los dos; en
+                    Ganancias solo cuenta el adicional. Si un servicio no lleva ganancia extra, dejá
+                    el adicional en 0. Al cobrar, el cajero escribe solo el prefijo o el código
+                    (ej. <code class="ayuda-code">ACN2</code>) y el sistema trae el servicio directo,
+                    sin pedir importe.
                 </p>
 
                 <div class="ayuda-advertencia">
@@ -470,7 +481,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/gestion_servicios.js' %}?v=20260828-1"></script>
+<script src="{% static 'cobranzas/js/gestion_servicios.js' %}?v=20260828-2"></script>
 <script>
     window.servicioAccionesUrl   = "{% url 'cobranzas:servicio_acciones' %}";
     window.servicioEliminarUrl   = "{% url 'cobranzas:servicio_eliminar' %}";

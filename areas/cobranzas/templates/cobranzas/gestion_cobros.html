@@ -86,10 +86,11 @@
             </div>
 
             <p class="cobro-hint-texto">
-                Escribí el prefijo del servicio (ej: <strong>EX</strong> para el código "EX1").
-                Para boletas de terceros (luz, SUBE…) agregá también el importe de la boleta;
-                para trámites de precio fijo alcanza con el prefijo. El sistema detecta el
-                servicio automáticamente.
+                Escribí el prefijo o el código del servicio (ej: <strong>CF</strong>, <strong>ACN2</strong>).
+                <strong>Boletas de terceros</strong> (luz, SUBE, DirecTV…): agregá también el importe de la
+                boleta y el sistema busca el tramo y su adicional.
+                <strong>Trámites de precio fijo</strong> (antecedentes, certificados, fotocopias…): alcanza
+                con el prefijo — trae el servicio directo con su precio y su adicional ya cargados.
             </p>
 
             <div id="smartBuscando" class="cobro-buscando" style="display:none;">
@@ -235,8 +236,8 @@
                 <div class="cobro-carga-fields">
 
                     <div class="cobro-field-full">
-                        <label class="cobro-label-principal">
-                            Importe de la factura
+                        <label class="cobro-label-principal" id="agrImporteLabel">
+                            <span id="agrImporteLabelText">Importe de la factura</span>
                             <span class="cobro-requerido">*</span>
                         </label>
                         <div class="cobro-input-grande-wrap">
@@ -244,6 +245,7 @@
                             <input type="number" id="agrImporte" min="0" step="0.01"
                                    placeholder="0,00" class="cobro-input-grande">
                         </div>
+                        <p class="cobro-hint-texto" style="margin-top:.2rem;" id="agrImporteHint"></p>
                     </div>
 
                     <div class="cobro-fields-row">
@@ -422,7 +424,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260828-4"></script>
+<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260828-5"></script>
 <script>
     window.cobroBuscarUrl    = "{% url 'cobranzas:cobro_buscar_servicio' %}";
     window.cobroConfirmarUrl = "{% url 'cobranzas:cobro_confirmar' %}";

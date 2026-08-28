@@ -237,7 +237,7 @@ class BuscarServicioAjax(LoginRequiredMixin, View):
                     'mensaje': f'Con "{prefijo.upper()}" hay varios servicios. Elegí cuál:',
                     'opciones': [
                         {'id': s.pk, 'codigo': s.codigo, 'descripcion': s.descripcion,
-                         'monto': str(s.monto)}
+                         'monto': str(s.monto), 'adicional_fijo': str(s.adicional_fijo)}
                         for s in resultado['opciones']
                     ],
                 })
@@ -253,11 +253,12 @@ class BuscarServicioAjax(LoginRequiredMixin, View):
                 'encontrado': True,
                 'tipo': resultado['tipo'],
                 'servicio': {
-                    'id':          s.pk,
-                    'codigo':      s.codigo,
-                    'descripcion': s.descripcion,
-                    'monto':       str(s.monto),
-                    'proveedor':   s.proveedor,
+                    'id':             s.pk,
+                    'codigo':         s.codigo,
+                    'descripcion':    s.descripcion,
+                    'monto':          str(s.monto),
+                    'adicional_fijo': str(s.adicional_fijo),
+                    'proveedor':      s.proveedor,
                 },
             })
 
@@ -277,7 +278,8 @@ class BuscarServicioAjax(LoginRequiredMixin, View):
                 Q(codigo__icontains=q) | Q(descripcion__icontains=q) | Q(proveedor__icontains=q)
             )
         servicios = list(qs.values(
-            'id', 'codigo', 'descripcion', 'monto', 'tipo_precio', 'proveedor'
+            'id', 'codigo', 'descripcion', 'monto', 'adicional_fijo',
+            'tipo_precio', 'proveedor'
         )[:20])
         return JsonResponse({'servicios': servicios})
 

@@ -249,16 +249,17 @@ const elSmartOpciones      = document.getElementById('smartOpciones');
 const elSmartOpcionesMsg   = document.getElementById('smartOpcionesMsg');
 const elSmartOpcionesLista = document.getElementById('smartOpcionesLista');
 const SMART_HINT_RANGO = 'Este es el importe que ingresaste. Si es incorrecto, usá el botón de cerrar para volver a buscar.';
-const SMART_HINT_FIJO  = 'Servicio de precio fijo — se cobra este monto, no hace falta el importe de una boleta.';
+const SMART_HINT_FIJO  = 'Precio base del servicio. El adicional (nuestra ganancia) se cobra aparte — el total ya lo incluye.';
 
 // Muestra el panel "servicio detectado".
-//   FIJO : servicio.monto ES el precio del servicio → va a "factura", sin adicional.
+//   FIJO : servicio.monto = precio base; adicional_fijo = nuestra ganancia.
+//          El cliente paga monto + adicional_fijo.
 //   RANGO: servicio.monto es el adicional del tramo; "factura" = importe ingresado.
 function smartMostrarResultado(s, tipo, importe) {
     const esFijo    = tipo === 'fijo';
     const monto     = parseFloat(s.monto);
     const factura   = esFijo ? monto : (importe || 0);
-    const adicional = esFijo ? 0 : monto;
+    const adicional = esFijo ? parseFloat(s.adicional_fijo || 0) : monto;
 
     estado.smartServicio = { ...s, _tipo: tipo };
     estado.smartImporte  = factura;
@@ -286,15 +287,18 @@ function smartMostrarResultado(s, tipo, importe) {
 function smartMostrarOpciones(mensaje, opciones) {
     if (!elSmartOpciones) return;
     elSmartOpcionesMsg.textContent = mensaje || 'Elegí el servicio:';
-    elSmartOpcionesLista.innerHTML = opciones.map(o => `
+    elSmartOpcionesLista.innerHTML = opciones.map(o => {
+        const adic = parseFloat(o.adicional_fijo || 0);
+        const info = adic > 0 ? `${fmt(o.monto)} + ${fmt(adic)}` : fmt(o.monto);
+        return `
         <div class="cobro-resultado-item" tabindex="0" data-op-id="${o.id}">
             <div class="cobro-resultado-top">
                 <span class="codigo-badge">${esc(o.codigo)}</span>
-                <span class="cobro-resultado-adicional">${fmt(o.monto)}</span>
+                <span class="cobro-resultado-adicional">${info}</span>
             </div>
             <div class="cobro-resultado-desc">${esc(o.descripcion)}</div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
     elSmartOpcionesLista.querySelectorAll('.cobro-resultado-item').forEach((el, i) => {
         const elegir = () => smartMostrarResultado(opciones[i], 'fijo', 0);
         el.addEventListener('click', elegir);
@@ -368,9 +372,9 @@ document.getElementById('btnSmartAgregar').addEventListener('click', () => {
     const monto     = parseFloat(s.monto);
     const esFijo    = s._tipo === 'fijo';
     const factura   = esFijo ? monto : estado.smartImporte;
-    const adicional = esFijo ? 0 : monto;
+    const adicional = esFijo ? parseFloat(s.adicional_fijo || 0) : monto;
 
-    // Rango: hace falta un importe válido. Fijo: alcanza con que el monto sea > 0.
+    // Rango: hace falta un importe válido. Fijo: alcanza con que el total sea > 0.
     if (!esFijo && (!factura || factura <= 0)) return;
     if (factura + adicional <= 0) return;
 
@@ -462,16 +466,21 @@ async function buscarServicios(q) {
             return;
         }
 
-        // "monto" del servicio: en fijo es el precio; en rango es el adicional del tramo.
+        // "monto": en fijo es el precio base; en rango es el adicional del tramo.
+        // "adicional_fijo": solo fijo, nuestra ganancia que se cobra aparte.
         listaResultados.innerHTML = data.servicios.map(s => {
             const esFijo = (s.tipo_precio || 'fijo') === 'fijo';
-            const infoDerecha = esFijo ? `${fmt(s.monto)} (fijo)` : `+${fmt(s.monto)} adicional`;
+            const adic   = parseFloat(s.adicional_fijo || 0);
+            const infoDerecha = esFijo
+                ? (adic > 0 ? `${fmt(s.monto)} + ${fmt(adic)} adic.` : `${fmt(s.monto)} (fijo)`)
+                : `+${fmt(s.monto)} adicional`;
             return `
             <div class="cobro-resultado-item" tabindex="0"
                  data-id="${s.id}"
                  data-codigo="${esc(s.codigo)}"
                  data-descripcion="${esc(s.descripcion)}"
                  data-monto="${s.monto}"
+                 data-adicional-fijo="${s.adicional_fijo || 0}"
                  data-tipo="${esc(s.tipo_precio || 'fijo')}"
                  data-proveedor="${esc(s.proveedor || '')}">
                 <div class="cobro-resultado-top">
@@ -487,12 +496,13 @@ async function buscarServicios(q) {
 
         listaResultados.querySelectorAll('.cobro-resultado-item').forEach(el => {
             const abrir = () => seleccionarServicio({
-                id:          parseInt(el.dataset.id),
-                codigo:      el.dataset.codigo,
-                descripcion: el.dataset.descripcion,
-                monto:       parseFloat(el.dataset.monto),
-                tipo:        el.dataset.tipo || 'fijo',
-                proveedor:   el.dataset.proveedor,
+                id:           parseInt(el.dataset.id),
+                codigo:       el.dataset.codigo,
+                descripcion:  el.dataset.descripcion,
+                monto:        parseFloat(el.dataset.monto),
+                adicionalFijo: parseFloat(el.dataset.adicionalFijo || 0),
+                tipo:         el.dataset.tipo || 'fijo',
+                proveedor:    el.dataset.proveedor,
             });
             el.addEventListener('click', abrir);
             el.addEventListener('keydown', e => { if (e.key === 'Enter') abrir(); });
@@ -510,9 +520,9 @@ function seleccionarServicio(s) {
     estado.textoServicioSeleccionado = s;
 
     const esFijo    = s.tipo === 'fijo';
-    // Fijo: monto es el precio del servicio (va a factura, sin adicional).
-    // Rango: monto es el adicional del tramo.
-    const adicional = esFijo ? 0 : s.monto;
+    // Fijo: monto es el precio base; adicionalFijo es nuestra ganancia (se cobra aparte).
+    // Rango: monto es el adicional del tramo; la factura la tipea el cajero.
+    const adicional = esFijo ? (s.adicionalFijo || 0) : s.monto;
 
     document.getElementById('agrCodigo').textContent      = s.codigo;
     document.getElementById('agrDescripcion').textContent = s.descripcion;
@@ -520,9 +530,19 @@ function seleccionarServicio(s) {
     document.getElementById('agrAdicional').textContent   =
         adicional.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    // Servicio fijo: precargar el precio (queda editable). Rango: en blanco,
+    // Servicio fijo: precargar el precio base (queda editable). Rango: en blanco,
     // lo tipea el cajero.
     agrImporte.value = esFijo ? s.monto.toFixed(2) : '';
+    const agrImporteLabelText = document.getElementById('agrImporteLabelText');
+    if (agrImporteLabelText) {
+        agrImporteLabelText.textContent = esFijo ? 'Precio del servicio' : 'Importe de la factura';
+    }
+    const agrImporteHint = document.getElementById('agrImporteHint');
+    if (agrImporteHint) {
+        agrImporteHint.textContent = esFijo
+            ? 'Precio base del servicio. El adicional se cobra aparte; el subtotal ya lo suma.'
+            : 'Lo que dice la boleta del cliente (luz, SUBE, etc.).';
+    }
     agrImporte.dispatchEvent(new Event('input'));
     panelAgregar.style.display = '';
 
@@ -544,7 +564,7 @@ agrImporte.addEventListener('input', () => {
     const s = estado.textoServicioSeleccionado;
     if (!s) return;
     const importe   = parseFloat(agrImporte.value) || 0;
-    const adicional = s.tipo === 'fijo' ? 0 : s.monto;
+    const adicional = s.tipo === 'fijo' ? (s.adicionalFijo || 0) : s.monto;
     const subtotal  = importe + adicional;
     const preview   = document.getElementById('subtotalPreview');
     const montoEl   = document.getElementById('subtotalPreviewMonto');
@@ -567,7 +587,7 @@ document.getElementById('btnAgregarItem').addEventListener('click', () => {
 
     const importe   = parseFloat(agrImporte.value) || 0;
     const esFijo    = s.tipo === 'fijo';
-    const adicional = esFijo ? 0 : s.monto;
+    const adicional = esFijo ? (s.adicionalFijo || 0) : s.monto;
     // Rango: hace falta un importe > 0. Fijo: alcanza con que el total sea > 0.
     const invalido = esFijo ? (importe + adicional <= 0) : (importe <= 0);
     if (invalido) {

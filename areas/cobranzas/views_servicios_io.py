@@ -21,7 +21,7 @@ from .models import Servicio
 from .views import familia_desde_codigo
 
 COLUMNAS_CSV = [
-    'codigo', 'descripcion', 'monto', 'activo', 'proveedor',
+    'codigo', 'descripcion', 'monto', 'adicional_fijo', 'activo', 'proveedor',
     'familia', 'tipo_precio', 'rango_desde', 'rango_hasta',
 ]
 
@@ -59,7 +59,8 @@ class ExportarServiciosCsvAjax(LoginRequiredMixin, View):
         servicios = sorted(Servicio.objects.all(), key=lambda s: _clave_orden_natural(s.codigo))
         for s in servicios:
             writer.writerow([
-                s.codigo, s.descripcion, s.monto, 'SI' if s.activo else 'NO',
+                s.codigo, s.descripcion, s.monto, s.adicional_fijo,
+                'SI' if s.activo else 'NO',
                 s.proveedor, s.familia, s.tipo_precio,
                 s.rango_desde if s.rango_desde is not None else '',
                 s.rango_hasta if s.rango_hasta is not None else '',
@@ -162,6 +163,11 @@ class ImportarServiciosCsvAjax(LoginRequiredMixin, View):
                 )
                 continue
 
+            # Columna opcional (los CSV viejos no la traen) → 0 por defecto.
+            adicional_fijo = _parse_decimal(fila.get('adicional_fijo', ''), 'adicional_fijo', i, errores)
+            if adicional_fijo is None:
+                adicional_fijo = Decimal('0')
+
             rango_desde = _parse_decimal(fila.get('rango_desde', ''), 'rango_desde', i, errores)
             rango_hasta = _parse_decimal(fila.get('rango_hasta', ''), 'rango_hasta', i, errores)
 
@@ -185,6 +191,7 @@ class ImportarServiciosCsvAjax(LoginRequiredMixin, View):
                 'codigo': codigo,
                 'descripcion': descripcion,
                 'monto': monto,
+                'adicional_fijo': Decimal('0') if tipo_precio == Servicio.TIPO_RANGO else adicional_fijo,
                 'activo': _parse_bool(fila.get('activo', 'SI')),
                 'proveedor': (fila.get('proveedor') or '').strip(),
                 'familia': familia,

@@ -144,6 +144,7 @@ class ServicioCrearEditarAjax(LoginRequiredMixin, View):
                 'codigo': servicio.codigo,
                 'descripcion': servicio.descripcion,
                 'monto': str(servicio.monto),
+                'adicional_fijo': str(servicio.adicional_fijo),
                 'activo': servicio.activo,
                 'proveedor': servicio.proveedor,
                 'tipo_precio': servicio.tipo_precio,
