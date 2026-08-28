@@ -134,21 +134,21 @@
 
 {# ── RESUMEN (primero) ── #}
 {% if cobros %}
-<div class="hist-resumen-grid">
+<div class="hist-resumen-grid" id="histResumenGrid">
     <div class="hist-resumen-card">
-        <span class="hist-resumen-label">Total cobros</span>
+        <span class="hist-resumen-label" id="resumenLabelCobros">Total cobros</span>
         <strong class="hist-resumen-valor" id="resumenCobros">0</strong>
     </div>
     <div class="hist-resumen-card">
-        <span class="hist-resumen-label">Total facturas</span>
+        <span class="hist-resumen-label" id="resumenLabelFacturas">Total facturas</span>
         <strong class="hist-resumen-valor" id="resumenFacturas">$0,00</strong>
     </div>
     <div class="hist-resumen-card hist-resumen-card-destacado">
-        <span class="hist-resumen-label">Total adicionales</span>
+        <span class="hist-resumen-label" id="resumenLabelAdicionales">Total adicionales</span>
         <strong class="hist-resumen-valor" id="resumenAdicionales">$0,00</strong>
     </div>
     <div class="hist-resumen-card hist-resumen-card-total">
-        <span class="hist-resumen-label">Total general</span>
+        <span class="hist-resumen-label" id="resumenLabelGeneral">Total general</span>
         <strong class="hist-resumen-valor" id="resumenGeneral">$0,00</strong>
     </div>
 </div>
@@ -615,16 +615,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ── Resumen totales ──────────────────────────────────────
-    let sumBoletas = 0, sumAdicionales = 0, sumGeneral = 0;
-    document.querySelectorAll('.hist-fila').forEach(f => {
-        sumBoletas     += parseFloat(f.dataset.totalBoletas     || 0);
-        sumAdicionales += parseFloat(f.dataset.totalAdicionales || 0);
-        sumGeneral     += parseFloat(f.dataset.totalGeneral     || 0);
-    });
-    if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(sumBoletas);
-    if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(sumAdicionales);
-    if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(sumGeneral);
+    // ── Resumen totales (global o de la selección) ───────────
+    const RESUMEN_LABELS = {
+        todos: {
+            cobros: 'Total cobros', facturas: 'Total facturas',
+            adicionales: 'Total adicionales', general: 'Total general',
+        },
+        seleccion: {
+            cobros: 'Cobros seleccionados', facturas: 'Facturas seleccionadas',
+            adicionales: 'Adicionales seleccionados', general: 'Total seleccionado',
+        },
+    };
+
+    function sumarFilas(filas) {
+        return filas.reduce((acc, f) => {
+            acc.count       += 1;
+            acc.boletas     += parseFloat(f.dataset.totalBoletas     || 0);
+            acc.adicionales += parseFloat(f.dataset.totalAdicionales || 0);
+            acc.general     += parseFloat(f.dataset.totalGeneral     || 0);
+            return acc;
+        }, { count: 0, boletas: 0, adicionales: 0, general: 0 });
+    }
+
+    // Pinta las 4 cards: con la selección actual si hay algo tildado,
+    // o con el total de todas las filas visibles si no hay nada.
+    function pintarResumen() {
+        if (!el('histResumenGrid')) return;
+        const filasSel = [...document.querySelectorAll('.check-cobro:checked')]
+            .map(c => c.closest('.hist-fila')).filter(Boolean);
+        const modoSeleccion = filasSel.length > 0;
+        const filas  = modoSeleccion ? filasSel : [...document.querySelectorAll('.hist-fila')];
+        const t      = sumarFilas(filas);
+        const labels = modoSeleccion ? RESUMEN_LABELS.seleccion : RESUMEN_LABELS.todos;
+
+        if (el('resumenCobros'))      el('resumenCobros').textContent      = t.count;
+        if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(t.boletas);
+        if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(t.adicionales);
+        if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(t.general);
+
+        if (el('resumenLabelCobros'))      el('resumenLabelCobros').textContent      = labels.cobros;
+        if (el('resumenLabelFacturas'))    el('resumenLabelFacturas').textContent    = labels.facturas;
+        if (el('resumenLabelAdicionales')) el('resumenLabelAdicionales').textContent = labels.adicionales;
+        if (el('resumenLabelGeneral'))     el('resumenLabelGeneral').textContent     = labels.general;
+
+        el('histResumenGrid').classList.toggle('is-seleccion', modoSeleccion);
+    }
+
+    pintarResumen();
 
     // ── Modal detalle ────────────────────────────────────────
     document.querySelectorAll('.hist-btn-detalle').forEach(btn => {
@@ -674,6 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function actualizarBarra() {
         const ids   = getIdsSeleccionados();
+        pintarResumen();
         const barra = el('barraAccionesMasivas');
         if (!barra) return;
         barra.style.display = ids.length > 0 ? 'flex' : 'none';
@@ -1095,16 +1133,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         el.textContent = fmt(data.total_adicionales);
                     });
 
-                    // Recalcular resumen de cabecera
-                    sumBoletas = sumAdicionales = sumGeneral = 0;
-                    document.querySelectorAll('.hist-fila').forEach(f => {
-                        sumBoletas     += parseFloat(f.dataset.totalBoletas     || 0);
-                        sumAdicionales += parseFloat(f.dataset.totalAdicionales || 0);
-                        sumGeneral     += parseFloat(f.dataset.totalGeneral     || 0);
-                    });
-                    if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(sumBoletas);
-                    if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(sumAdicionales);
-                    if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(sumGeneral);
+                    // Recalcular resumen de cabecera (respeta la selección activa)
+                    pintarResumen();
                 }
                 modalEditar.hide();
                 // Pequeño toast de éxito visual sin alert()

@@ -187,6 +187,8 @@
     background: #f0f1f5;
     min-width: 0;
 }
+/* La barra lateral fija en escritorio vive en core/css/responsive.css
+   (regla común a todas las áreas con [data-sidebar]). */
 
 /* ══════════════════════════════════════
    PAGE HEADER

@@ -4,8 +4,13 @@
  * la composición de escritorio de cada módulo.
  */
 
+/* overflow-x: clip (no `hidden`) evita el scroll horizontal SIN convertir a
+   <html>/<body> en contenedor de scroll — con `hidden`, el eje Y pasa a
+   `auto` y eso rompe `position: sticky` de la navbar y las barras laterales.
+   La línea `hidden` queda de fallback para navegadores sin soporte de clip. */
 html {
     overflow-x: hidden;
+    overflow-x: clip;
     text-size-adjust: 100%;
     -webkit-text-size-adjust: 100%;
 }
@@ -13,6 +18,7 @@ html {
 body {
     width: 100%;
     overflow-x: hidden;
+    overflow-x: clip;
 }
 
 img,
@@ -40,6 +46,26 @@ textarea {
 .app-main--area .cobranzas-layout {
     width: 100%;
     margin: 0;
+}
+
+/* ── Escritorio: barra lateral de área realmente fija ──
+   position:sticky no sirve acá: <html>/<body> y el <main class="app-main--area">
+   dejan al sticky sin contenedor de scroll y el menú se va con el scroll de la
+   página. Con position:fixed no depende de ningún ancestro. El layout reserva
+   el ancho del menú con padding-left. Cualquier área nueva con [data-sidebar]
+   sólo necesita sumar su `*-layout` a la lista de abajo. */
+@media (min-width: 992px) {
+    .app-main--area [data-sidebar] {
+        position: fixed;
+        top: var(--navbar-height);
+        left: 0;
+        bottom: 0;
+        height: auto;
+    }
+    .app-main--area .software-layout,
+    .app-main--area .cobranzas-layout {
+        padding-left: 240px;
+    }
 }
 
 .ui-icon,

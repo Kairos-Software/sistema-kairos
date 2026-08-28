@@ -285,6 +285,21 @@
     color: #6366f1;
 }
 
+/* ─── Resumen mostrando SÓLO los cobros seleccionados ─────── */
+.hist-resumen-card {
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+
+.hist-resumen-grid.is-seleccion .hist-resumen-card {
+    border-color: #E85C0D;
+    box-shadow: 0 0 0 1px rgba(232, 92, 13, 0.2);
+    background: #fff8f4;
+}
+
+.hist-resumen-grid.is-seleccion .hist-resumen-label {
+    color: #E85C0D;
+}
+
 /* ─── Tabla de cobros ─────────────────────────────────────── */
 .table-card {
     background: #fff;
