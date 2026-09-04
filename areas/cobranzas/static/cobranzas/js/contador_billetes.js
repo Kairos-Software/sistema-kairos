@@ -7,7 +7,8 @@
 (function () {
     'use strict';
 
-    const STORAGE_KEY = 'cbp_estado'; // { abierto, minimizado }
+    const STORAGE_KEY = 'cbp_estado'; // { abierto, minimizado } — preferencia de UI (localStorage)
+    const CONTEO_KEY  = 'cbp_conteo'; // { <valor>: <cantidad> } — se mantiene mientras dure la pestaña (sessionStorage)
 
     const BILLETES = [
         { valor: 20000, label: '$20.000' },
@@ -35,6 +36,32 @@
             const actual = leerEstado();
             localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...actual, ...cambios }));
         } catch { /* localStorage no disponible */ }
+    }
+
+    // Las cantidades tipeadas van a sessionStorage: sobreviven a la navegación
+    // entre secciones (mismo tab) pero se limpian al cerrar la pestaña, para
+    // que el próximo turno no vea el conteo del anterior.
+    function guardarConteo() {
+        try {
+            const conteo = {};
+            document.querySelectorAll('.cbp-cantidad').forEach(i => {
+                if (i.value !== '') conteo[i.dataset.valor] = i.value;
+            });
+            sessionStorage.setItem(CONTEO_KEY, JSON.stringify(conteo));
+        } catch { /* sessionStorage no disponible */ }
+    }
+
+    function restaurarConteo() {
+        try {
+            const conteo = JSON.parse(sessionStorage.getItem(CONTEO_KEY)) || {};
+            document.querySelectorAll('.cbp-cantidad').forEach(i => {
+                if (conteo[i.dataset.valor] != null) i.value = conteo[i.dataset.valor];
+            });
+        } catch { /* sessionStorage no disponible */ }
+    }
+
+    function borrarConteo() {
+        try { sessionStorage.removeItem(CONTEO_KEY); } catch { /* no-op */ }
     }
 
     // ── Helpers de formato ────────────────────────────────────
@@ -166,6 +193,7 @@
 
     function limpiarContador() {
         document.querySelectorAll('.cbp-cantidad').forEach(i => { i.value = ''; });
+        borrarConteo();
         actualizarTotal();
     }
 
@@ -196,6 +224,11 @@
     // ── Restaurar estado al cargar la página ──────────────────
     function restaurarEstado() {
         const estado = leerEstado();
+
+        // Conteo tipeado antes de navegar
+        restaurarConteo();
+        actualizarTotal();
+
         if (estado.minimizado) {
             minimizado = true;
             document.getElementById('contadorBilletesPanel').classList.add('minimizado');
@@ -250,6 +283,7 @@
             if (!e.target.classList.contains('cbp-cantidad')) return;
             if (parseInt(e.target.value) < 0) e.target.value = '';
             actualizarTotal();
+            guardarConteo();
         });
 
         panel.addEventListener('keydown', e => {

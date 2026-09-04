@@ -11,6 +11,7 @@ from .views_recaudaciones import (
     RegistrarRecaudacionAjax,
     EliminarRecaudacionAjax,
     EstadoRecaudacionAjax,
+    SistemaPorCanalAjax,
     HistorialRecaudacionesView,
 )
 
@@ -75,6 +76,7 @@ urlpatterns = [
     path('recaudaciones/registrar/', RegistrarRecaudacionAjax.as_view(), name='recaudaciones_registrar'),
     path('recaudaciones/eliminar/',  EliminarRecaudacionAjax.as_view(),  name='recaudaciones_eliminar'),
     path('recaudaciones/estado/',    EstadoRecaudacionAjax.as_view(),    name='recaudaciones_estado'),
+    path('recaudaciones/sistema/',   SistemaPorCanalAjax.as_view(),      name='recaudaciones_sistema'),
     path('recaudaciones/historial/', HistorialRecaudacionesView.as_view(), name='recaudaciones_historial'),
 
     # ── Ganancias (adicionales) ─────────────────────────────

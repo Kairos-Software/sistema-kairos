@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}?v=20260825-1">
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}?v=20260828-2">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -190,51 +190,86 @@
                     <strong id="turnoCantCobros">0</strong>
                 </div>
             </div>
-            <div class="caja-totales">
-                <div class="caja-total-row">
-                    <span>Efectivo cobrado</span>
-                    <strong id="turnoTotEfectivo">$ 0,00</strong>
+            <div class="caja-balance">
+
+                {# ── BLOQUE 1: EFECTIVO (lo que tiene que estar en el cajón) ── #}
+                <div class="caja-bloque caja-bloque-efectivo">
+                    <div class="caja-bloque-titulo">
+                        Efectivo
+                        <small>Lo único que tiene que estar físicamente en el cajón</small>
+                    </div>
+                    <div class="caja-eq">
+                        <div class="caja-eq-row">
+                            <span>Fondo inicial <em>(para vueltos)</em></span>
+                            <strong id="turnoEqFondo">$ 0,00</strong>
+                        </div>
+                        <div class="caja-eq-row caja-eq-mas">
+                            <span>Cobrado en efectivo</span>
+                            <strong id="turnoTotEfectivo">$ 0,00</strong>
+                        </div>
+                        <div class="caja-eq-row caja-eq-mas">
+                            <span>Ingresos de caja</span>
+                            <strong id="turnoTotIngresos">$ 0,00</strong>
+                        </div>
+                        <div class="caja-eq-row caja-eq-menos">
+                            <span>Retiros de caja <em>(depósitos, gastos…)</em></span>
+                            <strong id="turnoTotRetiros">$ 0,00</strong>
+                        </div>
+                        <div class="caja-eq-row caja-eq-menos">
+                            <span>Extracciones <em>(efectivo entregado al cliente)</em></span>
+                            <strong id="turnoTotExtracciones">$ 0,00</strong>
+                        </div>
+                        <div class="caja-eq-row caja-eq-total">
+                            <span>Efectivo esperado en el cajón</span>
+                            <strong id="turnoEfEsperado">$ 0,00</strong>
+                        </div>
+                    </div>
+                    <p class="caja-bloque-hint">
+                        Al cerrar el turno, contá el efectivo del cajón y comparalo con este número.
+                        Las tarjetas, transferencias y QR <strong>no</strong> cuentan acá.
+                    </p>
                 </div>
-                <div class="caja-total-row">
-                    <span>Transferencia</span>
-                    <strong id="turnoTotTransferencia">$ 0,00</strong>
+
+                {# ── BLOQUE 2: OTROS MEDIOS (no entran al cajón) ── #}
+                <div class="caja-bloque caja-bloque-otros">
+                    <div class="caja-bloque-titulo">
+                        Otros medios de pago
+                        <small>No entran al cajón — van a la cuenta / plataforma</small>
+                    </div>
+                    <div class="caja-mini-grid">
+                        <div class="caja-total-row"><span>Transferencia</span><strong id="turnoTotTransferencia">$ 0,00</strong></div>
+                        <div class="caja-total-row"><span>Débito</span><strong id="turnoTotDebito">$ 0,00</strong></div>
+                        <div class="caja-total-row"><span>Crédito</span><strong id="turnoTotCredito">$ 0,00</strong></div>
+                        <div class="caja-total-row"><span>QR</span><strong id="turnoTotQR">$ 0,00</strong></div>
+                    </div>
                 </div>
-                <div class="caja-total-row">
-                    <span>Débito</span>
-                    <strong id="turnoTotDebito">$ 0,00</strong>
+
+                {# ── BLOQUE 3: FACTURACIÓN Y GANANCIA ── #}
+                <div class="caja-bloque caja-bloque-factu">
+                    <div class="caja-bloque-titulo">
+                        Facturación y ganancia
+                        <small>De todo lo cobrado, con cualquier medio de pago</small>
+                    </div>
+                    <div class="caja-eq">
+                        <div class="caja-eq-row">
+                            <span>Boletas de terceros <em>(luz, SUBE, DirecTv…)</em></span>
+                            <strong id="turnoTotBoletas">$ 0,00</strong>
+                        </div>
+                        <div class="caja-eq-row caja-eq-mas caja-eq-ganancia">
+                            <span>Nuestros adicionales <em>(ganancia)</em></span>
+                            <strong id="turnoTotAdicionales">$ 0,00</strong>
+                        </div>
+                        <div class="caja-eq-row caja-eq-total">
+                            <span>Total facturado</span>
+                            <strong id="turnoTotGeneral">$ 0,00</strong>
+                        </div>
+                    </div>
+                    <p class="caja-bloque-hint">
+                        Las <strong>boletas de terceros</strong> se depositan a PagoFácil / Rapipago
+                        (no son plata del negocio). Los <strong>adicionales</strong> son la ganancia.
+                    </p>
                 </div>
-                <div class="caja-total-row">
-                    <span>Crédito</span>
-                    <strong id="turnoTotCredito">$ 0,00</strong>
-                </div>
-                <div class="caja-total-row">
-                    <span>QR</span>
-                    <strong id="turnoTotQR">$ 0,00</strong>
-                </div>
-                <div class="caja-total-row caja-total-ingresos">
-                    <span>Ingresos de caja</span>
-                    <strong id="turnoTotIngresos">$ 0,00</strong>
-                </div>
-                <div class="caja-total-row caja-total-retiros">
-                    <span>Retiros de caja</span>
-                    <strong id="turnoTotRetiros">$ 0,00</strong>
-                </div>
-                <div class="caja-total-row caja-total-extracciones">
-                    <span>Extracciones (efectivo entregado)</span>
-                    <strong id="turnoTotExtracciones">$ 0,00</strong>
-                </div>
-                <div class="caja-total-row caja-total-gral">
-                    <span>Total general</span>
-                    <strong id="turnoTotGeneral">$ 0,00</strong>
-                </div>
-                <div class="caja-total-row caja-total-adicionales">
-                    <span>Nuestros adicionales</span>
-                    <strong id="turnoTotAdicionales">$ 0,00</strong>
-                </div>
-                <div class="caja-total-row caja-total-efectivo-esperado">
-                    <span>Efectivo esperado en caja</span>
-                    <strong id="turnoEfEsperado">$ 0,00</strong>
-                </div>
+
             </div>
             <div class="caja-resumen-acciones">
                 <button type="button" class="btn-caja-secundario" onclick="cajaSwitchTab('movimientos','abierta')">
@@ -318,7 +353,7 @@
             <div class="caja-field">
                 <label class="caja-label">
                     Efectivo físico contado
-                    <span class="caja-hint">(fondo + cobros + ingresos - retiros - extracciones)</span>
+                    <span class="caja-hint">(contá los billetes y monedas del cajón)</span>
                 </label>
                 <div class="caja-input-wrap">
                     <span class="caja-signo">$</span>
@@ -382,7 +417,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/caja.js' %}?v=20260825-1"></script>
+<script src="{% static 'cobranzas/js/caja.js' %}?v=20260828-2"></script>
 <script>
     window.cajaUrls = {
         estado:              "{% url 'cobranzas:caja_estado' %}",

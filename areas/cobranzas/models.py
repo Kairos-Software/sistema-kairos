@@ -281,6 +281,19 @@ class Turno(models.Model):
             .aggregate(t=Sum('monto_adicional'))['t'] or 0
         )
 
+    def total_boletas(self):
+        """
+        Suma de las boletas/servicios cobrados (sin el adicional propio).
+        Es la plata de terceros: lo que hay que depositar a PagoFácil/RapiPago.
+        total_boletas() + total_adicionales() = facturación total del turno.
+        """
+        from django.db.models import Sum
+        return (
+            ItemCobro.objects
+            .filter(cobro__turno=self, cobro__estado=Cobro.ESTADO_CERRADO)
+            .aggregate(t=Sum('monto_servicio'))['t'] or 0
+        )
+
 
 # ─────────────────────────────────────────────────────────────
 # MOVIMIENTO DE CAJA (retiro o ingreso)

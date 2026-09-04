@@ -23,7 +23,46 @@ from django.views import View
 
 from decimal import Decimal
 
-from .models import RecaudacionDiaria, DepositoBancario, AjusteSaldoFavor
+from .models import (
+    RecaudacionDiaria, DepositoBancario, AjusteSaldoFavor, ItemCobro, Cobro,
+)
+
+
+# Canal de ItemCobro que corresponde a cada entidad de recaudación.
+CANAL_POR_ENTIDAD = {
+    RecaudacionDiaria.ENTIDAD_PAGOFACIL: ItemCobro.CANAL_PAGOFACIL,
+    RecaudacionDiaria.ENTIDAD_RAPIPAGO:  ItemCobro.CANAL_RAPIPAGO,
+}
+
+
+def _sistema_por_canal(entidad: str, fecha) -> dict:
+    """
+    Lo que el SISTEMA registró en cobros por el canal de esa entidad, para
+    una fecha dada (según fecha_cierre del cobro). Sirve para contrastar
+    contra la recaudación que el cajero carga a mano leyéndola de la
+    plataforma: si no coinciden, hay algo mal cargado de un lado o del otro.
+
+    - 'boletas'     = SUM(monto_servicio)  → plata de terceros, lo que se deposita
+    - 'adicionales' = SUM(monto_adicional) → nuestra ganancia (no se deposita)
+    """
+    canal = CANAL_POR_ENTIDAD.get(entidad)
+    if canal is None or fecha is None:
+        return {'boletas': Decimal('0'), 'adicionales': Decimal('0'),
+                'total': Decimal('0'), 'cant': 0}
+    qs = ItemCobro.objects.filter(
+        cobro__estado=Cobro.ESTADO_CERRADO,
+        canal=canal,
+        cobro__fecha_cierre__date=fecha,
+    )
+    agg = qs.aggregate(b=Sum('monto_servicio'), a=Sum('monto_adicional'))
+    boletas = agg['b'] or Decimal('0')
+    adic = agg['a'] or Decimal('0')
+    return {
+        'boletas':     boletas,
+        'adicionales': adic,
+        'total':       boletas + adic,
+        'cant':        qs.values('cobro_id').distinct().count(),
+    }
 
 
 # ─────────────────────────────────────────────────────────────
@@ -187,6 +226,17 @@ class RecaudacionesView(LoginRequiredMixin, View):
             'rapipago':  {k: float(v) for k, v in tot_rp.items()},
         }
 
+        # Contraste sistema vs. carga manual, para la fecha del formulario
+        # (por defecto hoy, o la de la recaudación que ya exista para hoy).
+        fecha_form = recaudacion_hoy.fecha if recaudacion_hoy else hoy
+        sist_pf = _sistema_por_canal(RecaudacionDiaria.ENTIDAD_PAGOFACIL, fecha_form)
+        sist_rp = _sistema_por_canal(RecaudacionDiaria.ENTIDAD_RAPIPAGO, fecha_form)
+        sistema_json = {
+            'fecha': str(fecha_form),
+            'pagofacil': {k: (float(v) if k != 'cant' else v) for k, v in sist_pf.items()},
+            'rapipago':  {k: (float(v) if k != 'cant' else v) for k, v in sist_rp.items()},
+        }
+
         return render(request, 'cobranzas/recaudaciones.html', {
             'entidad':          entidad,
             'entidad_label':    'PagoFácil' if entidad == RecaudacionDiaria.ENTIDAD_PAGOFACIL else 'RapiPago',
@@ -195,6 +245,7 @@ class RecaudacionesView(LoginRequiredMixin, View):
             'tot_rp':           tot_rp,
             'tot_activo':       tot_activo,
             'totales_json':     totales_json,
+            'sistema_json':     sistema_json,
             'cant_pf':          cant_pf,
             'cant_rp':          cant_rp,
             'recaudacion_hoy':  recaudacion_hoy,
@@ -313,6 +364,7 @@ class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
                 es_nueva = not bool(existente)
 
         totales = _totales_por_entidad(entidad)
+        sist = _sistema_por_canal(entidad, rec.fecha)
 
         return JsonResponse({
             'success':              True,
@@ -322,6 +374,10 @@ class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
             'recaudado_pendiente':  float(totales['recaudado_pendiente']),
             'total_depositado':     float(totales['depositado']),
             'pendiente':            float(totales['pendiente']),
+            'sistema_boletas':      float(sist['boletas']),
+            'sistema_adicionales':  float(sist['adicionales']),
+            'sistema_total':        float(sist['total']),
+            'sistema_cant':         sist['cant'],
         })
 
 
@@ -397,6 +453,33 @@ class EstadoRecaudacionAjax(LoginRequiredMixin, View):
             'total_depositado':    float(totales['depositado']),
             'pendiente':           float(totales['pendiente']),
             'ultimas':             ultimas,
+        })
+
+
+class SistemaPorCanalAjax(LoginRequiredMixin, View):
+    """
+    GET ?entidad=pagofacil|rapipago&fecha=YYYY-MM-DD
+    Devuelve lo que el sistema registró en cobros por ese canal ese día,
+    para contrastarlo con la recaudación que se carga a mano.
+    """
+    def get(self, request):
+        entidad = request.GET.get('entidad', '').strip()
+        if entidad not in (RecaudacionDiaria.ENTIDAD_PAGOFACIL,
+                           RecaudacionDiaria.ENTIDAD_RAPIPAGO):
+            return JsonResponse({'error': 'Entidad inválida.'}, status=400)
+
+        fecha = parse_date(request.GET.get('fecha', '').strip())
+        if fecha is None:
+            return JsonResponse({'error': 'Fecha inválida.'}, status=400)
+
+        s = _sistema_por_canal(entidad, fecha)
+        return JsonResponse({
+            'entidad':     entidad,
+            'fecha':       str(fecha),
+            'boletas':     float(s['boletas']),
+            'adicionales': float(s['adicionales']),
+            'total':       float(s['total']),
+            'cant':        s['cant'],
         })
 
 

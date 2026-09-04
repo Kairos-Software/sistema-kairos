@@ -624,6 +624,93 @@
 
 .caja-turnos-tabla tr:hover td { background: #f8f8fb; }
 
+.caja-turnos-tabla tfoot td {
+    padding: .45rem .65rem;
+    border-top: 2px solid #e5e5ec;
+    font-weight: 700;
+    color: #444;
+    font-size: .8rem;
+}
+.caja-turnos-tabla .caja-dif-pos { color: #16a34a; font-weight: 700; }
+.caja-turnos-tabla .caja-dif-neg { color: #dc2626; font-weight: 700; }
+
+/* ── Balance del turno: 3 bloques (efectivo / otros medios / facturación) ── */
+.caja-balance {
+    display: flex;
+    flex-direction: column;
+    gap: .9rem;
+}
+.caja-cierre-bloques {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: .8rem;
+    margin-bottom: .6rem;
+}
+.caja-bloque {
+    border: 1px solid #ececf2;
+    border-radius: 10px;
+    padding: .7rem .8rem .55rem;
+    background: #fcfcfd;
+}
+.caja-bloque-efectivo { border-color: rgba(232,92,13,.28); background: rgba(232,92,13,.035); }
+.caja-bloque-titulo {
+    font-size: .82rem;
+    font-weight: 800;
+    color: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-bottom: .5rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.caja-bloque-titulo small {
+    font-size: .68rem;
+    font-weight: 500;
+    color: #999;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.caja-eq { display: flex; flex-direction: column; gap: .12rem; }
+.caja-eq-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: .28rem .45rem;
+    border-radius: 6px;
+    font-size: .84rem;
+    color: #444;
+}
+.caja-eq-row span { display: flex; gap: .3rem; align-items: baseline; flex-wrap: wrap; }
+.caja-eq-row em { font-style: normal; color: #a0a0a8; font-size: .74rem; }
+.caja-eq-row strong { white-space: nowrap; color: #222; }
+.caja-eq-row.caja-eq-mas   span::before { content: "+"; color: #16a34a; font-weight: 700; margin-right: .15rem; }
+.caja-eq-row.caja-eq-menos span::before { content: "−"; color: #dc2626; font-weight: 700; margin-right: .15rem; }
+.caja-eq-row.caja-eq-ganancia strong { color: #16a34a; }
+.caja-eq-row.caja-eq-total {
+    margin-top: .2rem;
+    border-top: 1.5px solid #e2e2ea;
+    padding-top: .38rem;
+    font-weight: 800;
+    color: #111;
+    font-size: .9rem;
+}
+.caja-eq-row.caja-eq-total span::before { content: "="; color: #888; font-weight: 700; margin-right: .15rem; }
+.caja-eq-row.caja-eq-total strong { color: #c94e0a; }
+.caja-bloque-factu .caja-eq-row.caja-eq-total strong { color: #111; }
+.caja-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: .15rem;
+}
+.caja-bloque-hint {
+    margin: .5rem 0 0;
+    font-size: .74rem;
+    line-height: 1.45;
+    color: #8a8a92;
+}
+
 /* ── Modal caja ───────────────────────────────────────────── */
 .caja-modal .modal-body { background: #fff; border-radius: 14px; }
 
@@ -655,6 +742,8 @@
 
 .caja-modal-fila span { color: #888; }
 .caja-modal-fila strong { color: #111; }
+
+.caja-modal-fila.caja-modal-sep { border-top: 2px solid #ececf2; margin-top: .25rem; padding-top: .5rem; }
 
 .caja-modal-dif.sobrante strong { color: #16a34a; }
 .caja-modal-dif.faltante strong { color: #dc2626; }

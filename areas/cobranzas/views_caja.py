@@ -35,6 +35,8 @@ def _resumen_turno(turno):
     tot_ret   = float(turno.total_retiros())
     tot_ing   = float(turno.total_ingresos())
     tot_ext   = float(turno.total_extracciones())
+    tot_bol   = float(turno.total_boletas())
+    tot_adi   = float(turno.total_adicionales())
     retiros = [
         {
             'id':     r.pk,
@@ -61,7 +63,9 @@ def _resumen_turno(turno):
         'total_ingresos':       tot_ing,
         'total_extracciones':   tot_ext,
         'total_general':        float(turno.total_general()),
-        'total_adicionales':    float(turno.total_adicionales()),
+        'total_boletas':        tot_bol,
+        'total_adicionales':    tot_adi,
+        'total_facturado':      tot_bol + tot_adi,
         'efectivo_esperado':    float(turno.efectivo_esperado()),
         'cant_cobros':          turno.cobros.filter(estado=Cobro.ESTADO_CERRADO).count(),
         'retiros':              retiros,
@@ -169,6 +173,8 @@ class CerrarTurnoAjax(LoginRequiredMixin, View):
             turno.tipo_diferencia         = tipo_dif
             turno.save()
 
+        tot_bol = float(turno.total_boletas())
+        tot_adi = float(turno.total_adicionales())
         return JsonResponse({
             'success':             True,
             'numero':              turno.numero,
@@ -177,7 +183,9 @@ class CerrarTurnoAjax(LoginRequiredMixin, View):
             'diferencia':          float(diferencia),
             'tipo_diferencia':     turno.get_tipo_diferencia_display(),
             'total_general':       float(turno.total_general()),
-            'total_adicionales':   float(turno.total_adicionales()),
+            'total_boletas':       tot_bol,
+            'total_adicionales':   tot_adi,
+            'total_facturado':     tot_bol + tot_adi,
         })
 
 
@@ -423,6 +431,12 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
                 cobro__estado=Cobro.ESTADO_CERRADO,
             ).aggregate(t=Sum('monto_adicional'))['t'] or 0
         )
+        tot_boletas = float(
+            ItemCobro.objects.filter(
+                cobro__turno_id__in=ids_turnos,
+                cobro__estado=Cobro.ESTADO_CERRADO,
+            ).aggregate(t=Sum('monto_servicio'))['t'] or 0
+        )
 
         tot_efe   = _sum_metodo(PagoCobro.METODO_EFECTIVO)
         tot_tra   = _sum_metodo(PagoCobro.METODO_TRANSFERENCIA)
@@ -448,14 +462,34 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
         monto_inicial_dia = float(turnos.first().monto_inicial)
         efectivo_esperado_dia = monto_inicial_dia + tot_efe + tot_ing - tot_ret - tot_ext
 
+        # Cada turno ya calculó su propia diferencia al cerrarse, con su propio
+        # fondo inicial. La suma de esas diferencias es el descuadre real del
+        # período, sin depender de cómo se maneje el fondo entre turnos. Si no
+        # coincide con (efectivo_fisico − efectivo_esperado_dia) del cierre,
+        # esa brecha es en sí misma un dato para revisar.
+        suma_diferencias_turnos = float(
+            turnos.aggregate(t=Sum('diferencia'))['t'] or 0
+        )
+        suma_ef_declarado = float(
+            turnos.aggregate(t=Sum('efectivo_declarado'))['t'] or 0
+        )
+        suma_monto_inicial = float(
+            turnos.aggregate(t=Sum('monto_inicial'))['t'] or 0
+        )
+
         resumen_turnos = []
         for t in turnos:
+            esp = float(t.efectivo_esperado())
+            decl = float(t.efectivo_declarado or 0)
             resumen_turnos.append({
-                'numero':    t.numero,
-                'cajero':    str(t.cajero),
-                'fecha':     t.fecha_apertura.strftime('%d/%m/%Y'),
-                'tot_gral':  float(t.total_general()),
-                'ef_decl':   float(t.efectivo_declarado or 0),
+                'numero':      t.numero,
+                'cajero':      str(t.cajero),
+                'fecha':       t.fecha_apertura.strftime('%d/%m/%Y'),
+                'monto_inicial': float(t.monto_inicial),
+                'tot_gral':    float(t.total_general()),
+                'ef_esperado': esp,
+                'ef_decl':     decl,
+                'diferencia':  float(t.diferencia if t.diferencia is not None else decl - esp),
             })
 
         return JsonResponse({
@@ -470,8 +504,13 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
             'total_ingresos':     tot_ing,
             'total_extracciones': tot_ext,
             'total_general':      tot_general,
+            'total_boletas':      tot_boletas,
             'total_adicionales':  tot_adicionales,
+            'monto_inicial_dia':  monto_inicial_dia,
+            'suma_monto_inicial': suma_monto_inicial,
             'efectivo_esperado':  efectivo_esperado_dia,
+            'suma_diferencias_turnos': suma_diferencias_turnos,
+            'suma_ef_declarado':  suma_ef_declarado,
             'turnos':             resumen_turnos,
         })
 

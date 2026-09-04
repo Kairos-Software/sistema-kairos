@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('turnoFechaApertura').textContent          = t.fecha_apertura;
         document.getElementById('turnoMontoInicial').textContent           = fmt(t.monto_inicial);
         document.getElementById('turnoCantCobros').textContent             = t.cant_cobros;
+        document.getElementById('turnoEqFondo').textContent                = fmt(t.monto_inicial);
         document.getElementById('turnoTotEfectivo').textContent            = fmt(t.total_efectivo);
         document.getElementById('turnoTotTransferencia').textContent       = fmt(t.total_transferencia);
         document.getElementById('turnoTotDebito').textContent              = fmt(t.total_debito);
@@ -78,7 +79,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('turnoTotRetiros').textContent             = fmt(t.total_retiros);
         document.getElementById('turnoTotIngresos').textContent            = fmt(t.total_ingresos);
         document.getElementById('turnoTotExtracciones').textContent        = fmt(t.total_extracciones);
-        document.getElementById('turnoTotGeneral').textContent             = fmt(t.total_general);
+        document.getElementById('turnoTotBoletas').textContent             = fmt(t.total_boletas);
+        document.getElementById('turnoTotGeneral').textContent             = fmt(t.total_facturado);
         document.getElementById('turnoTotAdicionales').textContent         = fmt(t.total_adicionales);
         document.getElementById('turnoEfEsperado').textContent             = fmt(t.efectivo_esperado);
 
@@ -375,10 +377,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const signo = diff > 0 ? '+' : '';
             document.getElementById('cierreTurnoDetalle').innerHTML = `
                 <div class="caja-modal-fila"><span>Turno</span><strong>#${data.numero}</strong></div>
-                <div class="caja-modal-fila"><span>Total general</span><strong>${fmt(data.total_general)}</strong></div>
-                <div class="caja-modal-fila"><span>Adicionales</span><strong>${fmt(data.total_adicionales)}</strong></div>
-                <div class="caja-modal-fila"><span>Efectivo esperado</span><strong>${fmt(data.efectivo_esperado)}</strong></div>
-                <div class="caja-modal-fila"><span>Efectivo declarado</span><strong>${fmt(data.efectivo_declarado)}</strong></div>
+                <div class="caja-modal-fila"><span>Boletas de terceros</span><strong>${fmt(data.total_boletas)}</strong></div>
+                <div class="caja-modal-fila"><span>Nuestros adicionales (ganancia)</span><strong>${fmt(data.total_adicionales)}</strong></div>
+                <div class="caja-modal-fila"><span>Total facturado</span><strong>${fmt(data.total_facturado)}</strong></div>
+                <div class="caja-modal-fila caja-modal-sep"><span>Efectivo esperado en el cajón</span><strong>${fmt(data.efectivo_esperado)}</strong></div>
+                <div class="caja-modal-fila"><span>Efectivo que contaste</span><strong>${fmt(data.efectivo_declarado)}</strong></div>
                 <div class="caja-modal-fila caja-modal-dif ${diff > 0 ? 'sobrante' : diff < 0 ? 'faltante' : 'ok'}">
                     <span>Diferencia</span>
                     <strong>${signo}${fmt(Math.abs(diff))} — ${data.tipo_diferencia}</strong>
@@ -428,35 +431,74 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        const clsDif = d => d > 0.005 ? 'caja-dif-pos' : d < -0.005 ? 'caja-dif-neg' : '';
+        const signo  = d => (d > 0 ? '+' : '');
+
         const filasT = data.turnos.map(t =>
             `<tr>
                 <td>#${t.numero}</td>
                 <td>${t.cajero}</td>
                 <td>${t.fecha}</td>
-                <td>${fmt(t.tot_gral)}</td>
+                <td>${fmt(t.monto_inicial)}</td>
+                <td>${fmt(t.ef_esperado)}</td>
                 <td>${fmt(t.ef_decl)}</td>
+                <td class="${clsDif(t.diferencia)}">${signo(t.diferencia)}${fmt(t.diferencia)}</td>
             </tr>`
         ).join('');
 
+        const sumaDif = data.suma_diferencias_turnos || 0;
+
         document.getElementById('cierreResumen').innerHTML = `
-            <div class="caja-cierre-info-grid">
-                <div class="caja-ci-item"><span>Turnos encontrados</span><strong>${data.cant_turnos}</strong></div>
-                <div class="caja-ci-item"><span>Total efectivo</span><strong>${fmt(data.total_efectivo)}</strong></div>
-                <div class="caja-ci-item"><span>Transferencia</span><strong>${fmt(data.total_transferencia)}</strong></div>
-                <div class="caja-ci-item"><span>Débito</span><strong>${fmt(data.total_debito)}</strong></div>
-                <div class="caja-ci-item"><span>Crédito</span><strong>${fmt(data.total_credito)}</strong></div>
-                <div class="caja-ci-item"><span>QR</span><strong>${fmt(data.total_qr)}</strong></div>
-                <div class="caja-ci-item"><span>Retiros</span><strong>${fmt(data.total_retiros)}</strong></div>
-                <div class="caja-ci-item"><span>Ingresos</span><strong>${fmt(data.total_ingresos)}</strong></div>
-                <div class="caja-ci-item"><span>Extracciones</span><strong>${fmt(data.total_extracciones)}</strong></div>
-                <div class="caja-ci-item caja-ci-general"><span>Total general</span><strong>${fmt(data.total_general)}</strong></div>
-                <div class="caja-ci-item caja-ci-adicionales"><span>Nuestros adicionales</span><strong>${fmt(data.total_adicionales)}</strong></div>
-                <div class="caja-ci-item caja-ci-esperado"><span>Efectivo esperado en caja</span><strong>${fmt(data.efectivo_esperado)}</strong></div>
+            <div class="caja-cierre-bloques">
+
+                <div class="caja-bloque caja-bloque-efectivo">
+                    <div class="caja-bloque-titulo">Efectivo del período
+                        <small>Lo que tiene que haber en el cajón</small></div>
+                    <div class="caja-eq">
+                        <div class="caja-eq-row"><span>Fondo inicial <em>(1er turno)</em></span><strong>${fmt(data.monto_inicial_dia)}</strong></div>
+                        <div class="caja-eq-row caja-eq-mas"><span>Cobrado en efectivo</span><strong>${fmt(data.total_efectivo)}</strong></div>
+                        <div class="caja-eq-row caja-eq-mas"><span>Ingresos de caja</span><strong>${fmt(data.total_ingresos)}</strong></div>
+                        <div class="caja-eq-row caja-eq-menos"><span>Retiros de caja</span><strong>${fmt(data.total_retiros)}</strong></div>
+                        <div class="caja-eq-row caja-eq-menos"><span>Extracciones entregadas</span><strong>${fmt(data.total_extracciones)}</strong></div>
+                        <div class="caja-eq-row caja-eq-total"><span>Efectivo esperado</span><strong>${fmt(data.efectivo_esperado)}</strong></div>
+                    </div>
+                </div>
+
+                <div class="caja-bloque caja-bloque-otros">
+                    <div class="caja-bloque-titulo">Otros medios <small>No entran al cajón</small></div>
+                    <div class="caja-mini-grid">
+                        <div class="caja-total-row"><span>Transferencia</span><strong>${fmt(data.total_transferencia)}</strong></div>
+                        <div class="caja-total-row"><span>Débito</span><strong>${fmt(data.total_debito)}</strong></div>
+                        <div class="caja-total-row"><span>Crédito</span><strong>${fmt(data.total_credito)}</strong></div>
+                        <div class="caja-total-row"><span>QR</span><strong>${fmt(data.total_qr)}</strong></div>
+                    </div>
+                </div>
+
+                <div class="caja-bloque caja-bloque-factu">
+                    <div class="caja-bloque-titulo">Facturación y ganancia</div>
+                    <div class="caja-eq">
+                        <div class="caja-eq-row"><span>Boletas de terceros</span><strong>${fmt(data.total_boletas)}</strong></div>
+                        <div class="caja-eq-row caja-eq-mas caja-eq-ganancia"><span>Nuestros adicionales <em>(ganancia)</em></span><strong>${fmt(data.total_adicionales)}</strong></div>
+                        <div class="caja-eq-row caja-eq-total"><span>Total facturado</span><strong>${fmt(data.total_boletas + data.total_adicionales)}</strong></div>
+                    </div>
+                </div>
+
             </div>
+
             <table class="caja-turnos-tabla">
-                <thead><tr><th>#</th><th>Cajero</th><th>Fecha</th><th>Total</th><th>Ef. Declarado</th></tr></thead>
+                <thead><tr><th>#</th><th>Cajero</th><th>Fecha</th><th>Fondo</th><th>Esperado</th><th>Declarado</th><th>Dif.</th></tr></thead>
                 <tbody>${filasT}</tbody>
+                <tfoot><tr>
+                    <td colspan="6">Suma de las diferencias que cada turno declaró al cerrar</td>
+                    <td class="${clsDif(sumaDif)}">${signo(sumaDif)}${fmt(sumaDif)}</td>
+                </tr></tfoot>
             </table>
+            <p class="caja-bloque-hint" style="margin-top:.5rem;">
+                Abajo ingresás el efectivo físico que contaste ahora. La diferencia del cierre
+                debería coincidir con la <strong>suma de diferencias de los turnos</strong>
+                (${signo(sumaDif)}${fmt(sumaDif)}). Si no coincide, revisá si entre turno y turno
+                entró o salió efectivo sin registrarse.
+            </p>
         `;
 
         document.getElementById('cierreEfectivoFisico').value = Number(data.efectivo_esperado).toFixed(2);

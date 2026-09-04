@@ -7,7 +7,8 @@
 (function () {
     'use strict';
 
-    const STORAGE_KEY = 'vp_estado'; // { abierto, minimizado }
+    const STORAGE_KEY  = 'vp_estado';   // { abierto, minimizado } — preferencia de UI (localStorage)
+    const VALORES_KEY  = 'vp_valores';  // { total, entrega } — se mantiene mientras dure la pestaña (sessionStorage)
 
     // ── Persistencia ──────────────────────────────────────────
     function leerEstado() {
@@ -21,6 +22,28 @@
             const actual = leerEstado();
             localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...actual, ...cambios }));
         } catch { /* localStorage no disponible */ }
+    }
+
+    // Los importes tipeados se guardan en sessionStorage: sobreviven a la
+    // navegación entre secciones (mismo tab) pero se limpian al cerrar la
+    // pestaña, así el próximo turno no arranca con números viejos.
+    function leerValores() {
+        try {
+            return JSON.parse(sessionStorage.getItem(VALORES_KEY)) || {};
+        } catch { return {}; }
+    }
+
+    function guardarValores() {
+        try {
+            sessionStorage.setItem(VALORES_KEY, JSON.stringify({
+                total:   document.getElementById('vpTotal').value,
+                entrega: document.getElementById('vpEntrega').value,
+            }));
+        } catch { /* sessionStorage no disponible */ }
+    }
+
+    function borrarValores() {
+        try { sessionStorage.removeItem(VALORES_KEY); } catch { /* no-op */ }
     }
 
     // ── Formato ───────────────────────────────────────────────
@@ -147,6 +170,7 @@
     function limpiar() {
         document.getElementById('vpTotal').value   = '';
         document.getElementById('vpEntrega').value = '';
+        borrarValores();
         calcular();
         document.getElementById('vpTotal').focus();
     }
@@ -191,6 +215,13 @@
     // ── Restaurar estado al cargar la página ──────────────────
     function restaurarEstado() {
         const estado = leerEstado();
+
+        // Importes tipeados antes de navegar
+        const valores = leerValores();
+        if (valores.total   != null) document.getElementById('vpTotal').value   = valores.total;
+        if (valores.entrega != null) document.getElementById('vpEntrega').value = valores.entrega;
+        calcular();
+
         if (estado.minimizado) {
             minimizado = true;
             document.getElementById('vueltoPanel').classList.add('minimizado');
@@ -240,8 +271,9 @@
 
         const panel = construirPanel();
 
-        panel.querySelector('#vpTotal').addEventListener('input', calcular);
-        panel.querySelector('#vpEntrega').addEventListener('input', calcular);
+        const onInput = () => { calcular(); guardarValores(); };
+        panel.querySelector('#vpTotal').addEventListener('input', onInput);
+        panel.querySelector('#vpEntrega').addEventListener('input', onInput);
 
         panel.querySelector('#vpTotal').addEventListener('keydown', e => {
             if (e.key === 'Tab') {

@@ -144,6 +144,22 @@
         </div>
     </div>
 
+    {# ── Contraste con lo que registró el sistema ── #}
+    <div class="rec-sistema-box" id="recSistemaBox">
+        <div class="rec-sistema-head">
+            Según el sistema — canal <strong id="recSistEntidad">{{ entidad_label }}</strong>,
+            <span id="recSistFecha">{{ hoy|date:"d/m/Y" }}</span>
+        </div>
+        <div class="rec-sistema-nums">
+            <div><span>Boletas de terceros</span><strong id="recSistBoletas">$0,00</strong></div>
+            <div><span>Adicionales <em>(ganancia)</em></span><strong id="recSistAdic">$0,00</strong></div>
+            <div><span>Cobros</span><strong id="recSistCant">0</strong></div>
+        </div>
+        <p class="rec-sistema-diff" id="recSistDiff">
+            Ingresá el importe de la plataforma para compararlo con el sistema.
+        </p>
+    </div>
+
     <div id="recError" class="alerta-inline alerta-error" style="display:none; margin-top:.8rem;"></div>
     <div id="recExito" class="alerta-inline alerta-exito" style="display:none; margin-top:.8rem;"></div>
 
@@ -249,6 +265,9 @@
                     <span>Observaciones</span>
                     <strong id="modalObs">—</strong>
                 </div>
+                <div id="modalSistemaAviso" class="alerta-inline mt-3"
+                     style="display:none; font-size:.83rem;"></div>
+
                 <div id="modalAlertaReemplazo" class="alerta-inline alerta-warn mt-3"
                      style="display:none; font-size:.83rem;">
                     Esta acción <strong>reemplazará</strong> la recaudación existente para este día.
@@ -364,6 +383,41 @@
     padding: .6rem .9rem; font-size: .87rem;
 }
 
+/* ── Contraste sistema vs. carga manual ── */
+.rec-sistema-box {
+    margin-top: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 9px;
+    padding: .7rem .9rem;
+    background: #fafafa;
+}
+.rec-sistema-head {
+    font-size: .78rem;
+    color: #6b7280;
+    margin-bottom: .5rem;
+}
+.rec-sistema-head strong { color: var(--accent, #E85C0D); }
+.rec-sistema-nums {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.6rem;
+}
+.rec-sistema-nums > div { display: flex; flex-direction: column; gap: 1px; }
+.rec-sistema-nums span { font-size: .72rem; color: #999; }
+.rec-sistema-nums em { font-style: normal; color: #bbb; }
+.rec-sistema-nums strong { font-size: 1rem; font-weight: 700; color: #111; }
+.rec-sistema-diff {
+    margin: .6rem 0 0;
+    font-size: .82rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+.rec-sistema-diff.diff-ok    { color: #15803d; }
+.rec-sistema-diff.diff-warn  { color: #b45309; }
+.rec-sistema-diff.diff-info  { color: #6b7280; font-weight: 500; }
+.alerta-inline.rec-aviso-ok   { background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-radius: 7px; padding: .6rem .9rem; }
+.alerta-inline.rec-aviso-warn { background: #fff3cd; color: #856404; border: 1px solid #ffc107; border-radius: 7px; padding: .6rem .9rem; }
+
 @media (max-width: 900px) {
     .rec-balance-grid { grid-template-columns: 1fr 1fr; }
 }
@@ -375,6 +429,7 @@
 </style>
 
 {{ totales_json|json_script:"totalesInitData" }}
+{{ sistema_json|json_script:"sistemaInitData" }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     'use strict';
@@ -382,6 +437,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const urlRegistrar = "{% url 'cobranzas:recaudaciones_registrar' %}";
     const urlEliminar  = "{% url 'cobranzas:recaudaciones_eliminar' %}";
     const urlEstado    = "{% url 'cobranzas:recaudaciones_estado' %}";
+    const urlSistema   = "{% url 'cobranzas:recaudaciones_sistema' %}";
     const esAdmin      = {{ user.is_staff|yesno:"true,false" }} || {{ user.is_superuser|yesno:"true,false" }};
 
     let entidadActual = "{{ entidad }}";
@@ -458,6 +514,76 @@ document.addEventListener('DOMContentLoaded', function () {
     // Inicializar balance card con la entidad activa
     actualizarBalance(totalesInit[entidadActual]);
 
+    // ── Contraste: lo que el sistema registró en cobros vs. la carga manual ──
+    const sistemaRaw = JSON.parse(document.getElementById('sistemaInitData').textContent);
+    let sistemaActual = sistemaRaw[entidadActual] || { boletas: 0, adicionales: 0, total: 0, cant: 0 };
+    let sistemaFecha  = sistemaRaw.fecha;
+
+    const elSistBoletas = document.getElementById('recSistBoletas');
+    const elSistAdic    = document.getElementById('recSistAdic');
+    const elSistCant    = document.getElementById('recSistCant');
+    const elSistFecha   = document.getElementById('recSistFecha');
+    const elSistDiff    = document.getElementById('recSistDiff');
+    const inputMontoEl  = document.getElementById('inputMonto');
+    const inputFechaEl  = document.getElementById('inputFecha');
+
+    function fmtFechaISO(iso) {
+        if (!iso) return '—';
+        const [y, m, d] = iso.split('-');
+        return `${d}/${m}/${y}`;
+    }
+
+    function evaluarDiffSistema() {
+        const monto   = parseFloat(inputMontoEl.value);
+        const boletas = parseFloat(sistemaActual.boletas) || 0;
+        elSistDiff.className = 'rec-sistema-diff';
+        if (!sistemaActual.cant) {
+            elSistDiff.classList.add('diff-info');
+            elSistDiff.textContent = 'El sistema no tiene cobros por este canal para esta fecha.';
+            return;
+        }
+        if (!monto || monto <= 0) {
+            elSistDiff.classList.add('diff-info');
+            elSistDiff.textContent = 'Ingresá el importe de la plataforma para compararlo con el sistema.';
+            return;
+        }
+        const dif = monto - boletas;
+        if (Math.abs(dif) < 1) {
+            elSistDiff.classList.add('diff-ok');
+            elSistDiff.textContent = 'Coincide con las boletas que registró el sistema.';
+        } else {
+            elSistDiff.classList.add('diff-warn');
+            elSistDiff.textContent =
+                `No coincide con el sistema: boletas ${fmt(boletas)} (${sistemaActual.cant} cobros). ` +
+                `Diferencia ${dif > 0 ? '+' : ''}${fmt(dif)}. Revisá el total de la plataforma ` +
+                `(o puede ser la comisión que retiene la entidad).`;
+        }
+    }
+
+    function renderSistema() {
+        elSistBoletas.textContent = fmt(sistemaActual.boletas);
+        elSistAdic.textContent    = fmt(sistemaActual.adicionales);
+        elSistCant.textContent    = sistemaActual.cant;
+        elSistFecha.textContent   = fmtFechaISO(sistemaFecha);
+        evaluarDiffSistema();
+    }
+
+    async function fetchSistema(fecha) {
+        if (!fecha) return;
+        try {
+            const r = await fetch(`${urlSistema}?entidad=${entidadActual}&fecha=${fecha}`);
+            if (!r.ok) return;
+            const d = await r.json();
+            sistemaActual = { boletas: d.boletas, adicionales: d.adicionales, total: d.total, cant: d.cant };
+            sistemaFecha  = d.fecha;
+            renderSistema();
+        } catch { /* silencioso — el contraste no es crítico */ }
+    }
+
+    inputFechaEl.addEventListener('change', () => fetchSistema(inputFechaEl.value));
+    inputMontoEl.addEventListener('input', evaluarDiffSistema);
+    renderSistema();
+
     // ── Verificar si ya existe recaudación para la fecha seleccionada ──
     // (excluye la propia fila si se está editando, para no "chocar consigo misma")
     async function checkExistente(fecha) {
@@ -481,6 +607,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('inputFecha').value = fila.dataset.fecha;
         document.getElementById('inputMonto').value = fila.dataset.monto;
         document.getElementById('inputObservaciones').value = fila.dataset.observaciones || '';
+        fetchSistema(fila.dataset.fecha);
 
         tituloFormulario.innerHTML = `Editando recaudación #${idEditando} — <span id="labelEntidadForm" class="dep-entidad-label-activa">${document.getElementById('labelEntidadTabla').textContent}</span>`;
         btnRegistrarEl.lastChild.textContent = ' Guardar cambios';
@@ -556,6 +683,27 @@ document.addEventListener('DOMContentLoaded', function () {
         const alertaReemplazo = document.getElementById('modalAlertaReemplazo');
         alertaReemplazo.style.display = existente ? '' : 'none';
 
+        // Aviso de contraste con el sistema dentro del modal
+        const avisoSist = document.getElementById('modalSistemaAviso');
+        const bol = parseFloat(sistemaActual.boletas) || 0;
+        if (!sistemaActual.cant) {
+            avisoSist.style.display = 'none';
+        } else {
+            const dif = monto - bol;
+            if (Math.abs(dif) < 1) {
+                avisoSist.className = 'alerta-inline rec-aviso-ok mt-3';
+                avisoSist.textContent =
+                    `Coincide con el sistema: ${sistemaActual.cant} cobro(s), ${fmt(bol)} en boletas.`;
+            } else {
+                avisoSist.className = 'alerta-inline rec-aviso-warn mt-3';
+                avisoSist.textContent =
+                    `El sistema registró ${fmt(bol)} en boletas por este canal ` +
+                    `(${sistemaActual.cant} cobros). Estás cargando ${fmt(monto)} — ` +
+                    `diferencia ${dif > 0 ? '+' : ''}${fmt(dif)}.`;
+            }
+            avisoSist.style.display = '';
+        }
+
         document.getElementById('modalError').style.display = 'none';
         const btnConf = document.getElementById('btnConfirmar');
         btnConf.disabled    = false;
@@ -626,6 +774,18 @@ document.addEventListener('DOMContentLoaded', function () {
             actualizarPill(entidadActual, {
                 pendiente: data.pendiente,
             });
+
+            // Refrescar el contraste con el sistema para la fecha guardada
+            if (data.sistema_cant !== undefined) {
+                sistemaActual = {
+                    boletas:     data.sistema_boletas,
+                    adicionales: data.sistema_adicionales,
+                    total:       data.sistema_total,
+                    cant:        data.sistema_cant,
+                };
+                sistemaFecha = data.recaudacion.fecha_iso;
+                renderSistema();
+            }
 
             // Actualizar o agregar fila en tabla
             const tbody = document.getElementById('tbodyRecaudaciones');
