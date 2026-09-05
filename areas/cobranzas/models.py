@@ -379,19 +379,27 @@ class Cobro(models.Model):
 # ─────────────────────────────────────────────────────────────
 
 class ItemCobro(models.Model):
-    CANAL_PAGOFACIL = 'pagofacil'
-    CANAL_RAPIPAGO  = 'rapipago'
-    CANAL_OTRO      = 'otro'
+    CANAL_PAGOFACIL     = 'pagofacil'
+    CANAL_RAPIPAGO      = 'rapipago'
+    CANAL_WESTERN_UNION = 'western_union'
+    CANAL_OTRO          = 'otro'
     CANALES = [
-        (CANAL_PAGOFACIL, 'Pago Fácil'),
-        (CANAL_RAPIPAGO,  'Rapipago'),
-        (CANAL_OTRO,      'Otro'),
+        (CANAL_PAGOFACIL,     'Pago Fácil'),
+        (CANAL_RAPIPAGO,      'Rapipago'),
+        (CANAL_WESTERN_UNION, 'Western Union'),
+        (CANAL_OTRO,          'Otro'),
     ]
 
     cobro           = models.ForeignKey(Cobro, on_delete=models.CASCADE, related_name='items')
     servicio        = models.ForeignKey(Servicio, on_delete=models.PROTECT, related_name='cobros')
     monto_servicio  = models.DecimalField(max_digits=12, decimal_places=2)
     monto_adicional = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cantidad        = models.PositiveIntegerField(
+                          default=1,
+                          help_text="Unidades de este servicio en la línea (ej: 10 certificados iguales). "
+                                    "Solo se usa en servicios de precio fijo. IMPORTANTE: monto_servicio y "
+                                    "monto_adicional YA son el total de la línea (unitario × cantidad), así "
+                                    "que las sumas de caja / ganancias / recaudaciones no cambian por este campo.")
     canal           = models.CharField(max_length=20, choices=CANALES, default=CANAL_PAGOFACIL)
     orden           = models.PositiveSmallIntegerField(default=0)
 
@@ -399,10 +407,22 @@ class ItemCobro(models.Model):
         ordering = ['orden', 'pk']
 
     def __str__(self):
-        return f"{self.servicio.codigo} — ${self.monto_servicio} + ${self.monto_adicional}"
+        base = f"{self.servicio.codigo} — ${self.monto_servicio} + ${self.monto_adicional}"
+        return f"{base} (×{self.cantidad})" if self.cantidad and self.cantidad > 1 else base
 
     def subtotal(self):
+        # monto_servicio / monto_adicional ya vienen multiplicados por la cantidad.
         return self.monto_servicio + self.monto_adicional
+
+    def _unit(self, valor):
+        cant = self.cantidad or 1
+        return (valor / cant) if cant else valor
+
+    def precio_unit_servicio(self):
+        return self._unit(self.monto_servicio)
+
+    def precio_unit_adicional(self):
+        return self._unit(self.monto_adicional)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -490,11 +510,13 @@ class CierreDiario(models.Model):
 # ─────────────────────────────────────────────────────────────
 
 class DepositoBancario(models.Model):
-    ENTIDAD_PAGOFACIL = 'pagofacil'
-    ENTIDAD_RAPIPAGO  = 'rapipago'
+    ENTIDAD_PAGOFACIL     = 'pagofacil'
+    ENTIDAD_RAPIPAGO      = 'rapipago'
+    ENTIDAD_WESTERN_UNION = 'western_union'
     ENTIDADES = [
-        (ENTIDAD_PAGOFACIL, 'PagoFácil'),
-        (ENTIDAD_RAPIPAGO,  'RapiPago'),
+        (ENTIDAD_PAGOFACIL,     'PagoFácil'),
+        (ENTIDAD_RAPIPAGO,      'RapiPago'),
+        (ENTIDAD_WESTERN_UNION, 'Western Union'),
     ]
 
     entidad            = models.CharField(max_length=20, choices=ENTIDADES)
@@ -685,11 +707,13 @@ class DepositoTicket(models.Model):
 
 
 class RecaudacionDiaria(models.Model):
-    ENTIDAD_PAGOFACIL = 'pagofacil'
-    ENTIDAD_RAPIPAGO  = 'rapipago'
+    ENTIDAD_PAGOFACIL     = 'pagofacil'
+    ENTIDAD_RAPIPAGO      = 'rapipago'
+    ENTIDAD_WESTERN_UNION = 'western_union'
     ENTIDADES = [
-        (ENTIDAD_PAGOFACIL, 'PagoFácil'),
-        (ENTIDAD_RAPIPAGO,  'RapiPago'),
+        (ENTIDAD_PAGOFACIL,     'PagoFácil'),
+        (ENTIDAD_RAPIPAGO,      'RapiPago'),
+        (ENTIDAD_WESTERN_UNION, 'Western Union'),
     ]
  
     entidad        = models.CharField(max_length=20, choices=ENTIDADES)

@@ -26,6 +26,19 @@ from .views_caja import get_turno_abierto
 from .views_caja_grande import get_pendiente_caja_grande
 
 
+def _parse_cantidad(valor):
+    """
+    Normaliza la 'cantidad' de una línea de cobro. Siempre entero >= 1.
+    (Solo tiene sentido > 1 en servicios de precio fijo; el front ya lo
+    limita, pero acá lo blindamos igual.)
+    """
+    try:
+        n = int(valor)
+    except (TypeError, ValueError):
+        return 1
+    return n if n >= 1 else 1
+
+
 # ═══════════════════════════════════════════════════════════
 # LÓGICA DE RANGOS
 # ═══════════════════════════════════════════════════════════
@@ -338,6 +351,7 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
                     servicio=servicio,
                     monto_servicio=item.get('monto_servicio', 0),
                     monto_adicional=item.get('monto_adicional', 0),
+                    cantidad=_parse_cantidad(item.get('cantidad')),
                     canal=item.get('canal', ItemCobro.CANAL_PAGOFACIL),
                     orden=orden,
                 )
@@ -429,8 +443,9 @@ class EditarCobroAjax(LoginRequiredMixin, View):
         "items": [
             {
                 "servicio_id":     <int>,
-                "monto_servicio":  <float>,
-                "monto_adicional": <float>,
+                "monto_servicio":  <float>,   # total de la línea (ya × cantidad)
+                "monto_adicional": <float>,   # total de la línea (ya × cantidad)
+                "cantidad":        <int>,     # opcional, default 1 (solo fijos)
                 "canal":           "pagofacil" | "rapipago" | "otro"
             }
         ],
@@ -513,6 +528,7 @@ class EditarCobroAjax(LoginRequiredMixin, View):
                     servicio=servicio,
                     monto_servicio=float(item.get('monto_servicio', 0)),
                     monto_adicional=float(item.get('monto_adicional', 0)),
+                    cantidad=_parse_cantidad(item.get('cantidad')),
                     canal=item.get('canal', ItemCobro.CANAL_PAGOFACIL),
                     orden=orden,
                 )

@@ -13,7 +13,7 @@
 <div class="page-header">
     <div>
         <h1>Recaudaciones <span>Diarias</span></h1>
-        <p class="page-subtitle">Registrá lo recaudado por PagoFácil y RapiPago cada día</p>
+        <p class="page-subtitle">Registrá lo recaudado por PagoFácil, RapiPago y Western Union cada día</p>
     </div>
 </div>
 
@@ -52,6 +52,24 @@
                     Pendiente ${{ tot_rp.pendiente_mostrar|floatformat:2 }}
                 {% elif tot_rp.pendiente < 0 %}
                     A favor ${{ tot_rp.a_favor|floatformat:2 }}
+                {% else %}
+                    Sin pendiente
+                {% endif %}
+            </span>
+        </a>
+
+        <a href="?entidad={{ ENTIDAD_WU }}" data-entidad="{{ ENTIDAD_WU }}"
+           class="dep-entidad-btn {% if entidad == ENTIDAD_WU %}dep-entidad-activa{% endif %}">
+            <span class="dep-entidad-icono ui-icon-box"><i class="bi bi-globe-americas" aria-hidden="true"></i></span>
+            <span class="dep-entidad-nombre">Western Union</span>
+            <span class="dep-entidad-sub">
+                {{ cant_wu }} día{{ cant_wu|pluralize }} pendiente{{ cant_wu|pluralize }} de depositar
+            </span>
+            <span class="dep-pendiente-pill {% if tot_wu.pendiente > 0 %}pill-alerta{% elif tot_wu.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
+                {% if tot_wu.pendiente > 0 %}
+                    Pendiente ${{ tot_wu.pendiente_mostrar|floatformat:2 }}
+                {% elif tot_wu.pendiente < 0 %}
+                    A favor ${{ tot_wu.a_favor|floatformat:2 }}
                 {% else %}
                     Sin pendiente
                 {% endif %}
@@ -449,8 +467,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // que no rompan con locales donde el separador decimal es una coma.
     const totalesRaw = JSON.parse(document.getElementById('totalesInitData').textContent);
     const totalesInit = {
-        '{{ ENTIDAD_PF }}': totalesRaw.pagofacil,
-        '{{ ENTIDAD_RP }}': totalesRaw.rapipago,
+        '{{ ENTIDAD_PF }}': totalesRaw['{{ ENTIDAD_PF }}'],
+        '{{ ENTIDAD_RP }}': totalesRaw['{{ ENTIDAD_RP }}'],
+        '{{ ENTIDAD_WU }}': totalesRaw['{{ ENTIDAD_WU }}'],
     };
 
     // ── Utilidades ────────────────────────────────────────
@@ -664,6 +683,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const labelMap = {
             '{{ ENTIDAD_PF }}': 'PagoFácil',
             '{{ ENTIDAD_RP }}': 'RapiPago',
+            '{{ ENTIDAD_WU }}': 'Western Union',
         };
         document.getElementById('modalEntidad').textContent = labelMap[entidadActual] || entidadActual;
         const [y, m, d] = fecha.split('-');

@@ -88,6 +88,7 @@
             <div class="filtro-check-group">
                 <label><input type="checkbox" name="canales" value="pagofacil" {% if 'pagofacil' in canales_seleccionados %}checked{% endif %}> PagoFácil</label>
                 <label><input type="checkbox" name="canales" value="rapipago" {% if 'rapipago' in canales_seleccionados %}checked{% endif %}> Rapipago</label>
+                <label><input type="checkbox" name="canales" value="western_union" {% if 'western_union' in canales_seleccionados %}checked{% endif %}> Western Union</label>
                 <label><input type="checkbox" name="canales" value="otro" {% if 'otro' in canales_seleccionados %}checked{% endif %}> Otro</label>
             </div>
         </div>
@@ -127,6 +128,7 @@
                 <th>Total general</th>
                 <th>PagoFácil</th>
                 <th>Rapipago</th>
+                <th>Western Union</th>
                 <th>Otro canal</th>
                 <th>Ef. Declarado</th>
                 <th>Diferencia</th>
@@ -164,6 +166,7 @@
                 <td><strong>${{ t.total_general|floatformat:2 }}</strong></td>
                 <td>${% with val=t.total_pf %}{{ val|floatformat:2 }}{% endwith %}</td>
                 <td>${% with val=t.total_rp %}{{ val|floatformat:2 }}{% endwith %}</td>
+                <td>${% with val=t.total_wu %}{{ val|floatformat:2 }}{% endwith %}</td>
                 <td>${% with val=t.total_otro %}{{ val|floatformat:2 }}{% endwith %}</td>
                 <td>${{ t.efectivo_declarado|floatformat:2|default:"—" }}</td>
                 <td>

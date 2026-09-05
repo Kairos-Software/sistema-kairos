@@ -14,7 +14,7 @@ class ServicioForm(forms.ModelForm):
             'monto': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'adicional_fijo': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'proveedor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Rapipago, Pago Fácil'}),
+            'proveedor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Rapipago, Pago Fácil, Western Union'}),
             'tipo_precio': forms.Select(attrs={'class': 'form-control'}),
             'rango_desde': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'rango_hasta': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),

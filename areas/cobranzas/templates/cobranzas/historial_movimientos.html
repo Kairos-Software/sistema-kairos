@@ -1,0 +1,230 @@
+{% extends 'cobranzas/base_cobranzas.html' %}
+{% load static %}
+
+{% block title %}Historial de Movimientos — Cobranzas{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
+<link rel="stylesheet" href="{% static 'cobranzas/css/historial_turnos.css' %}">
+{% endblock %}
+
+{% block cobranzas_content %}
+
+<div class="page-header">
+    <div>
+        <h1>Historial de <span>Movimientos</span></h1>
+        <p class="page-subtitle" id="subtituloHistorial">
+            {{ total_movimientos }} movimiento{{ total_movimientos|pluralize }} encontrado{{ total_movimientos|pluralize }}
+            {% if total_movimientos == 500 %}(mostrando los primeros 500){% endif %}
+        </p>
+    </div>
+    <div class="page-header-actions">
+        <button type="button" class="export-csv-btn" id="btnExportarCSV">Exportar CSV</button>
+        <a href="{% url 'cobranzas:caja' %}" class="btn-volver">← Volver a Caja</a>
+    </div>
+</div>
+
+{# ── Aclaración ── #}
+<p class="mov-nota">
+    Ingresos y retiros de efectivo de todos los turnos (aportes, depósitos, gastos, etc.).
+    Los <strong>retiros</strong> reducen el efectivo esperado al cierre; los <strong>ingresos</strong> lo aumentan.
+    Para cargar o corregir un movimiento se hace desde la caja del turno abierto — esta pantalla es solo de consulta.
+</p>
+
+{# ── FILTROS ── #}
+<form method="get" class="filtros-avanzados" id="filtrosForm">
+    <div class="grupo-filtros">
+        <div>
+            <label>Desde</label>
+            <input type="date" name="desde" value="{{ desde }}" class="filtro-input" style="width:150px;">
+        </div>
+        <div>
+            <label>Hasta</label>
+            <input type="date" name="hasta" value="{{ hasta }}" class="filtro-input" style="width:150px;">
+        </div>
+        <div>
+            <label>Tipo</label>
+            <select name="tipo" class="filtro-input" style="width:140px;">
+                <option value="">Todos</option>
+                <option value="{{ TIPO_RETIRO }}"  {% if tipo == TIPO_RETIRO %}selected{% endif %}>Retiros</option>
+                <option value="{{ TIPO_INGRESO }}" {% if tipo == TIPO_INGRESO %}selected{% endif %}>Ingresos</option>
+            </select>
+        </div>
+        <div>
+            <label>Estado</label>
+            <select name="estado" class="filtro-input" style="width:130px;">
+                <option value="">Todos</option>
+                <option value="activo"  {% if estado == 'activo' %}selected{% endif %}>Activos</option>
+                <option value="anulado" {% if estado == 'anulado' %}selected{% endif %}>Anulados</option>
+            </select>
+        </div>
+        <div>
+            <label>Ordenar por</label>
+            <select name="order_by" class="filtro-input" style="width:170px;">
+                <option value="-fecha" {% if order_by == '-fecha' %}selected{% endif %}>Fecha (recientes)</option>
+                <option value="fecha"  {% if order_by == 'fecha' %}selected{% endif %}>Fecha (antiguos)</option>
+                <option value="-monto" {% if order_by == '-monto' %}selected{% endif %}>Monto (mayor)</option>
+                <option value="monto"  {% if order_by == 'monto' %}selected{% endif %}>Monto (menor)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="grupo-filtros">
+        <div>
+            <label>Turno N°</label>
+            <input type="number" name="turno" value="{{ turno }}" class="filtro-input" style="width:110px;" min="1" placeholder="Ej: 42">
+        </div>
+        <div>
+            <label>Registrado por</label>
+            <input type="text" name="usuario" value="{{ usuario }}" class="filtro-input" style="width:160px;" placeholder="Usuario">
+        </div>
+        <div style="flex:1;min-width:180px;">
+            <label>Motivo contiene</label>
+            <input type="text" name="motivo" value="{{ motivo }}" class="filtro-input" style="width:100%;" placeholder="Ej: depósito, gasto…">
+        </div>
+        <div>
+            <label>Monto mín. $</label>
+            <input type="number" name="monto_min" value="{{ monto_min }}" class="filtro-input" style="width:120px;" min="0" step="0.01">
+        </div>
+        <div>
+            <label>Monto máx. $</label>
+            <input type="number" name="monto_max" value="{{ monto_max }}" class="filtro-input" style="width:120px;" min="0" step="0.01">
+        </div>
+    </div>
+
+    <div class="botones-filtros">
+        <button type="submit" class="btn-filtrar-avanzado">Aplicar filtros</button>
+        <a href="{% url 'cobranzas:historial_movimientos' %}" class="btn-limpiar">Limpiar</a>
+    </div>
+</form>
+
+{# ── RESUMEN ── #}
+<div class="caja-card" style="margin-bottom:1rem; padding:.8rem 1.2rem;">
+    <div class="caja-resumen-grid">
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">Total ingresos</span>
+            <strong class="mov-monto-ingreso">+${{ tot_ingresos|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">Total retiros</span>
+            <strong class="mov-monto-retiro">−${{ tot_retiros|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">Neto (ingresos − retiros)</span>
+            <strong class="{% if neto >= 0 %}mov-monto-ingreso{% else %}mov-monto-retiro{% endif %}">
+                {% if neto >= 0 %}+{% else %}−{% endif %}${{ neto|floatformat:2|cut:"-" }}
+            </strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">Movimientos</span>
+            <strong>{{ total_movimientos }}{% if anulados %} <span style="font-weight:600;color:#999;font-size:.8rem;">({{ anulados }} anulado{{ anulados|pluralize }})</span>{% endif %}</strong>
+        </div>
+    </div>
+    <p style="margin:.5rem 0 0;font-size:.72rem;color:#999;">
+        Los totales suman solo movimientos <strong>activos</strong> (los anulados no cuentan).
+    </p>
+</div>
+
+{% if movimientos %}
+<div class="tabla-scroll">
+    <table class="tabla-base">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Fecha y hora</th>
+                <th>Tipo</th>
+                <th>Motivo</th>
+                <th>Monto</th>
+                <th>Turno</th>
+                <th>Cajero del turno</th>
+                <th>Registró</th>
+                <th>Cierre diario</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in movimientos %}
+            <tr class="hist-fila{% if not m.activo %} mov-fila-anulada{% endif %}" data-id="{{ m.pk }}">
+                <td><strong>#{{ m.pk }}</strong></td>
+                <td>{{ m.fecha|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <span class="badge-mov badge-mov-{{ m.tipo }}">{{ m.get_tipo_display }}</span>
+                </td>
+                <td>{{ m.motivo|default:"—" }}</td>
+                <td>
+                    <strong class="{% if m.tipo == TIPO_INGRESO %}mov-monto-ingreso{% else %}mov-monto-retiro{% endif %}">
+                        {% if m.tipo == TIPO_INGRESO %}+{% else %}−{% endif %}${{ m.monto|floatformat:2 }}
+                    </strong>
+                </td>
+                <td>
+                    {% if m.turno_id %}<strong>#{{ m.turno.numero }}</strong>{% else %}—{% endif %}
+                </td>
+                <td>{{ m.turno.cajero|default:"—" }}</td>
+                <td>{{ m.registrado_por|default:"—" }}</td>
+                <td>
+                    {% if m.turno.cierre_diario_id %}
+                        <span class="mov-consolidado" title="El turno fue consolidado en un cierre diario">Cierre #{{ m.turno.cierre_diario_id }}</span>
+                    {% else %}
+                        <span style="color:#bbb;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if m.activo %}
+                        <span class="badge-estado badge-abierto">Activo</span>
+                    {% else %}
+                        <span class="badge-estado badge-cerrado">Anulado</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="estado-vacio">
+    <p>No se encontraron movimientos con esos filtros.</p>
+</div>
+{% endif %}
+
+<style>
+.mov-nota {
+    font-size: .82rem; color: #666; line-height: 1.5;
+    background: #f8f9fb; border: 1px solid #eee; border-radius: 10px;
+    padding: .7rem .9rem; margin-bottom: 1rem;
+}
+.badge-mov {
+    display: inline-block; padding: .18rem .6rem; border-radius: 1rem;
+    font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+}
+.badge-mov-ingreso { background: rgba(22,163,74,.12); color: #15803d; border: 1px solid rgba(22,163,74,.25); }
+.badge-mov-retiro  { background: rgba(220,38,38,.10); color: #b91c1c; border: 1px solid rgba(220,38,38,.22); }
+.mov-monto-ingreso { color: #15803d; font-weight: 800; }
+.mov-monto-retiro  { color: #b91c1c; font-weight: 800; }
+.mov-fila-anulada td { opacity: .55; text-decoration: line-through; }
+.mov-fila-anulada td:first-child, .mov-fila-anulada td:last-child { text-decoration: none; }
+.mov-turno-link { color: #E85C0D; font-weight: 700; text-decoration: none; }
+.mov-turno-link:hover { text-decoration: underline; }
+.mov-consolidado { font-size: .76rem; color: #64748b; font-weight: 600; }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+    // Exportar CSV respetando los filtros actuales
+    const exportBtn = document.getElementById('btnExportarCSV');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            const form = document.getElementById('filtrosForm');
+            const params = new URLSearchParams();
+            for (const [key, value] of new FormData(form).entries()) {
+                if (value) params.append(key, value);
+            }
+            window.location.href = "{% url 'cobranzas:exportar_movimientos_csv' %}?" + params.toString();
+        });
+    }
+</script>
+{% endblock %}

@@ -192,6 +192,7 @@
             <div class="filtro-check-group">
                 <label><input type="checkbox" name="canales" value="pagofacil" {% if 'pagofacil' in canales_seleccionados %}checked{% endif %}> PagoFácil</label>
                 <label><input type="checkbox" name="canales" value="rapipago" {% if 'rapipago' in canales_seleccionados %}checked{% endif %}> Rapipago</label>
+                <label><input type="checkbox" name="canales" value="western_union" {% if 'western_union' in canales_seleccionados %}checked{% endif %}> Western Union</label>
                 <label><input type="checkbox" name="canales" value="otro" {% if 'otro' in canales_seleccionados %}checked{% endif %}> Otro</label>
             </div>
         </div>
@@ -285,7 +286,7 @@
                         {# ── Botón Ver detalle ── #}
                         <button class="btn-accion btn-editar hist-btn-detalle"
                                 data-id="{{ cobro.pk }}"
-                                data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}|{{ item.cantidad }}{% if not forloop.last %};;{% endif %}{% endfor %}"
                                 data-pagos="{% for pago in cobro.pagos.all %}{{ pago.get_metodo_display }}|{{ pago.monto }}{% if not forloop.last %};;{% endif %}{% endfor %}"
                                 data-obs="{{ cobro.observaciones }}">
                             Ver detalle
@@ -297,7 +298,7 @@
                                 data-id="{{ cobro.pk }}"
                                 data-fecha="{{ cobro.fecha_cierre|date:'Y-m-d' }}T{{ cobro.fecha_cierre|date:'H:i' }}"
                                 data-obs="{{ cobro.observaciones }}"
-                                data-items-full="{% for item in cobro.items.all %}{{ item.servicio.pk }}|{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:40 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-items-full="{% for item in cobro.items.all %}{{ item.servicio.pk }}|{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:40 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}|{{ item.cantidad }}{% if not forloop.last %};;{% endif %}{% endfor %}"
                                 data-pagos-full="{% for pago in cobro.pagos.all %}{{ pago.metodo }}|{{ pago.monto }}{% if not forloop.last %};;{% endif %}{% endfor %}"
                                 title="Editar este cobro">
                             <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
@@ -571,7 +572,7 @@
 // HISTORIAL DE COBROS — JS
 // ════════════════════════════════════════════════════════════
 
-const CANALES_HIST      = { pagofacil: 'Pago Fácil', rapipago: 'Rapipago', otro: 'Otro' };
+const CANALES_HIST      = { pagofacil: 'Pago Fácil', rapipago: 'Rapipago', western_union: 'Western Union', otro: 'Otro' };
 const METODOS_EDIT      = { efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito', qr:'QR' };
 const ELIMINAR_URL      = "{% url 'cobranzas:cobros_eliminar' %}";
 const LIMPIEZA_URL      = "{% url 'cobranzas:cobros_limpieza_automatica' %}";
@@ -671,19 +672,31 @@ document.addEventListener('DOMContentLoaded', () => {
             el('detalleTitle').textContent    = `Cobro #${btn.dataset.id}`;
             el('detalleSubtitle').textContent = `${items.length} boleta${items.length !== 1 ? 's' : ''}`;
             el('detalleItems').innerHTML = items.map(raw => {
-                const [cod, desc, factura, adicional, canal] = raw.split('|');
+                const [cod, desc, factura, adicional, canal, cantidad] = raw.split('|');
+                const cant = parseInt(cantidad, 10) || 1;
+                // factura/adicional guardados = total de la línea (ya × cantidad)
+                const fac = parseFloat(factura) || 0;
+                const adi = parseFloat(adicional) || 0;
+                const cantBadge = cant > 1
+                    ? `<span class="codigo-badge" style="background:#fff4ec;color:#E85C0D;border:1px solid rgba(232,92,13,.3);">×${cant}</span>`
+                    : '';
+                const unitInfo = cant > 1
+                    ? `<div class="cobro-item-desc" style="color:#999;">Unitario: ${fmt(fac / cant)} + ${fmt(adi / cant)}</div>`
+                    : '';
                 return `<div class="cobro-item-row">
                     <div class="cobro-item-header">
                         <span class="codigo-badge">${cod}</span>
+                        ${cantBadge}
                         <span class="cobro-item-canal cobro-canal-${canal}">${CANALES_HIST[canal] || canal}</span>
                     </div>
                     <div class="cobro-item-desc">${desc}</div>
+                    ${unitInfo}
                     <div class="cobro-item-montos">
-                        <div class="cobro-item-monto-col"><span class="cobro-monto-label">Factura</span><span class="cobro-monto-val">${fmt(factura)}</span></div>
+                        <div class="cobro-item-monto-col"><span class="cobro-monto-label">Factura${cant > 1 ? ' (total)' : ''}</span><span class="cobro-monto-val">${fmt(fac)}</span></div>
                         <span class="cobro-monto-mas">+</span>
-                        <div class="cobro-item-monto-col"><span class="cobro-monto-label">Adicional</span><span class="cobro-monto-val cobro-monto-adicional">${fmt(adicional)}</span></div>
+                        <div class="cobro-item-monto-col"><span class="cobro-monto-label">Adicional${cant > 1 ? ' (total)' : ''}</span><span class="cobro-monto-val cobro-monto-adicional">${fmt(adi)}</span></div>
                         <span class="cobro-monto-mas">=</span>
-                        <div class="cobro-item-monto-col cobro-item-subtotal"><span class="cobro-monto-label">Subtotal</span><span class="cobro-monto-val cobro-monto-total">${fmt(parseFloat(factura)+parseFloat(adicional))}</span></div>
+                        <div class="cobro-item-monto-col cobro-item-subtotal"><span class="cobro-monto-label">Subtotal</span><span class="cobro-monto-val cobro-monto-total">${fmt(fac + adi)}</span></div>
                     </div>
                 </div>`;
             }).join('');
@@ -913,13 +926,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Parsear items: srvId|codigo|desc|montoSrv|montoAd|canal
             const itemsRaw = btn.dataset.itemsFull ? btn.dataset.itemsFull.split(';;') : [];
             editState.items = itemsRaw.map(raw => {
-                const [srvId, codigo, desc, montoSrv, montoAd, canal] = raw.split('|');
+                const [srvId, codigo, desc, montoSrv, montoAd, canal, cantidad] = raw.split('|');
                 return {
                     servicio_id:     parseInt(srvId),
                     codigo,
                     desc,
+                    // montoSrv / montoAd = total de la línea (ya × cantidad)
                     monto_servicio:  parseFloat(montoSrv)  || 0,
                     monto_adicional: parseFloat(montoAd)   || 0,
+                    cantidad:        parseInt(cantidad, 10) || 1,
                     canal:           canal || 'pagofacil',
                 };
             });
@@ -950,23 +965,25 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="edit-item-row" data-idx="${idx}">
                 <div class="edit-item-header">
                     <span class="codigo-badge">${it.codigo}</span>
+                    ${it.cantidad > 1 ? `<span class="edit-badge-editando" style="background:rgba(232,92,13,.12);">×${it.cantidad} unidades</span>` : ''}
                     <select class="edit-canal-sel" data-idx="${idx}" data-field="canal">
-                        <option value="pagofacil" ${it.canal==='pagofacil'?'selected':''}>Pago Fácil</option>
-                        <option value="rapipago"  ${it.canal==='rapipago' ?'selected':''}>Rapipago</option>
-                        <option value="otro"      ${it.canal==='otro'     ?'selected':''}>Otro</option>
+                        <option value="pagofacil"     ${it.canal==='pagofacil'    ?'selected':''}>Pago Fácil</option>
+                        <option value="rapipago"      ${it.canal==='rapipago'     ?'selected':''}>Rapipago</option>
+                        <option value="western_union" ${it.canal==='western_union'?'selected':''}>Western Union</option>
+                        <option value="otro"          ${it.canal==='otro'         ?'selected':''}>Otro</option>
                     </select>
                 </div>
-                <div class="edit-item-desc">${it.desc}</div>
+                <div class="edit-item-desc">${it.desc}${it.cantidad > 1 ? ' — los montos de abajo son el TOTAL de la línea (todas las unidades)' : ''}</div>
                 <div class="edit-item-montos">
                     <div>
-                        <span class="edit-monto-label">Factura $</span>
+                        <span class="edit-monto-label">Factura $${it.cantidad > 1 ? ' (total)' : ''}</span>
                         <input type="number" class="edit-input-monto" min="0" step="0.01"
                                data-idx="${idx}" data-field="monto_servicio"
                                value="${it.monto_servicio.toFixed(2)}">
                     </div>
                     <span style="color:#aaa;font-size:.9rem;">+</span>
                     <div>
-                        <span class="edit-monto-label">Adicional $</span>
+                        <span class="edit-monto-label">Adicional $${it.cantidad > 1 ? ' (total)' : ''}</span>
                         <input type="number" class="edit-input-monto" min="0" step="0.01"
                                data-idx="${idx}" data-field="monto_adicional"
                                value="${it.monto_adicional.toFixed(2)}">
@@ -1089,6 +1106,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 servicio_id:     i.servicio_id,
                 monto_servicio:  i.monto_servicio,
                 monto_adicional: i.monto_adicional,
+                cantidad:        i.cantidad || 1,
                 canal:           i.canal,
             })),
             pagos: editState.pagos.filter(p => p.monto > 0).map(p => ({

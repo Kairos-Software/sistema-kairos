@@ -28,10 +28,14 @@ from .models import (
 )
 
 
+# Entidades válidas de recaudación/depósito (mismas 3 en todo el módulo).
+ENTIDADES_VALIDAS = {e for e, _ in RecaudacionDiaria.ENTIDADES}
+
 # Canal de ItemCobro que corresponde a cada entidad de recaudación.
 CANAL_POR_ENTIDAD = {
-    RecaudacionDiaria.ENTIDAD_PAGOFACIL: ItemCobro.CANAL_PAGOFACIL,
-    RecaudacionDiaria.ENTIDAD_RAPIPAGO:  ItemCobro.CANAL_RAPIPAGO,
+    RecaudacionDiaria.ENTIDAD_PAGOFACIL:     ItemCobro.CANAL_PAGOFACIL,
+    RecaudacionDiaria.ENTIDAD_RAPIPAGO:      ItemCobro.CANAL_RAPIPAGO,
+    RecaudacionDiaria.ENTIDAD_WESTERN_UNION: ItemCobro.CANAL_WESTERN_UNION,
 }
 
 
@@ -186,20 +190,27 @@ def _recaudacion_as_dict(r: RecaudacionDiaria) -> dict:
 class RecaudacionesView(LoginRequiredMixin, View):
     def get(self, request):
         entidad = request.GET.get('entidad', RecaudacionDiaria.ENTIDAD_PAGOFACIL)
-        if entidad not in (RecaudacionDiaria.ENTIDAD_PAGOFACIL, RecaudacionDiaria.ENTIDAD_RAPIPAGO):
+        if entidad not in ENTIDADES_VALIDAS:
             entidad = RecaudacionDiaria.ENTIDAD_PAGOFACIL
 
+        PF = RecaudacionDiaria.ENTIDAD_PAGOFACIL
+        RP = RecaudacionDiaria.ENTIDAD_RAPIPAGO
+        WU = RecaudacionDiaria.ENTIDAD_WESTERN_UNION
+
         # Totales para los botones de entidad
-        tot_pf = _totales_por_entidad(RecaudacionDiaria.ENTIDAD_PAGOFACIL)
-        tot_rp = _totales_por_entidad(RecaudacionDiaria.ENTIDAD_RAPIPAGO)
+        tot_pf = _totales_por_entidad(PF)
+        tot_rp = _totales_por_entidad(RP)
+        tot_wu = _totales_por_entidad(WU)
 
         # Cuenta solo días PENDIENTES (no cubiertos por un depósito) — una vez
         # depositada, esa recaudación ya cumplió su función y no aporta nada
         # seguir contándola acá; para verla queda el historial completo.
-        cant_pf = RecaudacionDiaria.objects.filter(
-            entidad=RecaudacionDiaria.ENTIDAD_PAGOFACIL, cubierta_por__isnull=True).count()
-        cant_rp = RecaudacionDiaria.objects.filter(
-            entidad=RecaudacionDiaria.ENTIDAD_RAPIPAGO, cubierta_por__isnull=True).count()
+        def _cant_pendientes(ent):
+            return RecaudacionDiaria.objects.filter(
+                entidad=ent, cubierta_por__isnull=True).count()
+        cant_pf = _cant_pendientes(PF)
+        cant_rp = _cant_pendientes(RP)
+        cant_wu = _cant_pendientes(WU)
 
         # Recaudaciones pendientes de la entidad activa — las ya cubiertas por
         # un depósito "desaparecen" de este listado (son historia vieja, se
@@ -214,7 +225,8 @@ class RecaudacionesView(LoginRequiredMixin, View):
         hoy = timezone.localdate()
         recaudacion_hoy = RecaudacionDiaria.objects.filter(entidad=entidad, fecha=hoy).first()
 
-        tot_activo = tot_pf if entidad == RecaudacionDiaria.ENTIDAD_PAGOFACIL else tot_rp
+        tot_por_entidad = {PF: tot_pf, RP: tot_rp, WU: tot_wu}
+        tot_activo = tot_por_entidad[entidad]
 
         # CAMBIO: los totales se pasan como JSON (via json_script) en vez de
         # interpolar {{ valor|floatformat:2 }} directo en un <script>. Con
@@ -222,35 +234,42 @@ class RecaudacionesView(LoginRequiredMixin, View):
         # lo que generaba un literal numérico JS inválido y rompía TODO el
         # script de la página (incluido el botón "Registrar recaudación").
         totales_json = {
-            'pagofacil': {k: float(v) for k, v in tot_pf.items()},
-            'rapipago':  {k: float(v) for k, v in tot_rp.items()},
+            PF: {k: float(v) for k, v in tot_pf.items()},
+            RP: {k: float(v) for k, v in tot_rp.items()},
+            WU: {k: float(v) for k, v in tot_wu.items()},
         }
 
         # Contraste sistema vs. carga manual, para la fecha del formulario
         # (por defecto hoy, o la de la recaudación que ya exista para hoy).
         fecha_form = recaudacion_hoy.fecha if recaudacion_hoy else hoy
-        sist_pf = _sistema_por_canal(RecaudacionDiaria.ENTIDAD_PAGOFACIL, fecha_form)
-        sist_rp = _sistema_por_canal(RecaudacionDiaria.ENTIDAD_RAPIPAGO, fecha_form)
+
+        def _sist_json(ent):
+            s = _sistema_por_canal(ent, fecha_form)
+            return {k: (float(v) if k != 'cant' else v) for k, v in s.items()}
         sistema_json = {
-            'fecha': str(fecha_form),
-            'pagofacil': {k: (float(v) if k != 'cant' else v) for k, v in sist_pf.items()},
-            'rapipago':  {k: (float(v) if k != 'cant' else v) for k, v in sist_rp.items()},
+            'fecha':  str(fecha_form),
+            PF: _sist_json(PF),
+            RP: _sist_json(RP),
+            WU: _sist_json(WU),
         }
 
         return render(request, 'cobranzas/recaudaciones.html', {
             'entidad':          entidad,
-            'entidad_label':    'PagoFácil' if entidad == RecaudacionDiaria.ENTIDAD_PAGOFACIL else 'RapiPago',
+            'entidad_label':    dict(RecaudacionDiaria.ENTIDADES).get(entidad, entidad),
             'ultimas':          ultimas,
             'tot_pf':           tot_pf,
             'tot_rp':           tot_rp,
+            'tot_wu':           tot_wu,
             'tot_activo':       tot_activo,
             'totales_json':     totales_json,
             'sistema_json':     sistema_json,
             'cant_pf':          cant_pf,
             'cant_rp':          cant_rp,
+            'cant_wu':          cant_wu,
             'recaudacion_hoy':  recaudacion_hoy,
-            'ENTIDAD_PF':       RecaudacionDiaria.ENTIDAD_PAGOFACIL,
-            'ENTIDAD_RP':       RecaudacionDiaria.ENTIDAD_RAPIPAGO,
+            'ENTIDAD_PF':       PF,
+            'ENTIDAD_RP':       RP,
+            'ENTIDAD_WU':       WU,
             'hoy':              hoy,
         })
 
@@ -283,7 +302,7 @@ class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
             return JsonResponse({'error': 'JSON inválido.'}, status=400)
 
         entidad = data.get('entidad', '').strip()
-        if entidad not in (RecaudacionDiaria.ENTIDAD_PAGOFACIL, RecaudacionDiaria.ENTIDAD_RAPIPAGO):
+        if entidad not in ENTIDADES_VALIDAS:
             return JsonResponse({'error': 'Entidad inválida.'}, status=400)
 
         fecha_raw = data.get('fecha', '').strip()
@@ -429,12 +448,12 @@ class EliminarRecaudacionAjax(LoginRequiredMixin, View):
 
 class EstadoRecaudacionAjax(LoginRequiredMixin, View):
     """
-    GET ?entidad=pagofacil|rapipago
+    GET ?entidad=pagofacil|rapipago|western_union
     Devuelve el balance actualizado de esa entidad.
     """
     def get(self, request):
         entidad = request.GET.get('entidad', '').strip()
-        if entidad not in (RecaudacionDiaria.ENTIDAD_PAGOFACIL, RecaudacionDiaria.ENTIDAD_RAPIPAGO):
+        if entidad not in ENTIDADES_VALIDAS:
             return JsonResponse({'error': 'Entidad inválida.'}, status=400)
 
         totales = _totales_por_entidad(entidad)
@@ -458,14 +477,13 @@ class EstadoRecaudacionAjax(LoginRequiredMixin, View):
 
 class SistemaPorCanalAjax(LoginRequiredMixin, View):
     """
-    GET ?entidad=pagofacil|rapipago&fecha=YYYY-MM-DD
+    GET ?entidad=pagofacil|rapipago|western_union&fecha=YYYY-MM-DD
     Devuelve lo que el sistema registró en cobros por ese canal ese día,
     para contrastarlo con la recaudación que se carga a mano.
     """
     def get(self, request):
         entidad = request.GET.get('entidad', '').strip()
-        if entidad not in (RecaudacionDiaria.ENTIDAD_PAGOFACIL,
-                           RecaudacionDiaria.ENTIDAD_RAPIPAGO):
+        if entidad not in ENTIDADES_VALIDAS:
             return JsonResponse({'error': 'Entidad inválida.'}, status=400)
 
         fecha = parse_date(request.GET.get('fecha', '').strip())
@@ -504,22 +522,21 @@ class HistorialRecaudacionesView(LoginRequiredMixin, View):
             qs = qs.filter(fecha__gte=desde)
         if hasta:
             qs = qs.filter(fecha__lte=hasta)
-        if entidad in (RecaudacionDiaria.ENTIDAD_PAGOFACIL, RecaudacionDiaria.ENTIDAD_RAPIPAGO):
+        if entidad in ENTIDADES_VALIDAS:
             qs = qs.filter(entidad=entidad)
         if estado == 'pendiente':
             qs = qs.filter(cubierta_por__isnull=True)
         elif estado == 'cubierta':
             qs = qs.filter(cubierta_por__isnull=False)
 
-        total_filtrado    = qs.aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        total_pf_filtrado = (
-            qs.filter(entidad=RecaudacionDiaria.ENTIDAD_PAGOFACIL)
-            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        )
-        total_rp_filtrado = (
-            qs.filter(entidad=RecaudacionDiaria.ENTIDAD_RAPIPAGO)
-            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        )
+        total_filtrado = qs.aggregate(t=Sum('monto'))['t'] or Decimal('0')
+
+        def _total_ent(ent):
+            return (qs.filter(entidad=ent).aggregate(t=Sum('monto'))['t']
+                    or Decimal('0'))
+        total_pf_filtrado = _total_ent(RecaudacionDiaria.ENTIDAD_PAGOFACIL)
+        total_rp_filtrado = _total_ent(RecaudacionDiaria.ENTIDAD_RAPIPAGO)
+        total_wu_filtrado = _total_ent(RecaudacionDiaria.ENTIDAD_WESTERN_UNION)
 
         return render(request, 'cobranzas/historial_recaudaciones.html', {
             'recaudaciones':      qs[:500],
@@ -530,6 +547,8 @@ class HistorialRecaudacionesView(LoginRequiredMixin, View):
             'total_filtrado':     total_filtrado,
             'total_pf_filtrado':  total_pf_filtrado,
             'total_rp_filtrado':  total_rp_filtrado,
+            'total_wu_filtrado':  total_wu_filtrado,
             'ENTIDAD_PF':         RecaudacionDiaria.ENTIDAD_PAGOFACIL,
             'ENTIDAD_RP':         RecaudacionDiaria.ENTIDAD_RAPIPAGO,
+            'ENTIDAD_WU':         RecaudacionDiaria.ENTIDAD_WESTERN_UNION,
         })

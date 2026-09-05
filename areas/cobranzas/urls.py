@@ -51,6 +51,8 @@ urlpatterns = [
     path('caja/turnos-pendientes/', views_caja.TurnosPendientesAjax.as_view(), name='caja_turnos_pendientes'),
     path('caja/turnos/', views_caja.HistorialTurnosView.as_view(), name='historial_turnos'),
     path('caja/turnos/eliminar/', views_caja.EliminarTurnosAjax.as_view(), name='turnos_eliminar'),
+    path('caja/movimientos/', views_caja.HistorialMovimientosView.as_view(), name='historial_movimientos'),
+    path('caja/movimientos/exportar/', views_caja.export_movimientos_csv, name='exportar_movimientos_csv'),
 
     # ── Cierre diario ────────────────────────────────────────
     path('cierre-diario/previsualizar/', views_caja.PrevisualizarCierreDiarioAjax.as_view(), name='cierre_previsualizar'),

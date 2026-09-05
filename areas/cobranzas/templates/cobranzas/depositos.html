@@ -51,6 +51,18 @@
             </span>
         </button>
 
+        <button class="dep-entidad-btn {% if entidad == ENTIDAD_WU %}dep-entidad-activa{% endif %}"
+                data-entidad="{{ ENTIDAD_WU }}" data-label="Western Union">
+            <span class="dep-entidad-icono ui-icon-box"><i class="bi bi-globe-americas" aria-hidden="true"></i></span>
+            <span class="dep-entidad-nombre">Western Union</span>
+            <span class="dep-entidad-cant">{{ cant_wu }} depósito{{ cant_wu|pluralize }}</span>
+            <span class="dep-pendiente-pill {% if tot_wu.pendiente > 0 %}pill-alerta{% elif tot_wu.pendiente < 0 %}pill-favor{% else %}pill-ok{% endif %}">
+                {% if tot_wu.pendiente > 0 %}Pendiente ${{ tot_wu.pendiente_mostrar|floatformat:2 }}
+                {% elif tot_wu.pendiente < 0 %}A favor ${{ tot_wu.a_favor|floatformat:2 }}
+                {% else %}Sin pendiente{% endif %}
+            </span>
+        </button>
+
     </div>
 </div>
 
@@ -262,16 +274,7 @@
                     <td>{{ d.observaciones|default:"—" }}</td>
                     <td>{{ d.realizado_por }}</td>
                     <td class="dep-tickets-cell">
-                        {% if d.entidad == ENTIDAD_PF %}
-                        <button type="button" class="btn-ver-ticket {% if 'ticket_1' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                                data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="Ticket 1 cargado">
-                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_1' in d.tickets_cargados %}Ticket 1 cargado{% else %}Ticket 1{% endif %}
-                        </button>
-                        <button type="button" class="btn-ver-ticket {% if 'ticket_2' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                                data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="Ticket 2 cargado">
-                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_2' in d.tickets_cargados %}Ticket 2 cargado{% else %}Ticket 2{% endif %}
-                        </button>
-                        {% else %}
+                        {% if d.entidad == ENTIDAD_RP %}
                         {% if d.monto_efectivo_fisico %}
                         <button type="button" class="btn-ver-ticket {% if 'efectivo_fisico' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
                                 data-deposito-id="{{ d.pk }}" data-tipo="efectivo_fisico" data-label-cargado="Efectivo cargado">
@@ -290,6 +293,16 @@
                             <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'saldo_plataforma' in d.tickets_cargados %}Saldo a favor cargado{% else %}Ticket saldo a favor{% endif %}
                         </button>
                         {% endif %}
+                        {% else %}
+                        {# PagoFácil y Western Union: 2 comprobantes genéricos #}
+                        <button type="button" class="btn-ver-ticket {% if 'ticket_1' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                                data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="Ticket 1 cargado">
+                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_1' in d.tickets_cargados %}Ticket 1 cargado{% else %}Ticket 1{% endif %}
+                        </button>
+                        <button type="button" class="btn-ver-ticket {% if 'ticket_2' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                                data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="Ticket 2 cargado">
+                            <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_2' in d.tickets_cargados %}Ticket 2 cargado{% else %}Ticket 2{% endif %}
+                        </button>
                         {% endif %}
                     </td>
                 </tr>
@@ -924,6 +937,7 @@
         const labelMap = {
             '{{ ENTIDAD_PF }}': 'PagoFácil',
             '{{ ENTIDAD_RP }}': 'RapiPago',
+            '{{ ENTIDAD_WU }}': 'Western Union',
         };
         document.getElementById('modalEntidad').textContent = labelMap[entidadActual] || entidadActual;
 

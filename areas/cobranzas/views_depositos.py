@@ -15,7 +15,10 @@ from django.views import View
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from .models import DepositoBancario, DepositoTicket, RecaudacionDiaria, AjusteSaldoFavor
-from .views_recaudaciones import _totales_por_entidad, _ultima_diferencia, _recaudado_pendiente
+from .views_recaudaciones import (
+    _totales_por_entidad, _ultima_diferencia, _recaudado_pendiente,
+    ENTIDADES_VALIDAS,
+)
 
 
 def _periodo_pendiente(entidad: str):
@@ -44,9 +47,13 @@ def _marcar_tickets_cargados(depositos):
 
 class DepositosView(LoginRequiredMixin, View):
     def get(self, request):
-        entidad = request.GET.get('entidad', DepositoBancario.ENTIDAD_PAGOFACIL)
-        if entidad not in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
-            entidad = DepositoBancario.ENTIDAD_PAGOFACIL
+        PF = DepositoBancario.ENTIDAD_PAGOFACIL
+        RP = DepositoBancario.ENTIDAD_RAPIPAGO
+        WU = DepositoBancario.ENTIDAD_WESTERN_UNION
+
+        entidad = request.GET.get('entidad', PF)
+        if entidad not in ENTIDADES_VALIDAS:
+            entidad = PF
 
         ultimos = _marcar_tickets_cargados(
             DepositoBancario.objects
@@ -55,21 +62,24 @@ class DepositosView(LoginRequiredMixin, View):
             .prefetch_related('tickets')[:10]
         )
 
-        cant_pf = DepositoBancario.objects.filter(entidad=DepositoBancario.ENTIDAD_PAGOFACIL).count()
-        cant_rp = DepositoBancario.objects.filter(entidad=DepositoBancario.ENTIDAD_RAPIPAGO).count()
+        def _cant(ent):
+            return DepositoBancario.objects.filter(entidad=ent).count()
+        cant_pf, cant_rp, cant_wu = _cant(PF), _cant(RP), _cant(WU)
 
         # Pendiente/a-favor de cada entidad, para el pill del selector (igual
         # que en recaudaciones.html) — 'pendiente' se mantiene con signo para
         # otros cálculos, pero en pantalla siempre se separa en dos valores
         # no-negativos (pendiente_mostrar / a_favor).
-        tot_pf = _totales_por_entidad(DepositoBancario.ENTIDAD_PAGOFACIL)
-        tot_rp = _totales_por_entidad(DepositoBancario.ENTIDAD_RAPIPAGO)
+        tot_pf = _totales_por_entidad(PF)
+        tot_rp = _totales_por_entidad(RP)
+        tot_wu = _totales_por_entidad(WU)
+        tot_por_entidad = {PF: tot_pf, RP: tot_rp, WU: tot_wu}
 
         # ── Mensajes clave (igual que FrmDeposito del Excel de referencia) ──
         # 'Neto a depositar' nunca debe mostrarse negativo: si ya se depositó
         # de más, lo que "falta depositar" es $0 (el sobrante se ve aparte en
         # 'Última diferencia').
-        neto_a_depositar    = (tot_pf if entidad == DepositoBancario.ENTIDAD_PAGOFACIL else tot_rp)['pendiente_mostrar']
+        neto_a_depositar    = tot_por_entidad[entidad]['pendiente_mostrar']
         saldo_anterior      = _ultima_diferencia(entidad)
         recaudado_pendiente = _recaudado_pendiente(entidad)
         periodo             = _periodo_pendiente(entidad)
@@ -82,33 +92,36 @@ class DepositosView(LoginRequiredMixin, View):
 
         return render(request, 'cobranzas/depositos.html', {
             'entidad':             entidad,
-            'entidad_label':       'PagoFácil' if entidad == DepositoBancario.ENTIDAD_PAGOFACIL else 'RapiPago',
+            'entidad_label':       dict(DepositoBancario.ENTIDADES).get(entidad, entidad),
             'ultimos':             ultimos,
             'cant_pf':             cant_pf,
             'cant_rp':             cant_rp,
+            'cant_wu':             cant_wu,
             'tot_pf':              tot_pf,
             'tot_rp':              tot_rp,
+            'tot_wu':              tot_wu,
             'neto_a_depositar':    neto_a_depositar,
             'saldo_anterior':      saldo_anterior,
             'recaudado_pendiente': recaudado_pendiente,
             'periodo_desde':       periodo[0] if periodo else None,
             'periodo_hasta':       periodo[1] if periodo else None,
             'usos_saldo':          usos_saldo,
-            'ENTIDAD_PF':          DepositoBancario.ENTIDAD_PAGOFACIL,
-            'ENTIDAD_RP':          DepositoBancario.ENTIDAD_RAPIPAGO,
+            'ENTIDAD_PF':          PF,
+            'ENTIDAD_RP':          RP,
+            'ENTIDAD_WU':          WU,
             'hoy':                 timezone.localdate(),
         })
 
 
 class PendientesRecaudacionAjax(LoginRequiredMixin, View):
     """
-    GET ?entidad=pagofacil|rapipago
+    GET ?entidad=pagofacil|rapipago|western_union
     Devuelve las recaudaciones sin cubrir de esa entidad, para el selector de
     días al registrar un depósito.
     """
     def get(self, request):
         entidad = request.GET.get('entidad', '').strip()
-        if entidad not in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
+        if entidad not in ENTIDADES_VALIDAS:
             return JsonResponse({'error': 'Entidad inválida.'}, status=400)
 
         pendientes = (
@@ -139,7 +152,7 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
             return JsonResponse({'error': 'JSON inválido.'}, status=400)
 
         entidad = data.get('entidad', '').strip()
-        if entidad not in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
+        if entidad not in ENTIDADES_VALIDAS:
             return JsonResponse({'error': 'Entidad inválida.'}, status=400)
 
         fecha_raw = data.get('fecha', '').strip()
@@ -296,18 +309,17 @@ class HistorialDepositosView(LoginRequiredMixin, View):
             qs = qs.filter(fecha__gte=desde)
         if hasta:
             qs = qs.filter(fecha__lte=hasta)
-        if entidad in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
+        if entidad in ENTIDADES_VALIDAS:
             qs = qs.filter(entidad=entidad)
 
-        total_filtrado    = qs.aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        total_pf_filtrado = (
-            qs.filter(entidad=DepositoBancario.ENTIDAD_PAGOFACIL)
-            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        )
-        total_rp_filtrado = (
-            qs.filter(entidad=DepositoBancario.ENTIDAD_RAPIPAGO)
-            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        )
+        total_filtrado = qs.aggregate(t=Sum('monto'))['t'] or Decimal('0')
+
+        def _total_ent(ent):
+            return (qs.filter(entidad=ent).aggregate(t=Sum('monto'))['t']
+                    or Decimal('0'))
+        total_pf_filtrado = _total_ent(DepositoBancario.ENTIDAD_PAGOFACIL)
+        total_rp_filtrado = _total_ent(DepositoBancario.ENTIDAD_RAPIPAGO)
+        total_wu_filtrado = _total_ent(DepositoBancario.ENTIDAD_WESTERN_UNION)
 
         return render(request, 'cobranzas/historial_depositos.html', {
             'depositos':          _marcar_tickets_cargados(qs[:500]),
@@ -317,8 +329,10 @@ class HistorialDepositosView(LoginRequiredMixin, View):
             'total_filtrado':     total_filtrado,
             'total_pf_filtrado':  total_pf_filtrado,
             'total_rp_filtrado':  total_rp_filtrado,
+            'total_wu_filtrado':  total_wu_filtrado,
             'ENTIDAD_PF':         DepositoBancario.ENTIDAD_PAGOFACIL,
             'ENTIDAD_RP':         DepositoBancario.ENTIDAD_RAPIPAGO,
+            'ENTIDAD_WU':         DepositoBancario.ENTIDAD_WESTERN_UNION,
         })
     
 
@@ -442,7 +456,7 @@ class UsarSaldoFavorAjax(LoginRequiredMixin, View):
             return JsonResponse({'error': 'JSON inválido.'}, status=400)
 
         entidad = data.get('entidad', '').strip()
-        if entidad not in (DepositoBancario.ENTIDAD_PAGOFACIL, DepositoBancario.ENTIDAD_RAPIPAGO):
+        if entidad not in ENTIDADES_VALIDAS:
             return JsonResponse({'error': 'Entidad inválida.'}, status=400)
 
         fecha_raw = data.get('fecha', '').strip()

@@ -46,6 +46,7 @@
             <option value="">Todas</option>
             <option value="{{ ENTIDAD_PF }}" {% if entidad == ENTIDAD_PF %}selected{% endif %}>PagoFácil</option>
             <option value="{{ ENTIDAD_RP }}" {% if entidad == ENTIDAD_RP %}selected{% endif %}>RapiPago</option>
+            <option value="{{ ENTIDAD_WU }}" {% if entidad == ENTIDAD_WU %}selected{% endif %}>Western Union</option>
         </select>
     </div>
     <button type="submit" class="btn-filtrar">Filtrar</button>
@@ -66,6 +67,10 @@
         <div class="caja-resumen-item">
             <span class="caja-resumen-label">RapiPago</span>
             <strong>${{ total_rp_filtrado|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">Western Union</span>
+            <strong>${{ total_wu_filtrado|floatformat:2 }}</strong>
         </div>
     </div>
 </div>
@@ -148,16 +153,7 @@
                 <td>{{ d.realizado_por }}</td>
                 <td>{{ d.fecha_registro|date:"d/m/Y H:i" }}</td>
                 <td class="dep-tickets-cell">
-                    {% if d.entidad == ENTIDAD_PF %}
-                    <button type="button" class="btn-ver-ticket {% if 'ticket_1' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="Ticket 1 cargado">
-                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_1' in d.tickets_cargados %}Ticket 1 cargado{% else %}Ticket 1{% endif %}
-                    </button>
-                    <button type="button" class="btn-ver-ticket {% if 'ticket_2' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
-                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="Ticket 2 cargado">
-                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_2' in d.tickets_cargados %}Ticket 2 cargado{% else %}Ticket 2{% endif %}
-                    </button>
-                    {% else %}
+                    {% if d.entidad == ENTIDAD_RP %}
                     {% if d.monto_efectivo_fisico %}
                     <button type="button" class="btn-ver-ticket {% if 'efectivo_fisico' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
                             data-deposito-id="{{ d.pk }}" data-tipo="efectivo_fisico" data-label-cargado="Efectivo cargado">
@@ -176,6 +172,16 @@
                         <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'saldo_plataforma' in d.tickets_cargados %}Saldo a favor cargado{% else %}Ticket saldo a favor{% endif %}
                     </button>
                     {% endif %}
+                    {% else %}
+                    {# PagoFácil y Western Union: 2 comprobantes genéricos #}
+                    <button type="button" class="btn-ver-ticket {% if 'ticket_1' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_1" data-label-cargado="Ticket 1 cargado">
+                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_1' in d.tickets_cargados %}Ticket 1 cargado{% else %}Ticket 1{% endif %}
+                    </button>
+                    <button type="button" class="btn-ver-ticket {% if 'ticket_2' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
+                            data-deposito-id="{{ d.pk }}" data-tipo="ticket_2" data-label-cargado="Ticket 2 cargado">
+                        <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ticket_2' in d.tickets_cargados %}Ticket 2 cargado{% else %}Ticket 2{% endif %}
+                    </button>
                     {% endif %}
                 </td>
                 {% if user.is_staff or user.is_superuser %}
@@ -252,8 +258,9 @@
 
 <style>
 .badge-entidad { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; }
-.badge-entidad-pagofacil { background:#fff3e0; color:#e65100; }
-.badge-entidad-rapipago  { background:#e8f5e9; color:#2e7d32; }
+.badge-entidad-pagofacil     { background:#fff3e0; color:#e65100; }
+.badge-entidad-rapipago      { background:#e8f5e9; color:#2e7d32; }
+.badge-entidad-western_union { background:#e3f2fd; color:#1565c0; }
 .dep-dif-favor  { color: #16a34a; font-weight: 700; }
 .dep-dif-contra { color: #dc2626; font-weight: 700; }
 .dep-dif-sindif   { color: #888; }

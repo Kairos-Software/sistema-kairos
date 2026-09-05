@@ -411,9 +411,10 @@
     padding: 2px 7px;
     border-radius: 20px;
 }
-.cobro-canal-pagofacil { background: #d3f9d8; color: #2b7a0b; }
-.cobro-canal-rapipago  { background: #fce4d6; color: #b84a00; }
-.cobro-canal-otro      { background: #f0f0f0; color: #666; }
+.cobro-canal-pagofacil     { background: #d3f9d8; color: #2b7a0b; }
+.cobro-canal-rapipago      { background: #fce4d6; color: #b84a00; }
+.cobro-canal-western_union { background: #d7e9ff; color: #1257a0; }
+.cobro-canal-otro          { background: #f0f0f0; color: #666; }
 
 .cobro-item-remove {
     margin-left: auto;
@@ -497,6 +498,48 @@
     -webkit-appearance: none;
     margin: 0;
 }
+
+/* ── Cantidad (solo servicios de precio fijo) ── */
+.cobro-cantidad-wrap { margin-top: .55rem; }
+.cobro-input-cantidad {
+    width: 90px;
+    padding: .4rem .55rem;
+    border: 1px solid #dcdde4;
+    border-radius: 6px;
+    font-size: .9rem;
+    font-weight: 700;
+    color: #222;
+    background: #fff;
+}
+.cobro-input-cantidad:focus {
+    outline: none;
+    border-color: #E85C0D;
+    box-shadow: 0 0 0 2px rgba(232,92,13,.15);
+}
+/* Selector de cantidad dentro de una fila del carrito */
+.cobro-item-cantidad-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: .15rem;
+    margin-left: .1rem;
+    padding: .1rem .35rem;
+    background: #fff4ec;
+    border: 1px solid rgba(232,92,13,.3);
+    border-radius: 6px;
+}
+.cobro-item-cantidad-x { font-size: .75rem; font-weight: 800; color: #E85C0D; }
+.cobro-item-cantidad {
+    width: 40px;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: .82rem;
+    font-weight: 800;
+    color: #E85C0D;
+    text-align: center;
+}
+.cobro-item-cantidad::-webkit-outer-spin-button,
+.cobro-item-cantidad::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* ── Totales ── */
 .cobro-totales-bloque {

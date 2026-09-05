@@ -73,16 +73,12 @@ class CajaGrandeView(LoginRequiredMixin, View):
         cant_cierres   = CierreDiario.objects.count()
         cant_depositos = DepositoBancario.objects.count()
 
-        depositos_pf = (
-            DepositoBancario.objects
-            .filter(entidad=DepositoBancario.ENTIDAD_PAGOFACIL)
-            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        )
-        depositos_rp = (
-            DepositoBancario.objects
-            .filter(entidad=DepositoBancario.ENTIDAD_RAPIPAGO)
-            .aggregate(t=Sum('monto'))['t'] or Decimal('0')
-        )
+        def _dep_ent(ent):
+            return (DepositoBancario.objects.filter(entidad=ent)
+                    .aggregate(t=Sum('monto'))['t'] or Decimal('0'))
+        depositos_pf = _dep_ent(DepositoBancario.ENTIDAD_PAGOFACIL)
+        depositos_rp = _dep_ent(DepositoBancario.ENTIDAD_RAPIPAGO)
+        depositos_wu = _dep_ent(DepositoBancario.ENTIDAD_WESTERN_UNION)
 
         ultimos_cierres = (
             CierreDiario.objects
@@ -104,6 +100,7 @@ class CajaGrandeView(LoginRequiredMixin, View):
             'cant_depositos':           cant_depositos,
             'depositos_pf':             depositos_pf,
             'depositos_rp':             depositos_rp,
+            'depositos_wu':             depositos_wu,
             'ultimos_cierres':          ultimos_cierres,
             'extracciones_caja_grande': extracciones_caja_grande,
             'cant_extracciones_cg':     cant_extracciones_cg,

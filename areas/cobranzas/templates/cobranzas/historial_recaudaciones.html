@@ -46,6 +46,7 @@
             <option value="">Todas</option>
             <option value="{{ ENTIDAD_PF }}" {% if entidad == ENTIDAD_PF %}selected{% endif %}>PagoFácil</option>
             <option value="{{ ENTIDAD_RP }}" {% if entidad == ENTIDAD_RP %}selected{% endif %}>RapiPago</option>
+            <option value="{{ ENTIDAD_WU }}" {% if entidad == ENTIDAD_WU %}selected{% endif %}>Western Union</option>
         </select>
     </div>
     <div class="filtro-fecha-wrap">
@@ -74,6 +75,10 @@
         <div class="caja-resumen-item">
             <span class="caja-resumen-label">RapiPago</span>
             <strong>${{ total_rp_filtrado|floatformat:2 }}</strong>
+        </div>
+        <div class="caja-resumen-item">
+            <span class="caja-resumen-label">Western Union</span>
+            <strong>${{ total_wu_filtrado|floatformat:2 }}</strong>
         </div>
     </div>
 </div>
@@ -151,8 +156,9 @@
 
 <style>
 .badge-entidad { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; }
-.badge-entidad-pagofacil { background:#fff3e0; color:#e65100; }
-.badge-entidad-rapipago  { background:#e8f5e9; color:#2e7d32; }
+.badge-entidad-pagofacil     { background:#fff3e0; color:#e65100; }
+.badge-entidad-rapipago      { background:#e8f5e9; color:#2e7d32; }
+.badge-entidad-western_union { background:#e3f2fd; color:#1565c0; }
 .badge-cubierta, .badge-pendiente {
     display: inline-block; padding: .2rem .55rem; border-radius: 20px;
     font-size: .78rem; font-weight: 600; white-space: nowrap;

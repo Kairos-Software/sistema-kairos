@@ -4,7 +4,12 @@
 // LÓGICA DE MONTOS (crítico — no modificar sin revisar todo):
 //   Servicio.monto  = nuestro ADICIONAL (ganancia fija por cobro)
 //   importe         = monto de la FACTURA del cliente (lo ingresa el usuario)
-//   subtotal        = importe + adicional
+//   subtotal        = (importe + adicional) × cantidad
+//
+//   CANTIDAD: en el estado del carrito, item.monto_factura e item.monto_adicional
+//   son SIEMPRE valores UNITARIOS. item.cantidad (default 1, solo servicios fijos)
+//   multiplica al mostrar y al enviar. Al backend se manda monto_servicio y
+//   monto_adicional YA multiplicados (total de la línea) + cantidad aparte.
 //
 // DOS MODOS DE BÚSQUEDA:
 //   Tab 1 — Inteligente: prefijo + importe → backend detecta servicio automáticamente
@@ -37,9 +42,10 @@ const estado = {
 };
 
 const CANALES = {
-    pagofacil: 'Pago Fácil',
-    rapipago:  'Rapipago',
-    otro:      'Otro',
+    pagofacil:     'Pago Fácil',
+    rapipago:      'Rapipago',
+    western_union: 'Western Union',
+    otro:          'Otro',
 };
 
 const METODOS_PAGO = {
@@ -70,6 +76,16 @@ function esc(str) {
     return String(str)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Cantidad de una línea del carrito (entera, >= 1).
+function cantOf(item) {
+    const n = parseInt(item.cantidad, 10);
+    return (isNaN(n) || n < 1) ? 1 : n;
+}
+// Total de la línea = (factura unitaria + adicional unitario) × cantidad.
+function lineaTotal(item) {
+    return (item.monto_factura + item.monto_adicional) * cantOf(item);
 }
 
 
@@ -109,6 +125,8 @@ const elSmartBuscando      = document.getElementById('smartBuscando');
 const elSmartError         = document.getElementById('smartError');
 const elSmartResultado     = document.getElementById('smartResultado');
 const elSmartImporteConfirm = document.getElementById('smartImporteConfirm');
+const elSmartCantidadWrap  = document.getElementById('smartCantidadWrap');
+const elSmartCantidad      = document.getElementById('smartCantidad');
 
 // ── Autocompletado de prefijos ──────────────────────────────────
 const elPrefijoDropdown = document.getElementById('smartPrefijoDropdown');
@@ -186,8 +204,16 @@ function smartLimpiarResultado() {
     elSmartResultado.style.display = 'none';
     estado.smartServicio           = null;
     estado.smartImporte            = 0;
+    if (elSmartCantidad)     elSmartCantidad.value = '1';
+    if (elSmartCantidadWrap) elSmartCantidadWrap.style.display = 'none';
     const op = document.getElementById('smartOpciones');
     if (op) op.style.display = 'none';
+}
+
+// Cantidad tipeada en el panel "servicio detectado" (entera, >= 1).
+function smartCantidadActual() {
+    const n = parseInt(elSmartCantidad ? elSmartCantidad.value : '1', 10);
+    return (isNaN(n) || n < 1) ? 1 : n;
 }
 
 // Navegación del dropdown de prefijos + Enter en prefijo → foco a importe
@@ -278,9 +304,34 @@ function smartMostrarResultado(s, tipo, importe) {
         elSmartImporteConfirmHint.textContent = esFijo ? SMART_HINT_FIJO : SMART_HINT_RANGO;
     }
 
-    document.getElementById('smartSubtotalMonto').textContent = fmt(factura + adicional);
+    // Cantidad: solo tiene sentido en servicios fijos (trámites repetibles).
+    if (elSmartCantidad)     elSmartCantidad.value = '1';
+    if (elSmartCantidadWrap) elSmartCantidadWrap.style.display = esFijo ? '' : 'none';
+    const adLabel = document.getElementById('smartSrvAdicionalLabel');
+    if (adLabel) adLabel.textContent = esFijo ? 'Adicional (nuestro, por unidad)' : 'Adicional (nuestro)';
+
+    smartActualizarSubtotal();
     if (elSmartOpciones) elSmartOpciones.style.display = 'none';
     elSmartResultado.style.display = '';
+}
+
+// Recalcula el "Subtotal esta boleta" del panel inteligente con la cantidad actual.
+function smartActualizarSubtotal() {
+    const s = estado.smartServicio;
+    if (!s) return;
+    const esFijo    = s._tipo === 'fijo';
+    const factura   = esFijo ? parseFloat(s.monto) : estado.smartImporte;
+    const adicional = esFijo ? parseFloat(s.adicional_fijo || 0) : parseFloat(s.monto);
+    const cant      = esFijo ? smartCantidadActual() : 1;
+    document.getElementById('smartSubtotalMonto').textContent = fmt((factura + adicional) * cant);
+}
+
+if (elSmartCantidad) {
+    elSmartCantidad.addEventListener('input', smartActualizarSubtotal);
+    elSmartCantidad.addEventListener('blur', () => {
+        elSmartCantidad.value = String(smartCantidadActual());
+        smartActualizarSubtotal();
+    });
 }
 
 // Cuando un prefijo tiene varios servicios fijos: mostrar botones para elegir.
@@ -373,6 +424,7 @@ document.getElementById('btnSmartAgregar').addEventListener('click', () => {
     const esFijo    = s._tipo === 'fijo';
     const factura   = esFijo ? monto : estado.smartImporte;
     const adicional = esFijo ? parseFloat(s.adicional_fijo || 0) : monto;
+    const cantidad  = esFijo ? smartCantidadActual() : 1;
 
     // Rango: hace falta un importe válido. Fijo: alcanza con que el total sea > 0.
     if (!esFijo && (!factura || factura <= 0)) return;
@@ -385,9 +437,11 @@ document.getElementById('btnSmartAgregar').addEventListener('click', () => {
         codigo:                   s.codigo,
         descripcion:              s.descripcion,
         proveedor:                s.proveedor || '',
-        monto_factura:            factura,
-        monto_adicional:          estado.sinAdicional ? 0 : adicional,
-        monto_adicional_original: adicional,
+        monto_factura:            factura,   // unitario
+        monto_adicional:          estado.sinAdicional ? 0 : adicional,  // unitario
+        monto_adicional_original: adicional, // unitario
+        cantidad,
+        esFijo,
         canal,
         _modo:           'inteligente',   // solo para trazabilidad interna, no se envía
     });
@@ -514,7 +568,15 @@ async function buscarServicios(q) {
 }
 
 // ── Panel de carga manual ────────────────────────────────────
-const agrImporte = document.getElementById('agrImporte');
+const agrImporte       = document.getElementById('agrImporte');
+const agrCantidadWrap  = document.getElementById('agrCantidadWrap');
+const agrCantidad       = document.getElementById('agrCantidad');
+
+// Cantidad tipeada en el panel de carga manual (entera, >= 1).
+function agrCantidadActual() {
+    const n = parseInt(agrCantidad ? agrCantidad.value : '1', 10);
+    return (isNaN(n) || n < 1) ? 1 : n;
+}
 
 function seleccionarServicio(s) {
     estado.textoServicioSeleccionado = s;
@@ -543,6 +605,13 @@ function seleccionarServicio(s) {
             ? 'Precio base del servicio. El adicional se cobra aparte; el subtotal ya lo suma.'
             : 'Lo que dice la boleta del cliente (luz, SUBE, etc.).';
     }
+
+    // Cantidad: solo servicios fijos (trámites repetibles).
+    if (agrCantidad)     agrCantidad.value = '1';
+    if (agrCantidadWrap) agrCantidadWrap.style.display = esFijo ? '' : 'none';
+    const agrAdLabel = document.getElementById('agrAdicionalLabel');
+    if (agrAdLabel) agrAdLabel.textContent = esFijo ? 'Adicional (nuestro, por unidad)' : 'Adicional (nuestro)';
+
     agrImporte.dispatchEvent(new Event('input'));
     panelAgregar.style.display = '';
 
@@ -557,15 +626,19 @@ function seleccionarServicio(s) {
 function cerrarPanelCarga() {
     panelAgregar.style.display = 'none';
     estado.textoServicioSeleccionado = null;
+    if (agrCantidad)     agrCantidad.value = '1';
+    if (agrCantidadWrap) agrCantidadWrap.style.display = 'none';
 }
 
 // Subtotal en tiempo real
-agrImporte.addEventListener('input', () => {
+function agrActualizarSubtotal() {
     const s = estado.textoServicioSeleccionado;
     if (!s) return;
+    const esFijo    = s.tipo === 'fijo';
     const importe   = parseFloat(agrImporte.value) || 0;
-    const adicional = s.tipo === 'fijo' ? (s.adicionalFijo || 0) : s.monto;
-    const subtotal  = importe + adicional;
+    const adicional = esFijo ? (s.adicionalFijo || 0) : s.monto;
+    const cant      = esFijo ? agrCantidadActual() : 1;
+    const subtotal  = (importe + adicional) * cant;
     const preview   = document.getElementById('subtotalPreview');
     const montoEl   = document.getElementById('subtotalPreviewMonto');
     if (subtotal > 0) {
@@ -574,7 +647,15 @@ agrImporte.addEventListener('input', () => {
     } else {
         preview.style.visibility = 'hidden';
     }
-});
+}
+agrImporte.addEventListener('input', agrActualizarSubtotal);
+if (agrCantidad) {
+    agrCantidad.addEventListener('input', agrActualizarSubtotal);
+    agrCantidad.addEventListener('blur', () => {
+        agrCantidad.value = String(agrCantidadActual());
+        agrActualizarSubtotal();
+    });
+}
 
 // Enter en importe → agregar
 agrImporte.addEventListener('keydown', e => {
@@ -588,6 +669,7 @@ document.getElementById('btnAgregarItem').addEventListener('click', () => {
     const importe   = parseFloat(agrImporte.value) || 0;
     const esFijo    = s.tipo === 'fijo';
     const adicional = esFijo ? (s.adicionalFijo || 0) : s.monto;
+    const cantidad  = esFijo ? agrCantidadActual() : 1;
     // Rango: hace falta un importe > 0. Fijo: alcanza con que el total sea > 0.
     const invalido = esFijo ? (importe + adicional <= 0) : (importe <= 0);
     if (invalido) {
@@ -606,9 +688,11 @@ document.getElementById('btnAgregarItem').addEventListener('click', () => {
         codigo:                   s.codigo,
         descripcion:              s.descripcion,
         proveedor:                s.proveedor || '',
-        monto_factura:            importe,
-        monto_adicional:          estado.sinAdicional ? 0 : adicional,
-        monto_adicional_original: adicional,
+        monto_factura:            importe,   // unitario
+        monto_adicional:          estado.sinAdicional ? 0 : adicional,  // unitario
+        monto_adicional_original: adicional, // unitario
+        cantidad,
+        esFijo,
         canal,
         _modo:           'texto',
     });
@@ -640,17 +724,29 @@ function renderCarrito() {
 
     document.getElementById('badgeCount').textContent = estado.items.length;
 
-    listaItems.innerHTML = estado.items.map(item => `
+    listaItems.innerHTML = estado.items.map(item => {
+        const cant   = cantOf(item);
+        const esFijo = !!item.esFijo;
+        const lblFac = esFijo ? 'Factura c/u' : 'Factura';
+        const lblAdi = esFijo ? 'Adicional c/u' : 'Adicional';
+        const cantidadCtrl = esFijo ? `
+                <div class="cobro-item-cantidad-wrap" title="Cantidad de este trámite">
+                    <span class="cobro-item-cantidad-x">×</span>
+                    <input type="number" class="cobro-item-cantidad" min="1" step="1"
+                           data-iid="${item._id}" value="${cant}" aria-label="Cantidad">
+                </div>` : '';
+        return `
         <div class="cobro-item-row">
             <div class="cobro-item-header">
                 <span class="codigo-badge">${esc(item.codigo)}</span>
                 <span class="cobro-item-canal cobro-canal-${item.canal}">${CANALES[item.canal]}</span>
+                ${cantidadCtrl}
                 <button class="cobro-item-remove" data-iid="${item._id}" title="Quitar boleta" aria-label="Quitar boleta"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
             </div>
             <div class="cobro-item-desc">${esc(item.descripcion)}</div>
             <div class="cobro-item-montos">
                 <div class="cobro-item-monto-col">
-                    <span class="cobro-monto-label">Factura</span>
+                    <span class="cobro-monto-label">${lblFac}</span>
                     <div class="cobro-monto-edit-wrap">
                         <span class="cobro-monto-edit-signo">$</span>
                         <input type="number" class="cobro-monto-edit-input" min="0" step="0.01"
@@ -660,7 +756,7 @@ function renderCarrito() {
                 </div>
                 <span class="cobro-monto-mas">+</span>
                 <div class="cobro-item-monto-col">
-                    <span class="cobro-monto-label">Adicional</span>
+                    <span class="cobro-monto-label">${lblAdi}</span>
                     <div class="cobro-monto-edit-wrap">
                         <span class="cobro-monto-edit-signo">$</span>
                         <input type="number" class="cobro-monto-edit-input cobro-monto-adicional" min="0" step="0.01"
@@ -670,12 +766,12 @@ function renderCarrito() {
                 </div>
                 <span class="cobro-monto-mas">=</span>
                 <div class="cobro-item-monto-col cobro-item-subtotal">
-                    <span class="cobro-monto-label">Subtotal</span>
-                    <span class="cobro-monto-val cobro-monto-total" data-subtotal-iid="${item._id}">${fmt(item.monto_factura + item.monto_adicional)}</span>
+                    <span class="cobro-monto-label" data-subtlabel-iid="${item._id}">Subtotal${cant > 1 ? ` (×${cant})` : ''}</span>
+                    <span class="cobro-monto-val cobro-monto-total" data-subtotal-iid="${item._id}">${fmt(lineaTotal(item))}</span>
                 </div>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 
     listaItems.querySelectorAll('.cobro-item-remove').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -699,7 +795,7 @@ function renderCarrito() {
             item[inp.dataset.field] = val;
 
             const subtotalEl = listaItems.querySelector(`[data-subtotal-iid="${item._id}"]`);
-            if (subtotalEl) subtotalEl.textContent = fmt(item.monto_factura + item.monto_adicional);
+            if (subtotalEl) subtotalEl.textContent = fmt(lineaTotal(item));
 
             actualizarTotales();
             sincronizarPago();
@@ -707,6 +803,30 @@ function renderCarrito() {
         inp.addEventListener('blur', () => {
             const item = estado.items.find(i => i._id === parseInt(inp.dataset.iid));
             if (item) inp.value = item[inp.dataset.field].toFixed(2);
+        });
+    });
+
+    // Cantidad por línea (solo servicios fijos)
+    listaItems.querySelectorAll('.cobro-item-cantidad').forEach(inp => {
+        inp.addEventListener('input', () => {
+            const item = estado.items.find(i => i._id === parseInt(inp.dataset.iid));
+            if (!item) return;
+            let n = parseInt(inp.value, 10);
+            if (isNaN(n) || n < 1) n = 1;
+            item.cantidad = n;
+
+            const subtotalEl = listaItems.querySelector(`[data-subtotal-iid="${item._id}"]`);
+            if (subtotalEl) subtotalEl.textContent = fmt(lineaTotal(item));
+            const labelEl = listaItems.querySelector(`[data-subtlabel-iid="${item._id}"]`);
+            if (labelEl) labelEl.textContent = n > 1 ? `Subtotal (×${n})` : 'Subtotal';
+
+            actualizarTotales();
+            sincronizarPago();
+        });
+        inp.addEventListener('blur', () => {
+            const item = estado.items.find(i => i._id === parseInt(inp.dataset.iid));
+            if (!item) return;
+            inp.value = String(cantOf(item));
         });
     });
 
@@ -729,8 +849,8 @@ btnToggleAdicional.addEventListener('click', () => {
 });
 
 function actualizarTotales() {
-    const totFacturas  = estado.items.reduce((s, i) => s + i.monto_factura, 0);
-    const totAdicional = estado.items.reduce((s, i) => s + i.monto_adicional, 0);
+    const totFacturas  = estado.items.reduce((s, i) => s + i.monto_factura  * cantOf(i), 0);
+    const totAdicional = estado.items.reduce((s, i) => s + i.monto_adicional * cantOf(i), 0);
     const totGeneral   = totFacturas + totAdicional;
 
     document.getElementById('totalFacturas').textContent    = fmt(totFacturas);
@@ -743,7 +863,7 @@ function actualizarTotales() {
 function sincronizarPago() {
     // Si hay exactamente un método de pago, le auto-asigna el total
     if (estado.pagos.length === 1) {
-        const total = estado.items.reduce((s, i) => s + i.monto_factura + i.monto_adicional, 0);
+        const total = estado.items.reduce((s, i) => s + lineaTotal(i), 0);
         estado.pagos[0].monto = total;
         const inp = document.querySelector(`[data-pago-id="${estado.pagos[0].id}"] .cobro-pago-monto`);
         if (inp) inp.value = total.toFixed(2);
@@ -813,7 +933,7 @@ document.getElementById('btnAgregarPago').addEventListener('click', () => {
 });
 
 function actualizarBalance() {
-    const total     = estado.items.reduce((s, i) => s + i.monto_factura + i.monto_adicional, 0);
+    const total     = estado.items.reduce((s, i) => s + lineaTotal(i), 0);
     const asignado  = estado.pagos.reduce((s, p) => s + p.monto, 0);
     const pendiente = total - asignado;
 
@@ -849,7 +969,7 @@ document.getElementById('btnConfirmarCobro').addEventListener('click', async () 
         return;
     }
 
-    const total    = estado.items.reduce((s, i) => s + i.monto_factura + i.monto_adicional, 0);
+    const total    = estado.items.reduce((s, i) => s + lineaTotal(i), 0);
     const asignado = estado.pagos.reduce((s, p) => s + p.monto, 0);
 
     if (!asignado) {
@@ -865,8 +985,10 @@ document.getElementById('btnConfirmarCobro').addEventListener('click', async () 
     const payload = {
         items: estado.items.map(i => ({
             servicio_id:     i.servicio_id,
-            monto_servicio:  i.monto_factura,
-            monto_adicional: i.monto_adicional,
+            // El backend recibe el TOTAL de la línea (ya × cantidad) + la cantidad aparte.
+            monto_servicio:  i.monto_factura  * cantOf(i),
+            monto_adicional: i.monto_adicional * cantOf(i),
+            cantidad:        cantOf(i),
             canal:           i.canal,
         })),
         pagos: estado.pagos.filter(p => p.monto > 0).map(p => ({

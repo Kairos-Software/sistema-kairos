@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}?v=20260825-3">
+<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}?v=20260905-2">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -151,9 +151,18 @@
                         </p>
                     </div>
 
+                    <div class="cobro-field-full cobro-cantidad-wrap" id="smartCantidadWrap" style="display:none;">
+                        <label class="cobro-label-secundario">Cantidad</label>
+                        <input type="number" id="smartCantidad" class="cobro-input-cantidad"
+                               min="1" step="1" value="1">
+                        <p class="cobro-hint-texto" style="margin-top:.2rem;">
+                            Cuántos de este mismo trámite. El subtotal ya multiplica precio + adicional por la cantidad.
+                        </p>
+                    </div>
+
                     <div class="cobro-fields-row">
                         <div class="cobro-field-half">
-                            <label class="cobro-label-secundario">Adicional (nuestro)</label>
+                            <label class="cobro-label-secundario" id="smartSrvAdicionalLabel">Adicional (nuestro)</label>
                             <div class="cobro-adicional-pill">
                                 <span>$</span>
                                 <strong id="smartSrvAdicional"></strong>
@@ -164,6 +173,7 @@
                             <select id="smartCanal" class="cobro-select">
                                 <option value="pagofacil">Pago Fácil</option>
                                 <option value="rapipago">Rapipago</option>
+                                <option value="western_union">Western Union</option>
                                 <option value="otro">Otro</option>
                             </select>
                         </div>
@@ -248,9 +258,18 @@
                         <p class="cobro-hint-texto" style="margin-top:.2rem;" id="agrImporteHint"></p>
                     </div>
 
+                    <div class="cobro-field-full cobro-cantidad-wrap" id="agrCantidadWrap" style="display:none;">
+                        <label class="cobro-label-secundario">Cantidad</label>
+                        <input type="number" id="agrCantidad" class="cobro-input-cantidad"
+                               min="1" step="1" value="1">
+                        <p class="cobro-hint-texto" style="margin-top:.2rem;">
+                            Cuántos de este mismo trámite. El subtotal ya multiplica precio + adicional por la cantidad.
+                        </p>
+                    </div>
+
                     <div class="cobro-fields-row">
                         <div class="cobro-field-half">
-                            <label class="cobro-label-secundario">Adicional (nuestro)</label>
+                            <label class="cobro-label-secundario" id="agrAdicionalLabel">Adicional (nuestro)</label>
                             <div class="cobro-adicional-pill">
                                 <span>$</span>
                                 <strong id="agrAdicional"></strong>
@@ -261,6 +280,7 @@
                             <select id="agrCanal" class="cobro-select">
                                 <option value="pagofacil">Pago Fácil</option>
                                 <option value="rapipago">Rapipago</option>
+                                <option value="western_union">Western Union</option>
                                 <option value="otro">Otro</option>
                             </select>
                         </div>
@@ -424,7 +444,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260828-5"></script>
+<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260905-2"></script>
 <script>
     window.cobroBuscarUrl    = "{% url 'cobranzas:cobro_buscar_servicio' %}";
     window.cobroConfirmarUrl = "{% url 'cobranzas:cobro_confirmar' %}";

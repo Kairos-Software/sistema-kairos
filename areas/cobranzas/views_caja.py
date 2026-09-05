@@ -713,27 +713,18 @@ class HistorialTurnosView(LoginRequiredMixin, View):
             ).values('cobro__turno').annotate(s=Sum('monto')).values('s')[:1]
         )
 
-        subq_pf = Subquery(
-            ItemCobro.objects.filter(
-                cobro__turno=OuterRef('pk'),
-                cobro__estado=Cobro.ESTADO_CERRADO,
-                canal=ItemCobro.CANAL_PAGOFACIL
-            ).values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
-        )
-        subq_rp = Subquery(
-            ItemCobro.objects.filter(
-                cobro__turno=OuterRef('pk'),
-                cobro__estado=Cobro.ESTADO_CERRADO,
-                canal=ItemCobro.CANAL_RAPIPAGO
-            ).values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
-        )
-        subq_otro = Subquery(
-            ItemCobro.objects.filter(
-                cobro__turno=OuterRef('pk'),
-                cobro__estado=Cobro.ESTADO_CERRADO,
-                canal=ItemCobro.CANAL_OTRO
-            ).values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
-        )
+        def _subq_canal(canal):
+            return Subquery(
+                ItemCobro.objects.filter(
+                    cobro__turno=OuterRef('pk'),
+                    cobro__estado=Cobro.ESTADO_CERRADO,
+                    canal=canal,
+                ).values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
+            )
+        subq_pf   = _subq_canal(ItemCobro.CANAL_PAGOFACIL)
+        subq_rp   = _subq_canal(ItemCobro.CANAL_RAPIPAGO)
+        subq_wu   = _subq_canal(ItemCobro.CANAL_WESTERN_UNION)
+        subq_otro = _subq_canal(ItemCobro.CANAL_OTRO)
 
         qs = qs.annotate(
             total_efe=Coalesce(subq_efe, Value(0, output_field=DecimalField())),
@@ -743,6 +734,7 @@ class HistorialTurnosView(LoginRequiredMixin, View):
             total_qr=Coalesce(subq_qr, Value(0, output_field=DecimalField())),
             total_pf=Coalesce(subq_pf, Value(0, output_field=DecimalField())),
             total_rp=Coalesce(subq_rp, Value(0, output_field=DecimalField())),
+            total_wu=Coalesce(subq_wu, Value(0, output_field=DecimalField())),
             total_otro=Coalesce(subq_otro, Value(0, output_field=DecimalField())),
         )
 
@@ -770,6 +762,8 @@ class HistorialTurnosView(LoginRequiredMixin, View):
                     q_canales |= Q(total_pf__gt=0)
                 elif can == ItemCobro.CANAL_RAPIPAGO:
                     q_canales |= Q(total_rp__gt=0)
+                elif can == ItemCobro.CANAL_WESTERN_UNION:
+                    q_canales |= Q(total_wu__gt=0)
                 elif can == ItemCobro.CANAL_OTRO:
                     q_canales |= Q(total_otro__gt=0)
             qs = qs.filter(q_canales)
@@ -859,6 +853,10 @@ def export_turnos_csv(request):
         ItemCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, canal=ItemCobro.CANAL_RAPIPAGO)
         .values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
     )
+    subq_wu = Subquery(
+        ItemCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, canal=ItemCobro.CANAL_WESTERN_UNION)
+        .values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
+    )
     subq_otro = Subquery(
         ItemCobro.objects.filter(cobro__turno=OuterRef('pk'), cobro__estado=Cobro.ESTADO_CERRADO, canal=ItemCobro.CANAL_OTRO)
         .values('cobro__turno').annotate(s=Sum('monto_servicio')).values('s')[:1]
@@ -872,6 +870,7 @@ def export_turnos_csv(request):
         total_qr=Coalesce(subq_qr, Value(0, output_field=DecimalField())),
         total_pf=Coalesce(subq_pf, Value(0, output_field=DecimalField())),
         total_rp=Coalesce(subq_rp, Value(0, output_field=DecimalField())),
+        total_wu=Coalesce(subq_wu, Value(0, output_field=DecimalField())),
         total_otro=Coalesce(subq_otro, Value(0, output_field=DecimalField())),
     )
 
@@ -897,6 +896,8 @@ def export_turnos_csv(request):
                 q_canales |= Q(total_pf__gt=0)
             elif can == ItemCobro.CANAL_RAPIPAGO:
                 q_canales |= Q(total_rp__gt=0)
+            elif can == ItemCobro.CANAL_WESTERN_UNION:
+                q_canales |= Q(total_wu__gt=0)
             elif can == ItemCobro.CANAL_OTRO:
                 q_canales |= Q(total_otro__gt=0)
         qs = qs.filter(q_canales)
@@ -910,8 +911,8 @@ def export_turnos_csv(request):
         'Número', 'Cajero', 'Fecha apertura', 'Fecha cierre', 'Estado',
         'Fondo inicial', 'Total efectivo', 'Total transferencia', 'Total débito',
         'Total crédito', 'Total QR', 'Total retiros', 'Total ingresos', 'Total extracciones',
-        'Total general', 'Total PagoFácil', 'Total Rapipago', 'Total Otro canal',
-        'Efectivo declarado', 'Diferencia', 'Cierre diario ID'
+        'Total general', 'Total PagoFácil', 'Total Rapipago', 'Total Western Union',
+        'Total Otro canal', 'Efectivo declarado', 'Diferencia', 'Cierre diario ID'
     ])
 
     for t in qs:
@@ -933,12 +934,150 @@ def export_turnos_csv(request):
             float(t.total_general()),
             float(getattr(t, 'total_pf', 0)),
             float(getattr(t, 'total_rp', 0)),
+            float(getattr(t, 'total_wu', 0)),
             float(getattr(t, 'total_otro', 0)),
             float(t.efectivo_declarado or 0),
             float(t.diferencia or 0),
             t.cierre_diario_id or '',
         ])
 
+    return response
+
+
+# ─────────────────────────────────────────────────────────────
+# HISTORIAL GLOBAL DE MOVIMIENTOS DE CAJA (ingresos / retiros)
+#
+# La carga y edición de movimientos sigue siendo por turno abierto
+# (RetiroCajaAjax). Esto es SOLO una vista de consulta/análisis de
+# todos los movimientos de todos los turnos, con filtros y export.
+# No permite editar ni anular — un movimiento de un turno ya cerrado
+# o consolidado no debe tocarse desde acá.
+# ─────────────────────────────────────────────────────────────
+
+_MOV_ORDEN_VALIDO = {
+    'fecha', '-fecha', 'monto', '-monto', 'tipo', '-tipo',
+}
+
+
+def _filtros_movimientos(GET):
+    return {
+        'desde':     GET.get('desde', '').strip(),
+        'hasta':     GET.get('hasta', '').strip(),
+        'tipo':      GET.get('tipo', '').strip(),       # '', 'retiro', 'ingreso'
+        'estado':    GET.get('estado', '').strip(),     # '', 'activo', 'anulado'
+        'turno':     GET.get('turno', '').strip(),      # número de turno
+        'usuario':   GET.get('usuario', '').strip(),    # registrado_por username
+        'motivo':    GET.get('motivo', '').strip(),
+        'monto_min': GET.get('monto_min', '').strip(),
+        'monto_max': GET.get('monto_max', '').strip(),
+        'order_by':  GET.get('order_by', '-fecha').strip(),
+    }
+
+
+def _qs_movimientos(f):
+    qs = RetiroCaja.objects.all()
+
+    if f['desde']:
+        qs = qs.filter(fecha__date__gte=f['desde'])
+    if f['hasta']:
+        qs = qs.filter(fecha__date__lte=f['hasta'])
+
+    if f['tipo'] in (RetiroCaja.TIPO_RETIRO, RetiroCaja.TIPO_INGRESO):
+        qs = qs.filter(tipo=f['tipo'])
+
+    if f['estado'] == 'activo':
+        qs = qs.filter(activo=True)
+    elif f['estado'] == 'anulado':
+        qs = qs.filter(activo=False)
+
+    if f['turno']:
+        try:
+            qs = qs.filter(turno__numero=int(f['turno']))
+        except ValueError:
+            pass
+
+    if f['usuario']:
+        qs = qs.filter(registrado_por__username__icontains=f['usuario'])
+    if f['motivo']:
+        qs = qs.filter(motivo__icontains=f['motivo'])
+
+    for key, lookup in (('monto_min', 'monto__gte'), ('monto_max', 'monto__lte')):
+        if f[key]:
+            try:
+                qs = qs.filter(**{lookup: float(f[key].replace(',', '.'))})
+            except ValueError:
+                pass
+
+    ob = f['order_by'] if f['order_by'] in _MOV_ORDEN_VALIDO else '-fecha'
+    return qs.order_by(ob, '-id')
+
+
+class HistorialMovimientosView(LoginRequiredMixin, View):
+    def get(self, request):
+        f = _filtros_movimientos(request.GET)
+        qs = _qs_movimientos(f)
+
+        # Resumen sobre el conjunto filtrado (antes de recortar a 500).
+        activos = qs.filter(activo=True)
+        tot_ret = float(
+            activos.filter(tipo=RetiroCaja.TIPO_RETIRO)
+            .aggregate(t=Sum('monto'))['t'] or 0
+        )
+        tot_ing = float(
+            activos.filter(tipo=RetiroCaja.TIPO_INGRESO)
+            .aggregate(t=Sum('monto'))['t'] or 0
+        )
+        total_movimientos = qs.count()
+        anulados = qs.filter(activo=False).count()
+
+        movimientos = qs.select_related(
+            'turno', 'turno__cajero', 'turno__cierre_diario', 'registrado_por'
+        )[:500]
+
+        ctx = dict(f)
+        ctx.update({
+            'movimientos':        movimientos,
+            'tot_retiros':        tot_ret,
+            'tot_ingresos':       tot_ing,
+            'neto':               tot_ing - tot_ret,
+            'total_movimientos':  total_movimientos,
+            'anulados':           anulados,
+            'TIPO_RETIRO':        RetiroCaja.TIPO_RETIRO,
+            'TIPO_INGRESO':       RetiroCaja.TIPO_INGRESO,
+        })
+        return render(request, 'cobranzas/historial_movimientos.html', ctx)
+
+
+def export_movimientos_csv(request):
+    """Exporta los movimientos filtrados a CSV (mismos filtros que la vista)."""
+    if not request.user.is_authenticated:
+        return HttpResponse("No autorizado", status=401)
+
+    f = _filtros_movimientos(request.GET)
+    qs = _qs_movimientos(f).select_related(
+        'turno', 'turno__cajero', 'turno__cierre_diario', 'registrado_por'
+    )
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="movimientos_caja.csv"'
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow([
+        'ID', 'Fecha', 'Tipo', 'Motivo', 'Monto', 'Turno',
+        'Cajero del turno', 'Registrado por', 'Cierre diario', 'Estado',
+    ])
+    for r in qs:
+        writer.writerow([
+            r.pk,
+            r.fecha.strftime('%Y-%m-%d %H:%M:%S'),
+            r.get_tipo_display(),
+            r.motivo,
+            float(r.monto),
+            r.turno.numero if r.turno_id else '',
+            str(r.turno.cajero) if (r.turno_id and r.turno.cajero_id) else '',
+            str(r.registrado_por) if r.registrado_por_id else '',
+            r.turno.cierre_diario_id if (r.turno_id and r.turno.cierre_diario_id) else '',
+            'Activo' if r.activo else 'Anulado',
+        ])
     return response
 
 
