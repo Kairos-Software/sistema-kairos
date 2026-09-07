@@ -1,6 +1,9 @@
 # core/forms_clientes.py
 from django import forms
-from .models import Cliente, ClienteImagen, ClienteContactoAdicional, ClienteTelefono, GrupoFamiliar
+from .models import (
+    Cliente, ClienteImagen, ClienteContactoAdicional, ClienteTelefono,
+    GrupoFamiliar, ServicioContratado,
+)
 
 
 class FormularioClienteBase(forms.ModelForm):
@@ -136,4 +139,36 @@ class FormularioContactoAdicional(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
+        self.fields['nombre'].required = True
+
+
+class FormularioServicioContratado(forms.ModelForm):
+    class Meta:
+        model  = ServicioContratado
+        fields = [
+            'area', 'nombre', 'descripcion', 'identificador', 'estado',
+            'monto_mensual', 'fecha_alta', 'fecha_baja', 'observaciones',
+        ]
+        widgets = {
+            'area':          forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'estado':        forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'nombre':        forms.TextInput(attrs={'class': 'form-control form-control-sm',
+                                 'placeholder': 'Ej: Internet Satelital 50 Mbps, Kai-Cart'}),
+            'descripcion':   forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2,
+                                 'placeholder': 'Detalle visible para el cliente'}),
+            'identificador': forms.TextInput(attrs={'class': 'form-control form-control-sm',
+                                 'placeholder': 'Nº de cuenta / abonado / servicio'}),
+            'monto_mensual': forms.NumberInput(attrs={'class': 'form-control form-control-sm',
+                                 'step': '0.01', 'min': '0'}),
+            'fecha_alta':    forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),
+            'fecha_baja':    forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),
+            'observaciones': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2,
+                                 'placeholder': 'Nota interna — no se muestra al cliente'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+        self.fields['area'].required   = True
         self.fields['nombre'].required = True

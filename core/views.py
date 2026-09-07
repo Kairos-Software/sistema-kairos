@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.urls import reverse_lazy
 
+
 class CustomLoginView(LoginView):
     template_name = 'core/login.html'
     redirect_authenticated_user = True
@@ -10,8 +11,10 @@ class CustomLoginView(LoginView):
     def get_success_url(self):
         return reverse_lazy('core:home')
 
+
 class CustomLogoutView(LogoutView):
-    next_page = reverse_lazy('core:login')
+    next_page = reverse_lazy('core:landing')
+
 
 @login_required
 def home(request):

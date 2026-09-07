@@ -70,6 +70,7 @@
 .estado-inactivo   { background:rgba(150,150,150,.12);color:#888;    border:1px solid rgba(150,150,150,.2); }
 .estado-potencial  { background:rgba(241,196,15,.12); color:#b7950b; border:1px solid rgba(241,196,15,.3); }
 .estado-suspendido { background:rgba(231,76,60,.12);  color:#c0392b; border:1px solid rgba(231,76,60,.28); }
+.estado-baja       { background:rgba(150,150,150,.12);color:#888;    border:1px solid rgba(150,150,150,.2); }
 .riesgo-badge  { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; }
 .riesgo-bajo   { background:rgba(46,204,113,.12);  color:#27ae60; border:1px solid rgba(46,204,113,.28); }
 .riesgo-medio  { background:rgba(230,126,34,.12);  color:#d35400; border:1px solid rgba(230,126,34,.28); }
@@ -190,6 +191,43 @@
 .lb-content { display:flex; flex-direction:column; align-items:center; gap:.6rem; max-width:90vw; max-height:90vh; }
 .lb-img { max-width:88vw; max-height:82vh; object-fit:contain; border-radius:8px; transition:opacity .2s; display:block; }
 .lb-caption { color:rgba(255,255,255,.5); font-size:.82rem; margin:0; text-align:center; }
+
+/* ════ SERVICIOS CONTRATADOS ════ */
+.sc-title-actions { display:flex; align-items:center; gap:.5rem; }
+.sc-btn-add {
+    background:#E85C0D; color:#fff; border:none; border-radius:7px;
+    font-size:.72rem; font-weight:700; letter-spacing:.3px; padding:4px 10px;
+    cursor:pointer; transition:background .15s;
+}
+.sc-btn-add:hover { background:#c94e0a; }
+
+.sc-list { display:flex; flex-direction:column; gap:.6rem; }
+.sc-item {
+    display:flex; align-items:flex-start; justify-content:space-between; gap:.6rem;
+    background:#fafafa; border:1px solid #f0f0f5; border-radius:10px; padding:.8rem .9rem;
+}
+.sc-item-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:.25rem; }
+.sc-item-head { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem; margin-bottom:.1rem; }
+.sc-area-badge {
+    display:inline-block; font-size:.62rem; font-weight:700; letter-spacing:.5px;
+    text-transform:uppercase; padding:2px 8px; border-radius:20px; border:1px solid transparent;
+}
+.sc-area-cobranzas { background:rgba(232,92,13,.1);  color:#c94e0a; border-color:rgba(232,92,13,.25); }
+.sc-area-software  { background:rgba(142,68,173,.1); color:#8e44ad; border-color:rgba(142,68,173,.25); }
+.sc-area-internet  { background:rgba(41,128,185,.1); color:#2980b9; border-color:rgba(41,128,185,.25); }
+.sc-area-otro      { background:rgba(150,150,150,.12);color:#888;   border-color:rgba(150,150,150,.2); }
+.sc-item-nombre { font-size:.92rem; font-weight:700; color:#111; }
+.sc-item-id   { font-size:.72rem; color:#999; font-family:monospace; }
+.sc-item-desc { font-size:.8rem; color:#888; line-height:1.4; }
+.sc-item-actions { display:flex; flex-direction:column; gap:.3rem; flex-shrink:0; }
+.sc-mini {
+    background:#fff; border:1px solid #e0e0ea; border-radius:6px;
+    font-size:.7rem; font-weight:700; color:#666; padding:3px 9px; cursor:pointer;
+    transition:all .15s; white-space:nowrap;
+}
+.sc-mini:hover { border-color:#E85C0D; color:#E85C0D; }
+.sc-mini.sc-del:hover { border-color:#c0392b; color:#c0392b; }
+.sc-lbl-hint { font-size:.68rem; font-weight:400; color:#aaa; text-transform:none; letter-spacing:0; }
 
 /* ════ RESPONSIVE ════ */
 @media(max-width:768px){

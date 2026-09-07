@@ -169,3 +169,11 @@ body::after {
     color: #444;
     letter-spacing: 0.5px;
 }
+.login-footer + .login-footer { margin-top: 0.5rem; }
+.login-back {
+    color: #888;
+    text-decoration: none;
+    font-weight: 700;
+    transition: color 0.15s;
+}
+.login-back:hover { color: var(--gk-orange); }

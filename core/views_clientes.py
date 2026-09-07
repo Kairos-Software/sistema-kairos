@@ -12,12 +12,12 @@ from django.conf import settings
 
 from .models import (
     Cliente, ClienteImagen, ClienteContactoAdicional,
-    ClienteTelefono, GrupoFamiliar
+    ClienteTelefono, GrupoFamiliar, ServicioContratado
 )
 from .forms_clientes import (
     FormularioClienteBase, FormularioClienteImagen,
     FormularioContactoAdicional, FormularioClienteTelefono,
-    FormularioGrupoFamiliar,
+    FormularioGrupoFamiliar, FormularioServicioContratado,
 )
 from .permisos import chequear_permiso
 
@@ -33,6 +33,23 @@ def _telefono_a_dict(t):
         'es_titular':   t.es_titular,
         'descripcion':  t.descripcion,
         'tiene_whatsapp': t.tiene_whatsapp,
+    }
+
+
+def _servicio_contratado_a_dict(s):
+    return {
+        'id':            s.pk,
+        'area':          s.area,
+        'area_display':  s.get_area_display(),
+        'nombre':        s.nombre,
+        'descripcion':   s.descripcion,
+        'identificador': s.identificador,
+        'estado':        s.estado,
+        'estado_display': s.get_estado_display(),
+        'monto_mensual': str(s.monto_mensual) if s.monto_mensual is not None else '',
+        'fecha_alta':    str(s.fecha_alta) if s.fecha_alta else '',
+        'fecha_baja':    str(s.fecha_baja) if s.fecha_baja else '',
+        'observaciones': s.observaciones,
     }
 
 
@@ -171,7 +188,8 @@ class ClienteDetalleView(LoginRequiredMixin, View):
 
         cliente = get_object_or_404(
             Cliente.objects.prefetch_related(
-                'imagenes', 'contactos_adicionales', 'telefonos'
+                'imagenes', 'contactos_adicionales', 'telefonos',
+                'servicios_contratados'
             ).select_related('grupo_familiar', 'referido_por', 'creado_por'),
             pk=pk
         )
@@ -188,9 +206,12 @@ class ClienteDetalleView(LoginRequiredMixin, View):
             'imagenes':       cliente.imagenes.all(),
             'contactos':      cliente.contactos_adicionales.all(),
             'telefonos':      cliente.telefonos.all(),
+            'servicios_contratados': cliente.servicios_contratados.all(),
             'convivientes':   convivientes,
             'puede_editar':   chequear_permiso(request.user, 'editar_clientes'),
             'puede_eliminar': chequear_permiso(request.user, 'eliminar_clientes'),
+            'area_choices':   ServicioContratado.AREAS,
+            'estado_serv_choices': ServicioContratado.ESTADOS,
         }
         return render(request, 'core/detalle_cliente.html', context)
 
@@ -420,6 +441,55 @@ class ClienteContactoAjax(LoginRequiredMixin, View):
                     'email': contacto.email, 'notas': contacto.notas,
                 }
             })
+        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+
+# ── AJAX: Servicios contratados ───────────────────────────────────
+
+class ServicioContratadoAjax(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        if not chequear_permiso(request.user, 'ver_clientes'):
+            return JsonResponse({'error': 'Sin permiso'}, status=403)
+        cliente = get_object_or_404(Cliente, pk=pk)
+        return JsonResponse({
+            'servicios': [
+                _servicio_contratado_a_dict(s)
+                for s in cliente.servicios_contratados.all()
+            ]
+        })
+
+    def post(self, request, pk):
+        if not chequear_permiso(request.user, 'editar_clientes'):
+            return JsonResponse({'error': 'Sin permiso'}, status=403)
+
+        cliente = get_object_or_404(Cliente, pk=pk)
+
+        if request.POST.get('_action') == 'eliminar':
+            servicio = get_object_or_404(
+                ServicioContratado,
+                pk=request.POST.get('servicio_pk'), cliente=cliente
+            )
+            servicio.delete()
+            return JsonResponse({'success': True})
+
+        servicio_pk = request.POST.get('servicio_pk')
+        if servicio_pk:
+            servicio = get_object_or_404(ServicioContratado, pk=servicio_pk, cliente=cliente)
+            form = FormularioServicioContratado(request.POST, instance=servicio)
+        else:
+            form = FormularioServicioContratado(request.POST)
+
+        if form.is_valid():
+            servicio = form.save(commit=False)
+            servicio.cliente = cliente
+            if not servicio_pk:
+                servicio.creado_por = request.user
+            servicio.save()
+            return JsonResponse({
+                'success': True,
+                'servicio': _servicio_contratado_a_dict(servicio),
+            })
+
         return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 

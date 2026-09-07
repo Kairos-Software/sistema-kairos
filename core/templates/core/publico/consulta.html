@@ -1,0 +1,84 @@
+{% extends 'core/publico/base_publico.html' %}
+{% load static %}
+
+{% block title %}Consultá tu cuenta — Grupo Kairos{% endblock %}
+{% block head_extra %}<meta name="robots" content="noindex">{% endblock %}
+
+{% block content %}
+
+<section class="pu-section pu-consulta">
+    <div class="pu-wrap pu-consulta__wrap">
+
+    {% if consultado %}
+
+        <p class="pu-label">Cuenta encontrada</p>
+        <h1 class="pu-h1">{{ cliente.get_nombre_display }}</h1>
+        <div class="pu-cq-meta">
+            <span class="pu-cq-code">{{ cliente.codigo }}</span>
+            <span class="pu-badge pu-badge--{{ cliente.estado }}">{{ cliente.get_estado_display }}</span>
+        </div>
+
+        {% if grupos %}
+        <div class="pu-cq-areas">
+            {% for area_nombre, servicios in grupos %}
+            <section class="pu-cq-area">
+                <h2 class="pu-cq-area__title">{{ area_nombre }}<span>{{ servicios|length }}</span></h2>
+                <ul>
+                    {% for s in servicios %}
+                    <li class="pu-cq-svc">
+                        <div class="pu-cq-svc__top">
+                            <span class="pu-cq-svc__name">{{ s.nombre }}</span>
+                            <span class="pu-badge pu-badge--{{ s.estado }}">{{ s.estado_display }}</span>
+                        </div>
+                        {% if s.descripcion %}<p class="pu-cq-svc__desc">{{ s.descripcion }}</p>{% endif %}
+                        {% if s.identificador %}<p class="pu-cq-svc__id">N.º {{ s.identificador }}</p>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="pu-destacado">
+            Todavía no tenés servicios cargados en tu cuenta. Si creés que es un
+            error, escribinos a <a href="mailto:{{ contacto.email }}">{{ contacto.email }}</a>.
+        </p>
+        {% endif %}
+
+        <a href="{% url 'core:consulta' %}" class="pu-btn pu-btn--ghost pu-btn--block">Consultar otra cuenta</a>
+
+    {% else %}
+
+        <p class="pu-label">Portal de clientes</p>
+        <h1 class="pu-h1">Consultá tu cuenta</h1>
+        <p class="pu-consulta__lead">
+            Ingresá tu DNI o tu número de cliente para ver los servicios que tenés
+            contratados y su estado. Sin usuario ni contraseña.
+        </p>
+
+        {% if error %}<p class="pu-alert" role="alert">{{ error }}</p>{% endif %}
+
+        <form method="post" class="pu-form" autocomplete="off">
+            {% csrf_token %}
+            <div class="pu-hp" aria-hidden="true">
+                <label>Empresa <input type="text" name="empresa" tabindex="-1" autocomplete="off"></label>
+            </div>
+            <label class="pu-field">
+                <span>DNI o número de cliente</span>
+                <input type="text" name="dato" value="{{ dato|default:'' }}"
+                       placeholder="Ej: 30111222 · o · GK-000000-AA" required autofocus>
+            </label>
+            <button type="submit" class="pu-btn pu-btn--orange pu-btn--block">Consultar</button>
+        </form>
+
+        <p class="pu-consulta__hint">
+            El número de cliente figura en tu comprobante o contrato, con el
+            formato <code>GK-000000-AA</code>.
+        </p>
+
+    {% endif %}
+
+    </div>
+</section>
+
+{% endblock %}

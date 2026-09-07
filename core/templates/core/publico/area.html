@@ -1,0 +1,106 @@
+{% extends 'core/publico/base_publico.html' %}
+{% load static %}
+
+{% block title %}{{ area.nombre }} — Grupo Kairos{% endblock %}
+{% block description %}{{ area.intro }}{% endblock %}
+
+{% block content %}
+
+<section class="pu-area-hero pu-area-hero--{{ area.slug }}">
+    <div class="pu-wrap">
+        <p class="pu-eyebrow"><a href="{% url 'core:landing' %}#areas">Áreas</a> <span>/</span> {{ area.nombre }}</p>
+        <div class="pu-area-hero__head">
+            <span class="pu-area-hero__icon">{% include 'core/publico/_icono_area.html' with slug=area.slug %}</span>
+            <h1 class="pu-hero__title">{{ area.titular }}</h1>
+        </div>
+        <p class="pu-hero__lead">{{ area.intro }}</p>
+        <div class="pu-hero__cta">
+            {% if area.cta_es_consulta %}
+            <a href="{% url 'core:consulta' %}" class="pu-btn pu-btn--orange pu-btn--lg">Consultá tu cuenta</a>
+            {% else %}
+            <a href="#contacto" class="pu-btn pu-btn--orange pu-btn--lg">{{ area.cta_label }}</a>
+            {% endif %}
+            <a href="#ofrecemos" class="pu-btn pu-btn--ghost pu-btn--lg">Qué ofrecemos</a>
+        </div>
+
+        {% if area.destacado %}
+        <p class="pu-destacado">{{ area.destacado }}</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="pu-section pu-section--alt" id="ofrecemos">
+    <div class="pu-wrap">
+        <p class="pu-label">{{ area.nombre }}</p>
+        <h2 class="pu-h2">Qué ofrecemos</h2>
+        <div class="pu-features">
+            {% for titulo, desc in area.features %}
+            <div class="pu-feature">
+                <span class="pu-feature__check" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8.5l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                <div>
+                    <h3>{{ titulo }}</h3>
+                    <p>{{ desc }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+{% if area.plataformas %}
+<section class="pu-section">
+    <div class="pu-wrap">
+        <p class="pu-label">Producto propio</p>
+        <h2 class="pu-h2">Nuestras plataformas</h2>
+        <div class="pu-plataformas">
+            {% for nombre, desc in area.plataformas %}
+            <div class="pu-plataforma">
+                <h3>{{ nombre }}</h3>
+                <p>{{ desc }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<section class="pu-cta">
+    <div class="pu-wrap pu-cta__inner">
+        <div>
+            <h2 class="pu-h2">{{ area.cta_titulo }}</h2>
+            <p>{{ area.cta_texto }}</p>
+        </div>
+        {% if area.cta_es_consulta %}
+        <a href="{% url 'core:consulta' %}" class="pu-btn pu-btn--orange pu-btn--lg">{{ area.cta_label }}</a>
+        {% else %}
+        <a href="#contacto" class="pu-btn pu-btn--orange pu-btn--lg">{{ area.cta_label }}</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="pu-section pu-section--alt">
+    <div class="pu-wrap">
+        <p class="pu-label">Seguí explorando</p>
+        <div class="pu-otras-areas">
+            {% for a in nav_areas %}
+                {% if a.slug != area.slug %}
+                <a href="{% url 'core:area' a.slug %}" class="pu-otra-area">
+                    <span class="pu-otra-area__icon">{% include 'core/publico/_icono_area.html' with slug=a.slug %}</span>
+                    <span>
+                        <b>{{ a.nombre }}</b>
+                        <span>{{ a.titular }}</span>
+                    </span>
+                </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+{% include 'core/publico/_contacto.html' %}
+
+{% endblock %}

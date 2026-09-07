@@ -1,6 +1,7 @@
 # core/urls.py  — versión extendida (agrega rutas de personal)
 from django.urls import path
 from . import views
+from . import views_publico
 from . import views_usuarios
 from . import views_permisos
 from . import views_clientes
@@ -9,8 +10,13 @@ from . import views_reinicio
 app_name = 'core'
 
 urlpatterns = [
+    # ── Sitio público ────────────────────────────────────────────
+    path('', views_publico.HomeView.as_view(), name='landing'),
+    path('areas/<slug:slug>/', views_publico.AreaView.as_view(), name='area'),
+    path('consulta/', views_publico.ConsultaClienteView.as_view(), name='consulta'),
+
     # ── Generales ─────────────────────────────────────────────────
-    path('', views.CustomLoginView.as_view(), name='login'),
+    path('ingresar/', views.CustomLoginView.as_view(), name='login'),
     path('logout/', views.CustomLogoutView.as_view(), name='logout'),
     path('home/', views.home, name='home'),
 
@@ -48,5 +54,6 @@ urlpatterns = [
     path('clientes/<int:pk>/imagenes/', views_clientes.ClienteImagenAjax.as_view(), name='cliente_imagenes'),
     path('clientes/<int:pk>/contactos/', views_clientes.ClienteContactoAjax.as_view(), name='cliente_contactos'),
     path('clientes/<int:pk>/telefonos/', views_clientes.ClienteTelefonoAjax.as_view(), name='cliente_telefonos'),
+    path('clientes/<int:pk>/servicios/', views_clientes.ServicioContratadoAjax.as_view(), name='cliente_servicios'),
     path('clientes/grupos/', views_clientes.GrupoFamiliarAjax.as_view(), name='grupo_familiar'),
 ]

@@ -937,3 +937,72 @@ class ClienteContactoAdicional(models.Model):
 
     def __str__(self):
         return f"{self.nombre} {self.apellido} ({self.get_rol_display()}) — {self.cliente}"
+
+
+# ══════════════════════════════════════════════════════════════════
+#  SERVICIO CONTRATADO
+#
+#  Qué tiene contratado un cliente, por área (Cobranzas / Software /
+#  Internet / …). Modelo genérico y liviano: es la base para que más
+#  adelante Software, Internet, etc. "pasen por Cobranzas". El staff
+#  lo carga desde la ficha del cliente; el cliente lo consulta (solo
+#  lectura) en la parte pública ingresando DNI + código.
+# ══════════════════════════════════════════════════════════════════
+
+class ServicioContratado(models.Model):
+    AREA_COBRANZAS = 'cobranzas'
+    AREA_SOFTWARE  = 'software'
+    AREA_INTERNET  = 'internet'
+    AREA_OTRO      = 'otro'
+    AREAS = [
+        (AREA_COBRANZAS, 'Cobranzas'),
+        (AREA_SOFTWARE,  'Software'),
+        (AREA_INTERNET,  'Internet'),
+        (AREA_OTRO,      'Otro'),
+    ]
+
+    ESTADO_ACTIVO     = 'activo'
+    ESTADO_SUSPENDIDO = 'suspendido'
+    ESTADO_BAJA       = 'baja'
+    ESTADOS = [
+        (ESTADO_ACTIVO,     'Activo'),
+        (ESTADO_SUSPENDIDO, 'Suspendido'),
+        (ESTADO_BAJA,       'Baja'),
+    ]
+
+    cliente       = models.ForeignKey(
+        Cliente, on_delete=models.CASCADE, related_name='servicios_contratados'
+    )
+    area          = models.CharField(max_length=20, choices=AREAS)
+    nombre        = models.CharField(
+        max_length=200,
+        help_text='Ej: Internet Satelital 50 Mbps, Kai-Cart, Plan Cobranzas'
+    )
+    descripcion   = models.TextField(blank=True, help_text='Visible para el cliente')
+    identificador = models.CharField(
+        max_length=100, blank=True,
+        help_text='Nº de cuenta / servicio / abonado. Visible para el cliente.'
+    )
+    estado        = models.CharField(max_length=15, choices=ESTADOS, default=ESTADO_ACTIVO)
+    monto_mensual = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    fecha_alta    = models.DateField(null=True, blank=True)
+    fecha_baja    = models.DateField(null=True, blank=True)
+    observaciones = models.TextField(
+        blank=True,
+        help_text='Nota interna. NUNCA se muestra al cliente.'
+    )
+
+    creado_por         = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='servicios_contratados_creados'
+    )
+    fecha_creacion     = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering            = ['area', 'nombre']
+        verbose_name        = 'Servicio contratado'
+        verbose_name_plural = 'Servicios contratados'
+
+    def __str__(self):
+        return f"{self.get_area_display()} — {self.nombre} ({self.cliente})"

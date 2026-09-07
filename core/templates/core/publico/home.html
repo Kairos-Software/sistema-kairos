@@ -1,0 +1,96 @@
+{% extends 'core/publico/base_publico.html' %}
+{% load static %}
+
+{% block title %}Grupo Kairos — Servicios que simplifican tu vida{% endblock %}
+
+{% block content %}
+
+<section class="pu-hero">
+    <div class="pu-wrap pu-hero__inner">
+        <p class="pu-eyebrow">Servicios que simplifican tu vida</p>
+        <h1 class="pu-hero__title">Tecnología para tu <span>negocio</span> y tu <span>casa</span></h1>
+        <p class="pu-hero__lead">
+            Cobranzas, software e internet gestionados de punta a punta por un
+            mismo equipo. Vos te ocupás de lo tuyo; lo técnico corre por nuestra cuenta.
+        </p>
+        <div class="pu-hero__cta">
+            <a href="{% url 'core:consulta' %}" class="pu-btn pu-btn--orange pu-btn--lg">Consultá tu cuenta</a>
+            <a href="#areas" class="pu-btn pu-btn--ghost pu-btn--lg">Ver las áreas</a>
+        </div>
+        <ul class="pu-stats">
+            <li><b>11</b><span>servicios</span></li>
+            <li><b>24/7</b><span>soporte</span></li>
+            <li><b>+500</b><span>clientes</span></li>
+        </ul>
+    </div>
+</section>
+
+<section class="pu-section pu-section--alt" id="areas">
+    <div class="pu-wrap">
+        <p class="pu-label">Áreas</p>
+        <h2 class="pu-h2">Elegí un área para conocerla</h2>
+        <p class="pu-section__lead">
+            Tres de nuestras once áreas ya están integradas a este sistema, con
+            cuenta online para cada cliente.
+        </p>
+
+        <div class="pu-areas">
+            {% for a in nav_areas %}
+            <a href="{% url 'core:area' a.slug %}" class="pu-area-card pu-area-card--{{ a.slug }}">
+                <span class="pu-area-card__icon">{% include 'core/publico/_icono_area.html' with slug=a.slug %}</span>
+                <h3>{{ a.nombre }}</h3>
+                <p>{{ a.titular }}</p>
+                <span class="pu-area-card__more">Ver más
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                        <path d="M3 7h8M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+
+        <p class="pu-otros">
+            <b>Además ofrecemos</b>
+            {% for s in otros_servicios %}{{ s }}{% if not forloop.last %} · {% endif %}{% endfor %}
+        </p>
+    </div>
+</section>
+
+<section class="pu-section">
+    <div class="pu-wrap">
+        <p class="pu-label">Por qué Kairos</p>
+        <h2 class="pu-h2">Un solo equipo, responsable de todo</h2>
+        <div class="pu-why">
+            <div class="pu-why__item">
+                <h3>Resultados medibles</h3>
+                <p>Nos comprometemos con métricas concretas y retorno comprobable, no con promesas.</p>
+            </div>
+            <div class="pu-why__item">
+                <h3>Equipo certificado</h3>
+                <p>Técnicos con certificaciones internacionales en cada una de las áreas.</p>
+            </div>
+            <div class="pu-why__item">
+                <h3>Soporte 24/7/365</h3>
+                <p>Asistencia técnica todo el año, con respuesta garantizada en menos de 24 horas.</p>
+            </div>
+            <div class="pu-why__item">
+                <h3>Atención local</h3>
+                <p>Hablás con alguien que conoce tu caso, no con un call center genérico.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="pu-cta">
+    <div class="pu-wrap pu-cta__inner">
+        <div>
+            <h2 class="pu-h2">¿Ya sos cliente?</h2>
+            <p>Consultá los servicios que tenés contratados con tu DNI o tu número de cliente. Sin usuario ni contraseña.</p>
+        </div>
+        <a href="{% url 'core:consulta' %}" class="pu-btn pu-btn--orange pu-btn--lg">Consultá tu cuenta</a>
+    </div>
+</section>
+
+{% include 'core/publico/_contacto.html' %}
+
+{% endblock %}

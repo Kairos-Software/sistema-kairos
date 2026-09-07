@@ -30,6 +30,11 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 
 AUTH_USER_MODEL = 'core.Usuario'
 
+# Login: la pantalla dejó de estar en '/' (ahora es la landing pública).
+LOGIN_URL = 'core:login'
+LOGIN_REDIRECT_URL = 'core:home'
+LOGOUT_REDIRECT_URL = 'core:landing'
+
 # Application definition
 
 INSTALLED_APPS = [

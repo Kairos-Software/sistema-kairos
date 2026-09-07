@@ -4,7 +4,7 @@
 {% block title %}{{ cliente.get_nombre_display }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'core/css/detalle_cliente.css' %}">
+<link rel="stylesheet" href="{% static 'core/css/detalle_cliente.css' %}?v=20260905-1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 {% endblock %}
 
@@ -176,6 +176,49 @@
     {# ═══════════ COL DERECHA ═══════════ #}
     <div class="dc-col">
 
+        {# Servicios contratados #}
+        <div class="dc-card" id="serviciosCard">
+            <div class="dc-card-title-row">
+                <span>Servicios contratados</span>
+                <div class="sc-title-actions">
+                    <span class="dc-card-count" id="scCount">{{ servicios_contratados|length }}</span>
+                    {% if puede_editar %}
+                    <button type="button" class="sc-btn-add" id="scBtnAdd">+ Agregar</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="sc-list" id="scList">
+                {% for s in servicios_contratados %}
+                <div class="sc-item" data-id="{{ s.pk }}"
+                     data-area="{{ s.area }}" data-nombre="{{ s.nombre }}"
+                     data-descripcion="{{ s.descripcion }}" data-identificador="{{ s.identificador }}"
+                     data-estado="{{ s.estado }}"
+                     data-monto="{{ s.monto_mensual|default_if_none:'' }}"
+                     data-alta="{{ s.fecha_alta|date:'Y-m-d' }}" data-baja="{{ s.fecha_baja|date:'Y-m-d' }}"
+                     data-observaciones="{{ s.observaciones }}">
+                    <div class="sc-item-main">
+                        <div class="sc-item-head">
+                            <span class="sc-area-badge sc-area-{{ s.area }}">{{ s.get_area_display }}</span>
+                            <span class="estado-badge estado-{{ s.estado }}">{{ s.get_estado_display }}</span>
+                        </div>
+                        <span class="sc-item-nombre">{{ s.nombre }}</span>
+                        {% if s.identificador %}<span class="sc-item-id">N.º {{ s.identificador }}</span>{% endif %}
+                        {% if s.descripcion %}<span class="sc-item-desc">{{ s.descripcion }}</span>{% endif %}
+                    </div>
+                    {% if puede_editar %}
+                    <div class="sc-item-actions">
+                        <button type="button" class="sc-mini sc-edit" data-id="{{ s.pk }}">Editar</button>
+                        <button type="button" class="sc-mini sc-del" data-id="{{ s.pk }}" data-nombre="{{ s.nombre }}">Eliminar</button>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <p class="sin-datos" id="scEmpty" {% if servicios_contratados %}style="display:none"{% endif %}>
+                Sin servicios contratados registrados.
+            </p>
+        </div>
+
         {# Dirección + mapa #}
         <div class="dc-card">
             <p class="dc-card-title">Dirección</p>
@@ -304,10 +347,87 @@
     <button class="lb-nav lb-next" id="lbNext">›</button>
 </div>
 
+{% if puede_editar %}
+{# ── Modal: servicio contratado ── #}
+<div class="modal fade" id="servicioModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="formServicio">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="servicioModalTitulo">Nuevo servicio contratado</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="servicio_pk" id="scPk">
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Área <span class="text-danger">*</span></label>
+                            <select name="area" id="scArea" class="form-select form-select-sm" required>
+                                {% for val, label in area_choices %}
+                                <option value="{{ val }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Estado</label>
+                            <select name="estado" id="scEstado" class="form-select form-select-sm">
+                                {% for val, label in estado_serv_choices %}
+                                <option value="{{ val }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                            <input type="text" name="nombre" id="scNombre" class="form-control form-control-sm"
+                                   placeholder="Ej: Internet Satelital 50 Mbps, Kai-Cart" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Descripción <span class="sc-lbl-hint">(la ve el cliente)</span></label>
+                            <textarea name="descripcion" id="scDescripcion" class="form-control form-control-sm" rows="2"></textarea>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">N.º de cuenta / abonado</label>
+                            <input type="text" name="identificador" id="scIdentificador" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Monto mensual</label>
+                            <input type="number" step="0.01" min="0" name="monto_mensual" id="scMonto" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Fecha de alta</label>
+                            <input type="date" name="fecha_alta" id="scAlta" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Fecha de baja</label>
+                            <input type="date" name="fecha_baja" id="scBaja" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observaciones <span class="sc-lbl-hint">(interno, no se muestra al cliente)</span></label>
+                            <textarea name="observaciones" id="scObservaciones" class="form-control form-control-sm" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="scErrores" class="alert alert-danger py-2 px-3 mt-3 mb-0" style="display:none;font-size:.83rem;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="scGuardar">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
-<script>window.clientePk = {{ cliente.pk }};</script>
+<script>
+    window.clientePk = {{ cliente.pk }};
+    window.clienteServiciosUrl = "{% url 'core:cliente_servicios' cliente.pk %}";
+    window.puedeEditarServicios = {{ puede_editar|yesno:"true,false" }};
+</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'core/js/detalle_cliente.js' %}"></script>
+<script src="{% static 'core/js/detalle_cliente.js' %}?v=20260905-1"></script>
 {% endblock %}

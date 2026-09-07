@@ -1,0 +1,73 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Grupo Kairos{% endblock %}</title>
+    <meta name="description" content="{% block description %}Grupo Kairos — servicios de cobranzas, software e internet. Consultá tu cuenta con tu DNI o número de cliente.{% endblock %}">
+    {% block head_extra %}{% endblock %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="{% static 'core/css/publico.css' %}?v=20260906-4">
+</head>
+<body>
+
+<a class="pu-skip" href="#main">Saltar al contenido</a>
+
+<header class="pu-nav">
+    <div class="pu-nav__inner">
+        <a href="{% url 'core:landing' %}" class="pu-brand">
+            <span class="pu-brand__mark">GK</span>
+            <span class="pu-brand__name">Grupo Kairos</span>
+        </a>
+
+        <button type="button" class="pu-nav__toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="pu-links">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </button>
+
+        <nav class="pu-links" id="pu-links">
+            <a href="{% url 'core:landing' %}" class="pu-link {% if nav_activo == 'inicio' %}is-active{% endif %}">Inicio</a>
+            {% for a in nav_areas %}
+            <a href="{% url 'core:area' a.slug %}" class="pu-link {% if nav_activo == a.slug %}is-active{% endif %}">{{ a.nombre }}</a>
+            {% endfor %}
+            <a href="{% url 'core:consulta' %}" class="pu-link {% if nav_activo == 'consulta' %}is-active{% endif %}">Consultá tu cuenta</a>
+            <a href="{% url 'core:login' %}" class="pu-btn pu-btn--ghost pu-btn--sm pu-nav__login">Iniciar sesión</a>
+        </nav>
+    </div>
+</header>
+
+<main id="main">
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="pu-foot">
+    <div class="pu-foot__inner">
+        <div class="pu-foot__col pu-foot__brand">
+            <span class="pu-brand__name">Grupo Kairos</span>
+            <p>Servicios que simplifican tu vida.</p>
+        </div>
+        <div class="pu-foot__col">
+            <p class="pu-foot__lbl">Áreas</p>
+            {% for a in nav_areas %}
+            <a href="{% url 'core:area' a.slug %}">{{ a.nombre }}</a>
+            {% endfor %}
+        </div>
+        <div class="pu-foot__col">
+            <p class="pu-foot__lbl">Clientes</p>
+            <a href="{% url 'core:consulta' %}">Consultá tu cuenta</a>
+            <a href="{% url 'core:login' %}">Acceso staff</a>
+        </div>
+        <div class="pu-foot__col">
+            <p class="pu-foot__lbl">Contacto</p>
+            <a href="{{ contacto.whatsapp_link }}" target="_blank" rel="noopener">WhatsApp {{ contacto.whatsapp_display }}</a>
+            <a href="mailto:{{ contacto.email }}">{{ contacto.email }}</a>
+        </div>
+    </div>
+    <div class="pu-foot__legal">© {% now "Y" %} Grupo Kairos · Todos los derechos reservados</div>
+</footer>
+
+<script src="{% static 'core/js/publico.js' %}?v=20260906-1"></script>
+</body>
+</html>
