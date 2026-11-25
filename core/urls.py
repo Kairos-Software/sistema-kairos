@@ -6,6 +6,7 @@ from . import views_usuarios
 from . import views_permisos
 from . import views_clientes
 from . import views_reinicio
+from . import views_respaldo
 
 app_name = 'core'
 
@@ -23,6 +24,9 @@ urlpatterns = [
     # ── Reinicio del sistema (solo superusuarios) ──────────────────
     path('reinicio/', views_reinicio.ReinicioSistemaView.as_view(), name='reinicio'),
     path('reinicio/ejecutar/', views_reinicio.EjecutarReinicioAjax.as_view(), name='reinicio_ejecutar'),
+
+    # ── Copia de seguridad de la base (solo superusuarios) ─────────
+    path('copia-seguridad/', views_respaldo.CopiaSeguridadView.as_view(), name='copia_seguridad'),
 
     # ── Usuarios — listado y acciones rápidas (modal) ─────────────
     path('usuarios/', views_usuarios.GestionUsuariosView.as_view(), name='gestion_usuarios'),

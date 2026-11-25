@@ -1,0 +1,174 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Copia de seguridad{% endblock %}
+
+{% block content %}
+<div class="respaldo-wrap">
+
+    <div class="respaldo-header">
+        <div class="respaldo-header-icono" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" width="26" height="26">
+                <ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M4.5 5.5v6c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-6" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M4.5 11.5v6c0 1.5 3.4 2.8 7.5 2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M18 15v6m0 0-2.4-2.4M18 21l2.4-2.4" stroke="currentColor" stroke-width="1.6"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div>
+            <h1>Copia de <span>seguridad</span></h1>
+            <p class="respaldo-subtitle">Descarga toda la base de datos del sistema en un archivo, para guardarla o
+                revisarla en otra computadora. No cambia nada del sistema.</p>
+        </div>
+    </div>
+
+    <div class="respaldo-grid">
+        <div class="respaldo-card">
+            <h2 class="respaldo-ok">Incluye</h2>
+            <ul class="respaldo-lista">
+                <li>Cobros, caja, turnos y retiros</li>
+                <li>Recaudaciones, depósitos y ganancias</li>
+                <li>Clientes y servicios</li>
+                <li>Usuarios y permisos (las contraseñas van cifradas)</li>
+            </ul>
+        </div>
+        <div class="respaldo-card">
+            <h2 class="respaldo-no">No incluye</h2>
+            <ul class="respaldo-lista respaldo-lista-no">
+                <li>Fotos y documentos subidos (están en una carpeta aparte, no en la base)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="respaldo-card respaldo-card-descargar">
+        <h2>Descargar</h2>
+        <p class="respaldo-aviso">
+            El archivo tiene <strong>datos personales de clientes</strong>. Guardalo en un lugar seguro y no lo
+            compartas. Queda registrado quién lo descargó.
+        </p>
+
+        {% if error %}
+        <div class="respaldo-error" role="alert">{{ error }}</div>
+        {% endif %}
+
+        {% if disponible %}
+        <form method="post" id="formRespaldo">
+            {% csrf_token %}
+            <label for="inputPassword" class="respaldo-label">Tu contraseña</label>
+            <input type="password" name="password" id="inputPassword" class="respaldo-input"
+                   autocomplete="current-password" required>
+            <button type="submit" id="btnRespaldo" class="respaldo-btn">Descargar copia</button>
+            <p class="respaldo-nota" id="respaldoNota" aria-live="polite">
+                Se descarga un archivo <code>.dump</code> (formato de PostgreSQL). Puede tardar unos segundos.
+            </p>
+        </form>
+        {% else %}
+        <div class="respaldo-error" role="alert">
+            Este servidor no tiene <code>pg_dump</code> instalado, así que no se puede generar la copia desde acá.
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<style>
+.respaldo-wrap { max-width: 760px; margin: 0 auto; padding-bottom: 3rem; }
+
+.respaldo-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.6rem; }
+.respaldo-header-icono {
+    flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px;
+    background: rgba(232,92,13,.1); color: #E85C0D;
+    display: flex; align-items: center; justify-content: center;
+}
+.respaldo-header h1 {
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 1.9rem;
+    color: #111; margin: 0 0 .2rem;
+}
+.respaldo-header h1 span { color: #E85C0D; }
+.respaldo-subtitle { color: #6b7280; font-size: .92rem; margin: 0; }
+
+.respaldo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (max-width: 700px) { .respaldo-grid { grid-template-columns: 1fr; } }
+
+.respaldo-card {
+    background: #fff; border-radius: 12px; padding: 1.3rem 1.4rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,.06);
+}
+.respaldo-card h2 {
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 1.05rem;
+    margin: 0 0 .8rem; text-transform: uppercase; letter-spacing: .03em; color: #111;
+}
+.respaldo-card h2.respaldo-ok { color: #16a34a; }
+.respaldo-card h2.respaldo-no { color: #6b7280; }
+
+.respaldo-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.respaldo-lista li { display: flex; align-items: baseline; gap: .5rem; font-size: .88rem; color: #374151; }
+.respaldo-lista li::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: #16a34a; transform: translateY(-2px);
+}
+.respaldo-lista-no li::before { background: #9ca3af; }
+
+.respaldo-card-descargar { border: 1.5px solid rgba(232,92,13,.3); }
+.respaldo-card-descargar h2 { color: #E85C0D; }
+.respaldo-aviso { font-size: .88rem; color: #4b5563; margin: 0 0 1rem; }
+
+.respaldo-label { display: block; font-size: .78rem; font-weight: 700; color: #6b7280;
+    text-transform: uppercase; letter-spacing: .05em; margin-bottom: .35rem; }
+.respaldo-input {
+    width: 100%; padding: .65rem .8rem; font-size: 1rem; min-height: 44px;
+    border: 1.5px solid #d1d5db; border-radius: 8px; margin-bottom: 1rem; box-sizing: border-box;
+}
+.respaldo-input:focus { outline: none; border-color: #E85C0D; box-shadow: 0 0 0 3px rgba(232,92,13,.2); }
+
+.respaldo-btn {
+    width: 100%; min-height: 48px; padding: .75rem; font-weight: 700; font-size: .95rem;
+    background: #E85C0D; color: #fff; border: none; border-radius: 8px;
+    cursor: pointer; transition: background .15s;
+}
+.respaldo-btn:hover:not(:disabled) { background: #c94d08; }
+.respaldo-btn:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
+.respaldo-btn:disabled { background: #f3b48f; cursor: wait; }
+
+.respaldo-nota { font-size: .8rem; color: #6b7280; margin: .7rem 0 0; }
+.respaldo-nota code, .respaldo-error code { background: #f3f4f6; color: #111; padding: .05rem .35rem; border-radius: 4px; }
+
+.respaldo-error {
+    padding: .7rem .9rem; border-radius: 8px; font-size: .87rem; margin-bottom: 1rem;
+    background: #fee2e2; color: #b91c1c;
+}
+
+@media (min-width: 1800px) {
+    .respaldo-wrap { max-width: 900px; }
+    .respaldo-subtitle, .respaldo-aviso, .respaldo-lista li { font-size: 1.02rem; }
+    .respaldo-btn, .respaldo-input { font-size: 1.1rem; }
+}
+</style>
+
+<script>
+(function () {
+    'use strict';
+    const form = document.getElementById('formRespaldo');
+    if (!form) return;
+    const btn  = document.getElementById('btnRespaldo');
+    const nota = document.getElementById('respaldoNota');
+    const pass = document.getElementById('inputPassword');
+    const notaOriginal = nota.innerHTML;
+
+    form.addEventListener('submit', () => {
+        // La descarga la maneja el navegador; acá solo se evita el doble clic.
+        setTimeout(() => {
+            btn.disabled = true;
+            btn.textContent = 'Generando copia…';
+            nota.textContent = 'Generando el archivo. La descarga empieza sola en unos segundos.';
+            pass.value = '';
+        }, 0);
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = 'Descargar copia';
+            nota.innerHTML = notaOriginal;
+        }, 8000);
+    });
+})();
+</script>
+{% endblock %}

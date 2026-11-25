@@ -48,6 +48,9 @@
                     {% if user.is_authenticated %}
                         {% if user.is_superuser %}
                             <li class="nav-item">
+                                <a class="btn btn-outline-light btn-sm" href="{% url 'core:copia_seguridad' %}">Copia de seguridad</a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="btn btn-outline-danger btn-sm" href="{% url 'core:reinicio' %}">Reiniciar</a>
                             </li>
                         {% endif %}
