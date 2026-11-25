@@ -273,10 +273,34 @@
         <p class="rec-sistema-diff" id="recSistDiff">
             Ingresá el importe de la plataforma para compararlo con el sistema.
         </p>
-        <a class="rec-sistema-link" id="recSistLink"
-           href="{% url 'cobranzas:historial_cobros' %}?desde={{ hoy|date:'Y-m-d' }}&hasta={{ hoy|date:'Y-m-d' }}&canales={{ entidad }}">
-            Ver los cobros de ese día
-        </a>
+        <div class="rec-sistema-acciones">
+            <button type="button" class="rec-bol-toggle" id="btnBoletasDia"
+                    aria-expanded="false" aria-controls="recBoletasPanel">
+                Ver las boletas de ese día
+            </button>
+            <a class="rec-sistema-link" id="recSistLink"
+               href="{% url 'cobranzas:historial_cobros' %}?desde={{ hoy|date:'Y-m-d' }}&hasta={{ hoy|date:'Y-m-d' }}&canales={{ entidad }}">
+                Ir al historial de cobros
+            </a>
+        </div>
+
+        {# ── Boletas del día: revisarlas contra el listado de la plataforma ── #}
+        <div class="rec-bol-panel" id="recBoletasPanel" hidden>
+            <p class="rec-bol-ayuda">
+                Compará cada boleta con el listado de {{ entidad_label }}. Si al cobrar se redondeó y el
+                redondeo quedó cargado <strong>dentro de la factura</strong> (ej. boleta de $18.246,86 cargada
+                como $18.300), escribí el <strong>importe real</strong>: la diferencia pasa a
+                <strong>Redondeo</strong> (ganancia). No cambia lo que pagó el cliente ni el efectivo de la caja.
+            </p>
+            <div class="rec-bol-lista" id="recBolLista"></div>
+            <div class="rec-bol-pie" id="recBolPie" hidden>
+                <p class="rec-bol-preview" id="recBolPreview" aria-live="polite"></p>
+                <button type="button" class="btn-caja-principal" id="btnBolGuardar" disabled>
+                    Guardar correcciones
+                </button>
+            </div>
+            <div id="recBolMsg" class="alerta-inline" style="display:none;"></div>
+        </div>
     </div>
 
     <div id="recError" class="alerta-inline alerta-error" style="display:none; margin-top:.8rem;"></div>
@@ -552,6 +576,77 @@
 .rec-sistema-comision strong { color: #b91c1c; }
 .rec-sistema-redondeo { color: var(--accent, #E85C0D) !important; }
 
+/* ── Boletas del día (revisión contra el listado de la plataforma) ── */
+.rec-sistema-acciones {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.2rem;
+    margin-top: .6rem;
+}
+.rec-sistema-acciones .rec-sistema-link { margin-top: 0; }
+.rec-bol-toggle {
+    min-height: 38px; padding: .35rem .9rem;
+    border: 1.5px solid var(--accent, #E85C0D); border-radius: 8px;
+    background: #fff; color: var(--accent, #E85C0D);
+    font-size: .84rem; font-weight: 700; cursor: pointer;
+}
+.rec-bol-toggle:hover, .rec-bol-toggle[aria-expanded="true"] { background: var(--accent, #E85C0D); color: #fff; }
+.rec-bol-toggle:focus-visible { outline: 3px solid var(--accent, #E85C0D); outline-offset: 2px; }
+.rec-bol-panel { margin-top: .75rem; border-top: 1px dashed #d1d5db; padding-top: .7rem; }
+.rec-bol-ayuda { margin: 0 0 .6rem; font-size: .8rem; line-height: 1.45; color: #4b5563; }
+.rec-bol-lista { display: flex; flex-direction: column; gap: .45rem; }
+.rec-bol-vacio { margin: 0; font-size: .82rem; color: #6b7280; }
+.rec-bol-fila {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem 1rem; align-items: center;
+    padding: .55rem .7rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff;
+}
+.rec-bol-fila.rec-bol-cambiada { border-color: var(--accent, #E85C0D); box-shadow: 0 0 0 1px var(--accent, #E85C0D) inset; }
+.rec-bol-nodecl { background: #f9fafb; }
+.rec-bol-top { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .5rem; }
+.rec-bol-hora { font-size: .76rem; color: #6b7280; font-variant-numeric: tabular-nums; }
+.rec-bol-cod {
+    font-size: .74rem; font-weight: 700; padding: .05rem .45rem; border-radius: 5px;
+    background: #f3f4f6; color: #111; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.rec-bol-pago { font-size: .72rem; font-weight: 700; padding: .05rem .5rem; border-radius: 99px; }
+.rec-bol-pago-efectivo { background: #dcfce7; color: #15803d; }
+.rec-bol-pago-otros    { background: #e0e7ff; color: #3730a3; }
+.rec-bol-pago-mixto    { background: #fef3c7; color: #92400e; }
+.rec-bol-desc { margin-top: .15rem; font-size: .8rem; color: #374151; line-height: 1.35; overflow-wrap: anywhere; }
+.rec-bol-nota { margin-top: .15rem; font-size: .74rem; color: #6b7280; }
+.rec-bol-montos { display: flex; align-items: flex-end; gap: .4rem .9rem; flex-wrap: wrap; justify-content: flex-end; }
+.rec-bol-sist { display: flex; flex-direction: column; text-align: right; }
+.rec-bol-sist span, .rec-bol-real > span { font-size: .7rem; color: #9ca3af; }
+.rec-bol-sist strong { font-size: .95rem; color: #111; font-variant-numeric: tabular-nums; }
+.rec-bol-nodecl .rec-bol-sist strong { color: #9ca3af; text-decoration: line-through; text-decoration-thickness: 1px; }
+.rec-bol-real { display: flex; flex-direction: column; gap: 2px; margin: 0; width: 150px; }
+.rec-bol-real .dep-input { min-height: 38px; }
+.rec-bol-real .dep-input-num:focus { outline: none; }
+.rec-bol-real .dep-input-money:focus-within { box-shadow: 0 0 0 3px rgba(232,92,13,.45); }
+.rec-bol-real .dep-input::placeholder { color: #c4c7cc; font-style: italic; }
+.rec-bol-dif { grid-column: 1 / -1; font-size: .76rem; font-weight: 600; text-align: right; }
+.rec-bol-dif:empty { display: none; }
+.rec-bol-dif.ok  { color: var(--accent, #E85C0D); }
+.rec-bol-dif.err { color: #b91c1c; }
+.rec-bol-pie {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1rem;
+    margin-top: .7rem;
+}
+.rec-bol-preview { margin: 0; flex: 1 1 260px; font-size: .82rem; font-weight: 600; color: #374151; line-height: 1.4; }
+.rec-bol-preview.ok   { color: #15803d; }
+.rec-bol-preview.warn { color: #b45309; }
+#recBolMsg { margin: .6rem 0 0; }
+@media (max-width: 640px) {
+    .rec-bol-fila { grid-template-columns: 1fr; }
+    .rec-bol-montos { justify-content: space-between; }
+    .rec-bol-sist { text-align: left; }
+    .rec-bol-real { width: auto; flex: 1 1 140px; }
+    .rec-bol-dif { text-align: left; }
+    .rec-bol-pie .btn-caja-principal { width: 100%; justify-content: center; }
+}
+@media (min-width: 1800px) {
+    .rec-bol-ayuda, .rec-bol-desc, .rec-bol-preview { font-size: .92rem; }
+    .rec-bol-sist strong { font-size: 1.05rem; }
+}
+
 /* ── Comisión por boleta de la entidad ── */
 .rec-comision {
     display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem;
@@ -763,7 +858,11 @@ document.addEventListener('DOMContentLoaded', function () {
             elSistDiff.classList.add('diff-warn');
             elSistDiff.textContent =
                 `No coincide: ${textoSistema(boletas)}. ` +
-                `Diferencia ${fmtDif(dif)}. Revisá el ticket o los cobros de ese día.`;
+                `Diferencia ${fmtDif(dif)}. ` +
+                (dif < 0
+                    ? 'Si al cobrar se redondeó y el redondeo quedó dentro de la factura, ' +
+                      'corregilo en "Ver las boletas de ese día".'
+                    : 'Revisá el ticket o las boletas de ese día.');
         }
     }
 
@@ -813,12 +912,241 @@ document.addEventListener('DOMContentLoaded', function () {
             sistemaActual = d;
             sistemaFecha  = d.fecha;
             renderSistema();
+            cargarBoletas();
         } catch { /* silencioso — el contraste no es crítico */ }
     }
 
     inputFechaEl.addEventListener('change', () => fetchSistema(inputFechaEl.value));
-    inputMontoEl.addEventListener('input', evaluarDiffSistema);
+    inputMontoEl.addEventListener('input', () => { evaluarDiffSistema(); previewBoletas(); });
     renderSistema();
+
+    // ── Boletas del día + corrección de facturas que quedaron redondeadas ──
+    const urlBoletas   = "{% url 'cobranzas:recaudaciones_boletas' %}";
+    const MAX_REDONDEO = 1000;   // igual que MAX_REDONDEO_FACTURA en el servidor
+    const btnBoletas   = document.getElementById('btnBoletasDia');
+    const panelBol     = document.getElementById('recBoletasPanel');
+    const listaBol     = document.getElementById('recBolLista');
+    const pieBol       = document.getElementById('recBolPie');
+    const previewBol   = document.getElementById('recBolPreview');
+    const btnBolGuardar = document.getElementById('btnBolGuardar');
+    const msgBol       = document.getElementById('recBolMsg');
+    const labelEntidad = "{{ entidad_label|escapejs }}";
+    let boletasDia = [];
+    let puedeCorregir = false;
+
+    function esc(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function r2(n) { return Math.round(n * 100) / 100; }
+    function mostrarMsgBol(texto, ok) {
+        msgBol.className = 'alerta-inline ' + (ok ? 'rec-aviso-ok' : 'alerta-error');
+        msgBol.textContent = texto;
+        msgBol.style.display = texto ? '' : 'none';
+    }
+
+    btnBoletas.addEventListener('click', () => {
+        const abrir = panelBol.hidden;
+        panelBol.hidden = !abrir;
+        btnBoletas.setAttribute('aria-expanded', String(abrir));
+        btnBoletas.textContent = abrir ? 'Ocultar las boletas' : 'Ver las boletas de ese día';
+        if (abrir) cargarBoletas();
+    });
+
+    let pedidoBoletas = 0;       // para ignorar respuestas viejas si se pide dos veces
+    let fechaRenderBol = null;   // fecha de la lista que está en pantalla
+    async function cargarBoletas() {
+        if (panelBol.hidden || !sistemaFecha) return;
+        const fecha = sistemaFecha;
+        const pedido = ++pedidoBoletas;
+        mostrarMsgBol('', true);
+        if (fechaRenderBol !== fecha) {
+            listaBol.innerHTML = '<p class="rec-bol-vacio">Cargando boletas…</p>';
+            pieBol.hidden = true;
+        }
+        try {
+            const r = await fetch(`${urlBoletas}?entidad=${entidadActual}&fecha=${fecha}`);
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error || 'error');
+            if (pedido !== pedidoBoletas) return;
+            boletasDia = d.boletas;
+            puedeCorregir = d.puede_corregir;
+            renderBoletas(fecha);
+        } catch {
+            if (pedido !== pedidoBoletas) return;
+            fechaRenderBol = null;
+            listaBol.innerHTML = '<p class="rec-bol-vacio">No se pudieron cargar las boletas. Probá de nuevo.</p>';
+        }
+    }
+
+    function renderBoletas(fecha = sistemaFecha, conservar = true) {
+        // Si se vuelve a dibujar la misma fecha, no se pierde lo que ya se escribió.
+        const escritos = {};
+        if (conservar && fechaRenderBol === fecha) {
+            listaBol.querySelectorAll('.rec-bol-input').forEach(i => { escritos[i.dataset.id] = i.value; });
+        }
+        fechaRenderBol = fecha;
+        renderListaBoletas();
+        listaBol.querySelectorAll('.rec-bol-input').forEach(i => {
+            if (escritos[i.dataset.id]) i.value = escritos[i.dataset.id];
+        });
+        previewBoletas();
+    }
+
+    function renderListaBoletas() {
+        if (!boletasDia.length) {
+            listaBol.innerHTML = `<p class="rec-bol-vacio">No hay boletas de ${esc(labelEntidad)} el ${fmtFechaISO(sistemaFecha)}.</p>`;
+            pieBol.hidden = true;
+            return;
+        }
+        listaBol.innerHTML = boletasDia.map(b => {
+            const noDecl = b.factor === 0;
+            let nota = '';
+            if (noDecl) {
+                nota = `No se declara en ${esc(labelEntidad)}: se pagó con ${esc(b.pago)}.`;
+            } else if (b.clase === 'mixto' && soloEfectivo) {
+                nota = 'Pago mixto: solo la parte en efectivo se declara.';
+            }
+            if (b.redondeo > 0) nota += (nota ? ' ' : '') + `Ya tiene ${fmt(b.redondeo)} de redondeo.`;
+            const real = puedeCorregir ? `
+                <label class="rec-bol-real">
+                    <span>Importe real</span>
+                    <span class="dep-input-money">
+                        <span class="dep-signo">$</span>
+                        <input type="number" class="dep-input dep-input-num rec-bol-input" data-id="${b.id}"
+                               min="0.01" step="0.01" inputmode="decimal"
+                               placeholder="Sin cambio"
+                               aria-label="Importe real de la boleta ${esc(b.codigo)} de las ${esc(b.hora)}">
+                    </span>
+                </label>` : '';
+            return `
+            <div class="rec-bol-fila${noDecl ? ' rec-bol-nodecl' : ''}" data-id="${b.id}">
+                <div class="rec-bol-info">
+                    <div class="rec-bol-top">
+                        <span class="rec-bol-hora">${esc(b.hora)}</span>
+                        <span class="rec-bol-cod">${esc(b.codigo)}</span>
+                        <span class="rec-bol-pago rec-bol-pago-${esc(b.clase)}">${esc(b.pago)}</span>
+                    </div>
+                    <div class="rec-bol-desc">${esc(b.descripcion)}${b.cantidad > 1 ? ` <strong>× ${b.cantidad}</strong>` : ''}</div>
+                    ${nota ? `<div class="rec-bol-nota">${nota}</div>` : ''}
+                </div>
+                <div class="rec-bol-montos">
+                    <div class="rec-bol-sist"><span>Factura en el sistema</span><strong>${fmt(b.factura)}</strong></div>
+                    ${real}
+                </div>
+                <div class="rec-bol-dif"></div>
+            </div>`;
+        }).join('');
+        listaBol.querySelectorAll('.rec-bol-input').forEach(inp => inp.addEventListener('input', previewBoletas));
+        pieBol.hidden = !puedeCorregir;
+        previewBoletas();
+    }
+
+    // Lee los importes escritos. Devuelve las correcciones válidas y si hay errores.
+    function leerCorrecciones() {
+        const correcciones = [];
+        let hayError = false;
+        let efecto = 0;      // cuánto baja el número que se compara
+        let total = 0;       // cuánto pasa a redondeo
+        boletasDia.forEach(b => {
+            const fila = listaBol.querySelector(`.rec-bol-fila[data-id="${b.id}"]`);
+            const inp  = fila?.querySelector('.rec-bol-input');
+            const difEl = fila?.querySelector('.rec-bol-dif');
+            if (!inp || !difEl) return;
+            difEl.className = 'rec-bol-dif';
+            difEl.textContent = '';
+            fila.classList.remove('rec-bol-cambiada');
+            if (inp.value.trim() === '') return;
+            const real = parseFloat(inp.value);
+            const dif  = r2(b.factura - real);
+            if (isNaN(real) || real <= 0) {
+                difEl.classList.add('err'); difEl.textContent = 'Importe inválido.'; hayError = true; return;
+            }
+            if (dif < 0) {
+                difEl.classList.add('err');
+                difEl.textContent = 'No puede ser mayor que la factura cargada (acá solo se saca el redondeo).';
+                hayError = true; return;
+            }
+            if (dif > MAX_REDONDEO) {
+                difEl.classList.add('err');
+                difEl.textContent = `Diferencia de ${fmt(dif)}: es demasiado para un redondeo. Revisá el número.`;
+                hayError = true; return;
+            }
+            if (dif === 0) return;
+            difEl.classList.add('ok');
+            difEl.textContent = `${fmt(dif)} pasan de la factura a redondeo`;
+            fila.classList.add('rec-bol-cambiada');
+            correcciones.push({ item_id: b.id, factura_real: r2(real) });
+            total  += dif;
+            efecto += dif * b.factor;
+        });
+        return { correcciones, hayError, total: r2(total), efecto: r2(efecto) };
+    }
+
+    function previewBoletas() {
+        if (panelBol.hidden || !puedeCorregir || !boletasDia.length) return;
+        const { correcciones, hayError, total, efecto } = leerCorrecciones();
+        previewBol.className = 'rec-bol-preview';
+        btnBolGuardar.disabled = hayError || !correcciones.length;
+        if (!correcciones.length) {
+            previewBol.textContent = hayError ? 'Corregí los importes marcados en rojo.'
+                : 'Escribí el importe real solo en las boletas que quedaron redondeadas.';
+            return;
+        }
+        const nuevo = r2((parseFloat(sistemaActual.boletas) || 0) - efecto);
+        const n = correcciones.length;
+        let txt = `${n} boleta${n === 1 ? '' : 's'}: ${fmt(total)} pasan a redondeo. ` +
+                  `${soloEfectivo ? 'Efectivo a declarar' : 'Total a declarar'} queda en ${fmt(nuevo)}`;
+        const monto = parseFloat(inputMontoEl.value);
+        if (monto > 0) {
+            const dif = r2(monto - nuevo);
+            if (Math.abs(dif) < 1) {
+                txt += ': coincide con lo que cargaste.';
+                previewBol.classList.add('ok');
+            } else {
+                txt += ` (con lo que cargaste queda una diferencia de ${fmtDif(dif)}).`;
+                previewBol.classList.add('warn');
+            }
+        } else {
+            txt += '.';
+        }
+        if (hayError) txt += ' Hay importes marcados en rojo.';
+        previewBol.textContent = txt;
+    }
+
+    btnBolGuardar.addEventListener('click', async () => {
+        const { correcciones, hayError, total } = leerCorrecciones();
+        if (hayError || !correcciones.length) return;
+        const n = correcciones.length;
+        if (!confirm(`¿Pasar ${fmt(total)} de factura a redondeo en ${n} boleta${n === 1 ? '' : 's'}?\n\n` +
+                     'Baja lo que hay que declarar y sube la ganancia en lo mismo. ' +
+                     'No cambia lo que pagó el cliente ni la caja.')) return;
+        btnBolGuardar.disabled = true;
+        mostrarMsgBol('', true);
+        try {
+            const r = await fetch(urlBoletas, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ entidad: entidadActual, fecha: sistemaFecha, correcciones }),
+            });
+            const d = await r.json();
+            if (!r.ok || !d.success) {
+                mostrarMsgBol(d.error || 'No se pudo guardar.', false);
+                previewBoletas();
+                return;
+            }
+            sistemaActual = d.sistema;
+            sistemaFecha  = d.sistema.fecha;
+            renderSistema();
+            boletasDia = d.boletas;
+            renderBoletas(sistemaFecha, false);   // ya guardado: los campos vuelven a quedar vacíos
+            mostrarMsgBol(`Listo: ${fmt(d.total_redondeo)} pasaron de factura a redondeo ` +
+                          `(${d.corregidas} boleta${d.corregidas === 1 ? '' : 's'}).`, true);
+        } catch {
+            mostrarMsgBol('Error de red. Intentá de nuevo.', false);
+            previewBoletas();
+        }
+    });
 
     // ── Cambiar la comisión por boleta (solo administradores) ──
     const btnComision = document.getElementById('btnComisionCambiar');

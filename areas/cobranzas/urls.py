@@ -13,6 +13,7 @@ from .views_recaudaciones import (
     EstadoRecaudacionAjax,
     SistemaPorCanalAjax,
     ComisionEntidadAjax,
+    BoletasCanalAjax,
     HistorialRecaudacionesView,
 )
 
@@ -81,6 +82,7 @@ urlpatterns = [
     path('recaudaciones/estado/',    EstadoRecaudacionAjax.as_view(),    name='recaudaciones_estado'),
     path('recaudaciones/sistema/',   SistemaPorCanalAjax.as_view(),      name='recaudaciones_sistema'),
     path('recaudaciones/comision/',  ComisionEntidadAjax.as_view(),      name='recaudaciones_comision'),
+    path('recaudaciones/boletas/',   BoletasCanalAjax.as_view(),         name='recaudaciones_boletas'),
     path('recaudaciones/historial/', HistorialRecaudacionesView.as_view(), name='recaudaciones_historial'),
 
     # ── Ganancias (adicionales) ─────────────────────────────

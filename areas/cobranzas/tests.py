@@ -266,3 +266,116 @@ class ConvertirExcedentesTests(TestCase):
         self.assertEqual(c.items.get().monto_adicional, D('158'))
         cierre.refresh_from_db()
         self.assertEqual(cierre.total_adicionales, D('158'))
+
+
+class CorregirFacturasRedondeadasTests(TestCase):
+    """
+    El caso real del 24/11/2026: las 5 boletas de PagoFácil se cargaron con el
+    redondeo ADENTRO de la factura (18.246,86 → 18.300, 68.818,74 → 68.900).
+    El ticket de PagoFácil dice $248.065,60 en efectivo; el sistema, $248.200.
+    """
+
+    def setUp(self):
+        self.admin = Usuario.objects.create_superuser('admin_bol', 'b@test.local', 'x')
+        self.client.force_login(self.admin)
+        self.turno = Turno.objects.create(monto_inicial=D('20000'), cajero=self.admin)
+        self.srv = _servicio()
+        self.hoy = timezone.localdate()
+        self.url = reverse('cobranzas:recaudaciones_boletas')
+        # (factura cargada, factura real, medio de pago)
+        filas = [('18300', '18246.86', 'debito'), ('68900', '68818.74', 'efectivo'),
+                 ('18300', '18246.86', 'efectivo'), ('55600', '55600', 'efectivo'),
+                 ('105400', '105400', 'efectivo')]
+        self.items = []
+        for cargada, real, medio in filas:
+            c = _cobro(self.turno, [(self.srv, cargada, '1300', 'pagofacil')],
+                       [(medio, D(cargada) + 1300)])
+            self.items.append((c.items.get(), D(real)))
+
+    def _post(self, correcciones, entidad='pagofacil'):
+        return self.client.post(self.url, json.dumps({
+            'entidad': entidad, 'fecha': str(self.hoy),
+            'correcciones': [{'item_id': it.pk, 'factura_real': str(real)} for it, real in correcciones],
+        }), content_type='application/json')
+
+    def test_lista_marca_lo_que_no_se_declara(self):
+        r = self.client.get(self.url, {'entidad': 'pagofacil', 'fecha': str(self.hoy)})
+        self.assertEqual(r.status_code, 200)
+        boletas = r.json()['boletas']
+        self.assertEqual(len(boletas), 5)
+        self.assertEqual([b['factor'] for b in boletas], [0, 1, 1, 1, 1])   # el de débito no se declara
+        self.assertTrue(r.json()['puede_corregir'])
+
+    def test_caso_real_queda_igual_al_ticket_sin_tocar_la_caja(self):
+        self.assertEqual(_sistema_por_canal('pagofacil', self.hoy)['boletas'], D('248200'))
+        efectivo_esperado = self.turno.efectivo_esperado()
+        totales = [it.cobro.total_general() for it, _ in self.items]
+
+        r = self._post([(it, real) for it, real in self.items if it.monto_servicio != real])
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()['total_redondeo'], 187.54)
+
+        s = _sistema_por_canal('pagofacil', self.hoy)
+        self.assertEqual(s['boletas'], D('248065.60'))          # = ticket de PagoFácil
+        self.assertEqual(s['redondeos'], D('187.54'))           # incluye el del cobro con débito
+        self.assertEqual(self.turno.efectivo_esperado(), efectivo_esperado)   # caja intacta
+        for (it, real), total in zip(self.items, totales):
+            it.refresh_from_db()
+            self.assertEqual(it.monto_servicio, real)
+            self.assertEqual(it.cobro.total_general(), total)   # el cobro suma lo mismo
+        it = self.items[1][0]
+        self.assertEqual((it.monto_adicional, it.monto_redondeo), (D('1381.26'), D('81.26')))
+        self.assertIn('68.900,00 → $68.818,74', it.cobro.observaciones)
+
+    def test_actualiza_el_cierre_diario_guardado(self):
+        cierre = CierreDiario.objects.create(fecha_desde=self.hoy, fecha_hasta=self.hoy,
+                                             total_adicionales=D('6500'), total_general=D('273000'))
+        self.turno.cierre_diario = cierre
+        self.turno.save()
+        self.assertEqual(self._post([self.items[1]]).status_code, 200)
+        cierre.refresh_from_db()
+        self.assertEqual((cierre.total_adicionales, cierre.total_redondeos, cierre.total_general),
+                         (D('6581.26'), D('81.26'), D('273000')))
+
+    def test_rechaza_lo_que_no_es_un_redondeo_sin_cambiar_nada(self):
+        it, _ = self.items[1]
+        casos = [
+            [(it, D('69000'))],                      # mayor que la factura cargada
+            [(it, D('6890'))],                       # error de tipeo: diferencia enorme
+            [(self.items[2][0], D('18246.86')), (it, D('0'))],   # una mala frena todas
+        ]
+        for correcciones in casos:
+            self.assertEqual(self._post(correcciones).status_code, 400)
+        for item, _ in self.items:
+            self.assertEqual(ItemCobro.objects.get(pk=item.pk).monto_redondeo, D('0'))
+        # Boleta de otro canal (pedida como RapiPago) tampoco.
+        self.assertEqual(self._post([(it, D('68818.74'))], entidad='rapipago').status_code, 400)
+
+    def test_solo_quien_puede_editar_cobros(self):
+        cajero = Usuario.objects.create_user('cajero_bol', 'cb@test.local', 'x')
+        self.client.force_login(cajero)
+        self.assertEqual(self._post([self.items[1]]).status_code, 403)
+        r = self.client.get(self.url, {'entidad': 'pagofacil', 'fecha': str(self.hoy)})
+        self.assertFalse(r.json()['puede_corregir'])
+
+
+class DiagnosticoCajaTests(TestCase):
+    def test_puente_del_total_general_al_efectivo_esperado(self):
+        turno = Turno.objects.create(monto_inicial=D('20000'))
+        srv = _servicio()
+        ext = _servicio('EX1', familia='EX')
+        _cobro(turno, [(srv, '68900', '1300', 'pagofacil')], [('efectivo', '70200')])
+        _cobro(turno, [(srv, '18300', '1300', 'pagofacil')], [('debito', '19600')])
+        _cobro(turno, [(srv, '1000', '100', 'otro')], [('efectivo', '1100')])
+        _cobro(turno, [(ext, '4000', '400', 'rapipago')], [('transferencia', '4400')])
+        out = StringIO()
+        call_command('diagnostico_caja', str(timezone.localdate()), '--contado', '86.400', stdout=out)
+        salida = out.getvalue()
+        # Historial PF+RP: 70.200 + 19.600 + 4.400 = 94.200 (no es el efectivo del cajón)
+        self.assertIn('TOTAL GENERAL:       $94.200,00', salida)
+        # 20.000 fondo + 70.200 + 1.100 (canal Otro) − 4.000 entregados en la extracción
+        esperado = turno.efectivo_esperado()
+        self.assertEqual(esperado, D('87300'))
+        self.assertIn('= EFECTIVO ESPERADO                                   $87.300,00', salida)
+        self.assertIn('-$900,00   (FALTA)', salida)
+        self.assertIn('Facturas "redondas" (múltiplo de $50, sin centavos): 2', salida)   # la EX no cuenta

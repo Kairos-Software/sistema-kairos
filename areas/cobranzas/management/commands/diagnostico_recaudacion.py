@@ -90,7 +90,7 @@ class Command(BaseCommand):
             f'  ({sist["cant_mixto"]} cobros, estimado en efectivo {_m(sist["mixto_efectivo_estimado"])})')
         out(f'     total facturas (todos los medios):    {_m(sist["boletas_todos"])}')
         out(f'   Valor facial a declarar:                {_m(sist["valor_facial"])}')
-        out(f'   − Comisión de la entidad:               {_m(sist["comision"])}'
+        out(f'   - Comisión de la entidad:               {_m(sist["comision"])}'
             f'  ({sist["comision_cant"]} boletas × {_m(sist["comision_unit"])}'
             f'{", vigente desde " + sist["comision_desde"] if sist["comision_desde"] else ", sin comisión cargada"})')
         out(f'   = Número que se compara:                {_m(sist["boletas"])}')

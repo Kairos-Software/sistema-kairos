@@ -70,6 +70,8 @@
 .hist-boleta-desc { font-size: .78rem; color: #555; line-height: 1.3; overflow-wrap: anywhere; }
 .hist-boleta-desc strong { color: #E85C0D; }
 .hist-redondeo-mini { display: block; font-size: .72rem; font-weight: 600; color: #E85C0D; white-space: nowrap; }
+.hist-resumen-nota { font-size: .7rem; line-height: 1.3; color: #6b7280; }
+@media (min-width: 1800px) { .hist-resumen-nota { font-size: .8rem; } }
 .edit-input-redondeo { color: #E85C0D; }
 .edit-balance-sobra  { color:#b45309; }
 .edit-section-label {
@@ -174,6 +176,8 @@
     <div class="hist-resumen-card hist-resumen-card-total">
         <span class="hist-resumen-label" id="resumenLabelGeneral">Total general</span>
         <strong class="hist-resumen-valor" id="resumenGeneral">$0,00</strong>
+        <small class="hist-resumen-nota" title="Para comparar con los billetes contados usá el efectivo esperado de Caja.">
+            Todos los medios de pago: no es el efectivo de la caja.</small>
     </div>
 </div>
 {% endif %}

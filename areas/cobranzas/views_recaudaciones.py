@@ -25,7 +25,7 @@ from decimal import Decimal
 
 from .models import (
     RecaudacionDiaria, DepositoBancario, AjusteSaldoFavor, ItemCobro, Cobro, PagoCobro,
-    ComisionEntidad,
+    ComisionEntidad, CierreDiario,
 )
 
 
@@ -48,6 +48,13 @@ CANAL_POR_ENTIDAD = {
 ENTIDADES_SOLO_EFECTIVO = {RecaudacionDiaria.ENTIDAD_PAGOFACIL}
 
 CENT = Decimal('0.01')
+
+
+def _pesos(valor) -> str:
+    """Formato argentino para mensajes: Decimal('18246.86') -> '$18.246,86'."""
+    v = Decimal(valor or 0).quantize(CENT)
+    entero, dec = f'{abs(v):,.2f}'.split('.')
+    return f"{'-' if v < 0 else ''}${entero.replace(',', '.')},{dec}"
 
 
 def _sistema_por_canal(entidad: str, fecha) -> dict:
@@ -587,6 +594,202 @@ class SistemaPorCanalAjax(LoginRequiredMixin, View):
         s = _sistema_json(_sistema_por_canal(entidad, fecha))
         s.update({'entidad': entidad, 'fecha': str(fecha)})
         return JsonResponse(s)
+
+
+# ─────────────────────────────────────────────────────────────
+# BOLETAS DEL DÍA + CORRECCIÓN DE FACTURAS REDONDEADAS
+# ─────────────────────────────────────────────────────────────
+
+# Una diferencia mayor entre lo cargado y la boleta real ya no parece un
+# redondeo sino un error de carga: no se deja pasar a ganancia desde acá.
+MAX_REDONDEO_FACTURA = Decimal('1000')
+
+
+def _boletas_del_dia(entidad: str, fecha) -> list:
+    """
+    Cada boleta (ItemCobro) del canal de la entidad en esa fecha, con cómo
+    se pagó su cobro y cuánto pesa en el número que se declara:
+      factor 1   → se declara completa
+      factor 0   → no se declara (PagoFácil: cobro pagado sin efectivo)
+      factor 0-1 → cobro mixto en PagoFácil: parte proporcional al efectivo
+    Mismo criterio que _sistema_por_canal(), para que la vista previa de
+    "cómo queda con las correcciones" coincida con lo que se va a comparar.
+    """
+    canal = CANAL_POR_ENTIDAD.get(entidad)
+    if canal is None or fecha is None:
+        return []
+    solo_efectivo = entidad in ENTIDADES_SOLO_EFECTIVO
+    items = list(
+        ItemCobro.objects
+        .filter(cobro__estado=Cobro.ESTADO_CERRADO, canal=canal,
+                cobro__fecha_cierre__date=fecha)
+        .select_related('servicio', 'cobro')
+        .order_by('cobro__fecha_cierre', 'cobro_id', 'orden', 'pk')
+    )
+    pagos = {}
+    for p in (PagoCobro.objects.filter(cobro_id__in={i.cobro_id for i in items})
+              .values('cobro_id', 'metodo').annotate(s=Sum('monto'))):
+        pagos.setdefault(p['cobro_id'], {})
+        pagos[p['cobro_id']][p['metodo']] = pagos[p['cobro_id']].get(p['metodo'], Decimal('0')) + p['s']
+    nombres = dict(PagoCobro.METODOS)
+
+    out = []
+    for it in items:
+        pg = {m: v for m, v in pagos.get(it.cobro_id, {}).items() if v > 0}
+        tot = sum(pg.values(), Decimal('0'))
+        efe = pg.get(PagoCobro.METODO_EFECTIVO, Decimal('0'))
+        if efe <= 0 or tot <= 0:
+            clase, factor = 'otros', (Decimal('0') if solo_efectivo else Decimal('1'))
+        elif efe >= tot:
+            clase, factor = 'efectivo', Decimal('1')
+        else:
+            clase, factor = 'mixto', (efe / tot if solo_efectivo else Decimal('1'))
+        out.append({
+            'id':          it.pk,
+            'cobro_id':    it.cobro_id,
+            'hora':        timezone.localtime(it.cobro.fecha_cierre).strftime('%H:%M'),
+            'codigo':      it.servicio.codigo,
+            'descripcion': it.servicio.descripcion,
+            'cantidad':    it.cantidad or 1,
+            'factura':     float(it.monto_servicio),
+            'adicional':   float(it.monto_adicional - it.monto_redondeo),
+            'redondeo':    float(it.monto_redondeo),
+            'pago':        ' + '.join(nombres.get(m, m) for m in sorted(pg)) or 'Sin pago',
+            'clase':       clase,
+            'factor':      float(factor),
+        })
+    return out
+
+
+class BoletasCanalAjax(LoginRequiredMixin, View):
+    """
+    GET  ?entidad=&fecha=  → las boletas del canal ese día (para revisarlas
+         contra el listado de la plataforma).
+    POST JSON { entidad, fecha, correcciones: [{item_id, factura_real}] }
+         → corrige boletas que se cargaron con el redondeo ADENTRO de la
+         factura (ej. boleta real $18.246,86 cargada como $18.300): la
+         factura baja al importe real y la diferencia pasa a redondeo,
+         que es parte del adicional (ganancia).
+
+    Qué NO cambia: el total del cobro ni sus pagos → la caja, los cierres
+    de turno y el efectivo esperado quedan igual. Qué SÍ cambia: baja lo
+    que hay que declarar a la entidad y sube la ganancia en lo mismo. Si
+    el turno ya tiene cierre diario, su total de adicionales/redondeos
+    guardado sube en lo mismo (su total general no cambia).
+    """
+    def get(self, request):
+        from .views_cobros import puede_editar_cobros
+        entidad = request.GET.get('entidad', '').strip()
+        if entidad not in ENTIDADES_VALIDAS:
+            return JsonResponse({'error': 'Entidad inválida.'}, status=400)
+        fecha = parse_date(request.GET.get('fecha', '').strip())
+        if fecha is None:
+            return JsonResponse({'error': 'Fecha inválida.'}, status=400)
+        return JsonResponse({
+            'boletas':        _boletas_del_dia(entidad, fecha),
+            'puede_corregir': puede_editar_cobros(request.user),
+        })
+
+    def post(self, request):
+        from .views_cobros import puede_editar_cobros
+        if not puede_editar_cobros(request.user):
+            return JsonResponse({'error': 'No tenés permiso para corregir cobros.'}, status=403)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        entidad = (data.get('entidad') or '').strip()
+        if entidad not in ENTIDADES_VALIDAS:
+            return JsonResponse({'error': 'Entidad inválida.'}, status=400)
+        fecha = parse_date((data.get('fecha') or '').strip())
+        if fecha is None:
+            return JsonResponse({'error': 'Fecha inválida.'}, status=400)
+
+        pedidas = {}
+        for c in data.get('correcciones') or []:
+            try:
+                item_id = int(c.get('item_id'))
+                real = Decimal(str(c.get('factura_real'))).quantize(CENT)
+            except (TypeError, ValueError, InvalidOperation, AttributeError):
+                return JsonResponse({'error': 'Hay un importe inválido.'}, status=400)
+            pedidas[item_id] = real
+        if not pedidas:
+            return JsonResponse({'error': 'No hay correcciones para guardar.'}, status=400)
+
+        canal = CANAL_POR_ENTIDAD[entidad]
+        autor = request.user.get_full_name() or request.user.username
+        hoy = timezone.localtime().strftime('%d/%m/%Y')
+        with transaction.atomic():
+            items = {
+                i.pk: i for i in
+                ItemCobro.objects.select_for_update(of=('self',))
+                .select_related('servicio', 'cobro')
+                .filter(pk__in=pedidas.keys(), canal=canal,
+                        cobro__estado=Cobro.ESTADO_CERRADO, cobro__fecha_cierre__date=fecha)
+            }
+            errores = []
+            cambios = []
+            for item_id, real in pedidas.items():
+                it = items.get(item_id)
+                if it is None:
+                    errores.append(f'La boleta #{item_id} no es de este canal y fecha.')
+                    continue
+                cod = it.servicio.codigo
+                if real <= 0:
+                    errores.append(f'{cod}: el importe real tiene que ser mayor a cero.')
+                    continue
+                dif = it.monto_servicio - real
+                if dif < 0:
+                    errores.append(
+                        f'{cod}: el importe real ({_pesos(real)}) es mayor que la factura cargada '
+                        f'({_pesos(it.monto_servicio)}). Acá solo se saca el redondeo de la factura; '
+                        f'para subirla, usá Editar en el historial de cobros.')
+                    continue
+                if dif > MAX_REDONDEO_FACTURA:
+                    errores.append(
+                        f'{cod}: la diferencia ({_pesos(dif)}) es demasiado grande para un redondeo '
+                        f'(máximo {_pesos(MAX_REDONDEO_FACTURA)}). Revisá el número o corregilo desde '
+                        f'el historial de cobros.')
+                    continue
+                if dif:
+                    cambios.append((it, real, dif))
+            if errores:
+                return JsonResponse({'error': ' '.join(errores)}, status=400)
+
+            total = Decimal('0')
+            for it, real, dif in cambios:
+                anterior = it.monto_servicio
+                it.monto_servicio = real
+                it.monto_adicional += dif
+                it.monto_redondeo += dif
+                it.save(update_fields=['monto_servicio', 'monto_adicional', 'monto_redondeo'])
+
+                # Queda anotado en el cobro (se ve en el detalle del historial).
+                cobro = Cobro.objects.select_for_update().get(pk=it.cobro_id)
+                nota = (f'[{hoy} {autor}] Redondeo sacado de la factura {it.servicio.codigo}: '
+                        f'{_pesos(anterior)} → {_pesos(real)} ({_pesos(dif)} pasan a redondeo).')
+                cobro.observaciones = f'{cobro.observaciones}\n{nota}'.strip()
+                cobro.save(update_fields=['observaciones'])
+
+                cierre_id = (Cobro.objects.filter(pk=it.cobro_id)
+                             .values_list('turno__cierre_diario_id', flat=True).first())
+                if cierre_id:
+                    cierre = CierreDiario.objects.select_for_update().get(pk=cierre_id)
+                    cierre.total_adicionales += dif
+                    cierre.total_redondeos += dif
+                    cierre.save(update_fields=['total_adicionales', 'total_redondeos'])
+                total += dif
+
+        s = _sistema_json(_sistema_por_canal(entidad, fecha))
+        s.update({'entidad': entidad, 'fecha': str(fecha)})
+        return JsonResponse({
+            'success':        True,
+            'corregidas':     len(cambios),
+            'total_redondeo': float(total),
+            'sistema':        s,
+            'boletas':        _boletas_del_dia(entidad, fecha),
+        })
 
 
 class ComisionEntidadAjax(LoginRequiredMixin, View):
