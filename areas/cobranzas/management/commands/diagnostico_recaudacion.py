@@ -100,6 +100,9 @@ class Command(BaseCommand):
         if rec:
             out(f'   Recaudación cargada ese día:            {_m(rec.monto)}'
                 f'  (diferencia que ve el cajero: {_m(rec.monto - sist["boletas"])})')
+            out(f'   Redondeo dentro de las facturas:        {_m(rec.redondeo)}'
+                f'  (se toma solo si el sistema tiene más que lo cargado y no pasa'
+                f' {_m(sist["tope_redondeo"])})')
         if ticket is not None:
             out(f'   Ticket indicado (--ticket):             {_m(ticket)}'
                 f'  (diferencia: {_m(ticket - sist["boletas"])})')

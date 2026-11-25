@@ -453,6 +453,10 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
                     efectivo_turno_antes=efectivo_turno_antes,
                 )
 
+            # Si hoy ya se registró la recaudación, su redondeo cambia.
+            from .views_recaudaciones import recalcular_redondeo_recaudaciones
+            recalcular_redondeo_recaudaciones([timezone.localtime(cobro.fecha_cierre).date()])
+
         totales_por_metodo = {p.get_metodo_display(): float(p.monto) for p in cobro.pagos.all()}
         return JsonResponse({
             'success':           True,
@@ -496,8 +500,27 @@ class HistorialCobrosView(LoginRequiredMixin, View):
 
         cobros = cobros.distinct()
 
+        # Redondeo que quedó DENTRO de las facturas y se detectó al registrar la
+        # recaudación de esos días (ver RecaudacionDiaria.redondeo). No es de
+        # ningún cobro en particular: solo se suma a las tarjetas del resumen,
+        # y solo si lo que se ve es el día completo de esa entidad (sin filtro
+        # de usuario o método de pago, y sin cortar la lista en 500 filas).
+        redondeo_recaudaciones = Decimal('0')
+        if not usuario and not metodos_sel and cobros.count() <= 500:
+            from .models import RecaudacionDiaria
+            from .views_recaudaciones import CANAL_POR_ENTIDAD
+            rq = RecaudacionDiaria.objects.filter(redondeo__gt=0)
+            if desde:
+                rq = rq.filter(fecha__gte=desde)
+            if hasta:
+                rq = rq.filter(fecha__lte=hasta)
+            if canales_sel:
+                rq = rq.filter(entidad__in=[e for e, c in CANAL_POR_ENTIDAD.items() if c in canales_sel])
+            redondeo_recaudaciones = rq.aggregate(t=Sum('redondeo'))['t'] or Decimal('0')
+
         return render(request, 'cobranzas/historial_cobros.html', {
             'cobros':                cobros[:500],
+            'redondeo_recaudaciones': redondeo_recaudaciones,
             'desde':                 desde,
             'hasta':                 hasta,
             'usuario':               usuario,
@@ -597,6 +620,8 @@ class EditarCobroAjax(LoginRequiredMixin, View):
             if timezone.is_naive(nueva_fecha):
                 nueva_fecha = timezone.make_aware(nueva_fecha)
 
+        fecha_anterior = timezone.localtime(cobro.fecha_cierre).date() if cobro.fecha_cierre else None
+
         # ── Transacción: reemplazar ítems y pagos ─────────────────────────────
         with transaction.atomic():
             # Borrar todo lo anterior
@@ -635,6 +660,11 @@ class EditarCobroAjax(LoginRequiredMixin, View):
                 cobro.fecha_cierre = nueva_fecha
                 campos_a_guardar.append('fecha_cierre')
             cobro.save(update_fields=campos_a_guardar)
+
+            # Si ese día (o el nuevo) ya tiene recaudación, su redondeo cambia.
+            from .views_recaudaciones import recalcular_redondeo_recaudaciones
+            recalcular_redondeo_recaudaciones(
+                [fecha_anterior, timezone.localtime(cobro.fecha_cierre).date()])
 
         # ── Respuesta ─────────────────────────────────────────────────────────
         totales_por_metodo = {

@@ -156,7 +156,8 @@
 
 {# ── RESUMEN (primero) ── #}
 {% if cobros %}
-<div class="hist-resumen-grid" id="histResumenGrid">
+<div class="hist-resumen-grid" id="histResumenGrid"
+     data-redondeo-recaudaciones="{{ redondeo_recaudaciones|unlocalize }}">
     <div class="hist-resumen-card">
         <span class="hist-resumen-label" id="resumenLabelCobros">Total cobros</span>
         <strong class="hist-resumen-valor" id="resumenCobros">0</strong>
@@ -172,6 +173,7 @@
     <div class="hist-resumen-card hist-resumen-card-destacado">
         <span class="hist-resumen-label" id="resumenLabelRedondeos">Total redondeos</span>
         <strong class="hist-resumen-valor" id="resumenRedondeos">$0,00</strong>
+        <small class="hist-resumen-nota" id="resumenRedondeosNota" style="display:none;"></small>
     </div>
     <div class="hist-resumen-card hist-resumen-card-total">
         <span class="hist-resumen-label" id="resumenLabelGeneral">Total general</span>
@@ -697,6 +699,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const filas  = modoSeleccion ? filasSel : [...document.querySelectorAll('.hist-fila')];
         const t      = sumarFilas(filas);
         const labels = modoSeleccion ? RESUMEN_LABELS.seleccion : RESUMEN_LABELS.todos;
+
+        // Redondeo que quedó dentro de las facturas, detectado con el ticket de
+        // la recaudación de esos días: sale de "facturas" y pasa a "redondeos".
+        // No es de un cobro en particular, así que no aplica a una selección.
+        const extra = modoSeleccion ? 0
+            : parseFloat(el('histResumenGrid').dataset.redondeoRecaudaciones || 0);
+        t.boletas     -= extra;
+        t.adicionales += extra;
+        t.redondeos   += extra;
+        const notaRed = el('resumenRedondeosNota');
+        if (notaRed) {
+            notaRed.textContent = extra > 0
+                ? `Incluye ${fmt(extra)} que estaban dentro de las facturas (según el ticket).`
+                : '';
+            notaRed.style.display = extra > 0 ? '' : 'none';
+        }
 
         if (el('resumenCobros'))      el('resumenCobros').textContent      = t.count;
         if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(t.boletas);

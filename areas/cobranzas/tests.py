@@ -379,3 +379,85 @@ class DiagnosticoCajaTests(TestCase):
         self.assertIn('= EFECTIVO ESPERADO                                   $87.300,00', salida)
         self.assertIn('-$900,00   (FALTA)', salida)
         self.assertIn('Facturas "redondas" (múltiplo de $50, sin centavos): 2', salida)   # la EX no cuenta
+
+
+class RedondeoDesdeElTicketTests(TestCase):
+    """
+    El redondeo que quedó cargado DENTRO de las facturas se deduce solo del
+    ticket de la recaudación, sin corregir los cobros uno por uno.
+    Caso real PagoFácil 24/11/2026: sistema $248.200 en efectivo, ticket $248.065,60.
+    """
+
+    def setUp(self):
+        self.admin = Usuario.objects.create_superuser('admin_red', 'r@test.local', 'x')
+        self.client.force_login(self.admin)
+        self.turno = Turno.objects.create(monto_inicial=D('0'), cajero=self.admin)
+        self.srv = _servicio()
+        self.hoy = timezone.localdate()
+        filas = [('18300', '1000', 'debito'), ('68900', '1500', 'efectivo'),
+                 ('18300', '1000', 'efectivo'), ('55600', '1000', 'efectivo'),
+                 ('105400', '2000', 'efectivo')]
+        self.cobros = [_cobro(self.turno, [(self.srv, f, a, 'pagofacil')], [(m, D(f) + D(a))])
+                       for f, a, m in filas]
+
+    def _registrar(self, monto):
+        return self.client.post(reverse('cobranzas:recaudaciones_registrar'), json.dumps({
+            'entidad': 'pagofacil', 'fecha': str(self.hoy), 'monto': monto,
+        }), content_type='application/json')
+
+    def _rec(self):
+        from .models import RecaudacionDiaria
+        return RecaudacionDiaria.objects.get(entidad='pagofacil', fecha=self.hoy)
+
+    def test_la_diferencia_a_favor_es_redondeo(self):
+        r = self._registrar('248065.60')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()['redondeo'], 134.40)
+        self.assertEqual(self._rec().redondeo, D('134.40'))
+        from .views_ganancias import _totales
+        t = _totales()
+        self.assertEqual(t['redondeos'], D('134.40'))
+        self.assertEqual(t['ganado'], D('6500') + D('134.40'))
+        self.assertEqual(t['adicionales'], D('6500'))
+
+    def test_lo_que_no_parece_redondeo_no_se_toma(self):
+        # El ticket tiene MÁS que el sistema: falta algo, no es redondeo.
+        self._registrar('248300')
+        self.assertEqual(self._rec().redondeo, D('0'))
+        # El sistema tiene $8.200 más: más de $1.000 por boleta redonda (4) → revisar.
+        self._registrar('240000')
+        self.assertEqual(self._rec().redondeo, D('0'))
+
+    def test_corregir_boletas_despues_no_lo_cuenta_dos_veces(self):
+        self._registrar('248065.60')
+        items = [c.items.get() for c in self.cobros]
+        r = self.client.post(reverse('cobranzas:recaudaciones_boletas'), json.dumps({
+            'entidad': 'pagofacil', 'fecha': str(self.hoy),
+            'correcciones': [{'item_id': items[1].pk, 'factura_real': '68818.74'},
+                             {'item_id': items[2].pk, 'factura_real': '18246.86'}],
+        }), content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self._rec().redondeo, D('0'))      # ya está en cada boleta
+        from .views_ganancias import _totales
+        self.assertEqual(_totales()['redondeos'], D('134.40'))
+
+    def test_editar_un_cobro_recalcula(self):
+        self._registrar('248065.60')
+        c = self.cobros[1]
+        r = self.client.post(reverse('cobranzas:cobro_editar', args=[c.pk]), json.dumps({
+            'items': [{'servicio_id': self.srv.pk, 'monto_servicio': 68818.74,
+                       'monto_adicional': 1581.26, 'monto_redondeo': 81.26, 'canal': 'pagofacil'}],
+            'pagos': [{'metodo': 'efectivo', 'monto': 70400}],
+        }), content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self._rec().redondeo, D('53.14'))   # queda solo el de la otra boleta
+
+    def test_historial_lo_suma_a_las_tarjetas(self):
+        self._registrar('248065.60')
+        url = reverse('cobranzas:historial_cobros')
+        r = self.client.get(url, {'desde': str(self.hoy), 'hasta': str(self.hoy), 'canales': 'pagofacil'})
+        self.assertEqual(r.context['redondeo_recaudaciones'], D('134.40'))
+        r = self.client.get(url, {'desde': str(self.hoy), 'canales': 'rapipago'})
+        self.assertEqual(r.context['redondeo_recaudaciones'], D('0'))
+        r = self.client.get(url, {'desde': str(self.hoy), 'metodos': 'efectivo'})
+        self.assertEqual(r.context['redondeo_recaudaciones'], D('0'))

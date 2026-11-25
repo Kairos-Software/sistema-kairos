@@ -266,7 +266,7 @@
             </div>
             {% endif %}
             <div><span>Adicionales <em>(ganancia)</em></span><strong id="recSistAdic">$0,00</strong></div>
-            <div><span>Redondeos <em>(ganancia)</em></span><strong id="recSistRedondeos" class="rec-sistema-redondeo">$0,00</strong></div>
+            <div><span>Redondeos <em>(ganancia)</em></span><strong id="recSistRedondeos" class="rec-sistema-redondeo">$0,00</strong><small id="recSistRedondeosNota"></small></div>
             <div><span>Cobros</span><strong id="recSistCant">0</strong></div>
         </div>
         <p class="rec-sistema-mixto" id="recSistMixto" style="display:none;"></p>
@@ -287,10 +287,11 @@
         {# ── Boletas del día: revisarlas contra el listado de la plataforma ── #}
         <div class="rec-bol-panel" id="recBoletasPanel" hidden>
             <p class="rec-bol-ayuda">
-                Compará cada boleta con el listado de {{ entidad_label }}. Si al cobrar se redondeó y el
-                redondeo quedó cargado <strong>dentro de la factura</strong> (ej. boleta de $18.246,86 cargada
-                como $18.300), escribí el <strong>importe real</strong>: la diferencia pasa a
-                <strong>Redondeo</strong> (ganancia). No cambia lo que pagó el cliente ni el efectivo de la caja.
+                Acá ves cada boleta del día para compararla con el listado de {{ entidad_label }}.
+                <strong>No hace falta corregir nada</strong>: el redondeo que quedó dentro de las facturas
+                se calcula solo con la diferencia contra el ticket. Solo si querés que cada factura quede
+                igual a la de la plataforma (ej. $18.246,86 en vez de $18.300), escribí el
+                <strong>importe real</strong> y la diferencia pasa al redondeo de esa boleta.
             </p>
             <div class="rec-bol-lista" id="recBolLista"></div>
             <div class="rec-bol-pie" id="recBolPie" hidden>
@@ -816,6 +817,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const elSistOtros   = document.getElementById('recSistOtros');
     const elSistAdic    = document.getElementById('recSistAdic');
     const elSistRedond  = document.getElementById('recSistRedondeos');
+    const elSistRedondNota = document.getElementById('recSistRedondeosNota');
     const elSistCant    = document.getElementById('recSistCant');
     const elSistFecha   = document.getElementById('recSistFecha');
     const elSistDiff    = document.getElementById('recSistDiff');
@@ -829,41 +831,60 @@ document.addEventListener('DOMContentLoaded', function () {
         const [y, m, d] = iso.split('-');
         return `${d}/${m}/${y}`;
     }
-    // Diferencia con signo legible: "+$134,40" / "-$18.434,40"
-    function fmtDif(n) {
-        return (n > 0 ? '+' : n < 0 ? '-' : '') + fmt(Math.abs(n));
+
+    // Compara lo que se carga (el ticket de la plataforma) con el sistema.
+    // Si el sistema tiene un poco MÁS, es el redondeo que se cobró al cliente y
+    // quedó cargado dentro de las facturas: es ganancia y se toma solo (mismo
+    // criterio que redondeo_detectado() en el servidor). Nunca muestra restas
+    // negativas: dice quién tiene más y qué puede ser.
+    function compararConSistema(monto) {
+        const S    = parseFloat(sistemaActual.boletas) || 0;
+        const tope = parseFloat(sistemaActual.tope_redondeo) || 0;
+        const dif  = Math.round((S - monto) * 100) / 100;   // > 0: el sistema tiene más
+        const que  = soloEfectivo ? 'en efectivo'
+                   : (sistemaActual.comision > 0 ? 'para declarar' : 'en boletas');
+        if (dif > 0 && dif <= tope) {
+            return { tipo: 'ok', redondeo: dif, texto:
+                `Coincide con redondeo: el sistema tiene ${fmt(S)} ${que} = ${fmt(monto)} del ticket ` +
+                `+ ${fmt(dif)} de redondeo a favor (se redondeó al cobrar y quedó dentro de las facturas). ` +
+                `Se suma a Redondeos como ganancia.` };
+        }
+        if (Math.abs(dif) < 1) {
+            return { tipo: 'ok', redondeo: 0, texto: `Coincide: ${textoSistema(S)}.` };
+        }
+        if (dif > 0) {
+            return { tipo: 'warn', redondeo: 0, texto:
+                `El sistema tiene ${fmt(dif)} más que el ticket (${fmt(S)} ${que}): es demasiado para ser ` +
+                `redondeo. Puede ser un cobro que la plataforma no tomó o que entró en el cierre de otro día. ` +
+                `Revisá las boletas de ese día.` };
+        }
+        return { tipo: 'warn', redondeo: 0, texto:
+            `El ticket tiene ${fmt(-dif)} más que el sistema (${fmt(S)} ${que}): puede faltar registrar un ` +
+            `cobro, o una boleta quedó cargada en otro canal o con otro medio de pago. ` +
+            `Revisá las boletas de ese día.` };
     }
 
     function evaluarDiffSistema() {
         const monto   = parseFloat(inputMontoEl.value);
-        const boletas = parseFloat(sistemaActual.boletas) || 0;
         elSistDiff.className = 'rec-sistema-diff';
+        let redondeoTicket = 0;
         if (!sistemaActual.cant) {
             elSistDiff.classList.add('diff-info');
             elSistDiff.textContent = 'El sistema no tiene cobros por este canal para esta fecha.';
-            return;
-        }
-        if (!monto || monto <= 0) {
+        } else if (!monto || monto <= 0) {
             elSistDiff.classList.add('diff-info');
             elSistDiff.textContent = soloEfectivo
                 ? 'Ingresá el efectivo del ticket de cierre para compararlo con el sistema.'
                 : 'Ingresá el total del cierre para compararlo con el sistema.';
-            return;
-        }
-        const dif = monto - boletas;
-        if (Math.abs(dif) < 1) {
-            elSistDiff.classList.add('diff-ok');
-            elSistDiff.textContent = `Coincide: ${textoSistema(boletas)}.`;
         } else {
-            elSistDiff.classList.add('diff-warn');
-            elSistDiff.textContent =
-                `No coincide: ${textoSistema(boletas)}. ` +
-                `Diferencia ${fmtDif(dif)}. ` +
-                (dif < 0
-                    ? 'Si al cobrar se redondeó y el redondeo quedó dentro de la factura, ' +
-                      'corregilo en "Ver las boletas de ese día".'
-                    : 'Revisá el ticket o las boletas de ese día.');
+            const c = compararConSistema(monto);
+            elSistDiff.classList.add(c.tipo === 'ok' ? 'diff-ok' : 'diff-warn');
+            elSistDiff.textContent = c.texto;
+            redondeoTicket = c.redondeo;
         }
+        // Redondeos = los marcados en cada cobro + el que quedó dentro de las facturas.
+        elSistRedond.textContent = fmt((parseFloat(sistemaActual.redondeos) || 0) + redondeoTicket);
+        elSistRedondNota.textContent = redondeoTicket > 0 ? `${fmt(redondeoTicket)} dentro de las facturas` : '';
     }
 
     function renderSistema() {
@@ -871,7 +892,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (elSistOtros) elSistOtros.textContent = fmt(sistemaActual.boletas_otros || 0);
         // 'adicionales' incluye los redondeos: se muestran separados.
         elSistAdic.textContent    = fmt(sistemaActual.adicionales_propios ?? sistemaActual.adicionales);
-        elSistRedond.textContent  = fmt(sistemaActual.redondeos || 0);
         const hayComision = sistemaActual.comision > 0;
         document.getElementById('recSistFacialWrap').style.display   = hayComision ? '' : 'none';
         document.getElementById('recSistComisionWrap').style.display = hayComision ? '' : 'none';
@@ -1104,7 +1124,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 txt += ': coincide con lo que cargaste.';
                 previewBol.classList.add('ok');
             } else {
-                txt += ` (con lo que cargaste queda una diferencia de ${fmtDif(dif)}).`;
+                txt += dif < 0
+                    ? ` (el sistema queda con ${fmt(-dif)} más que lo que cargaste).`
+                    : ` (lo que cargaste tiene ${fmt(dif)} más que el sistema).`;
                 previewBol.classList.add('warn');
             }
         } else {
@@ -1286,21 +1308,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Aviso de contraste con el sistema dentro del modal
         const avisoSist = document.getElementById('modalSistemaAviso');
-        const bol = parseFloat(sistemaActual.boletas) || 0;
         if (!sistemaActual.cant) {
             avisoSist.style.display = 'none';
         } else {
-            const dif = monto - bol;
-            if (Math.abs(dif) < 1) {
-                avisoSist.className = 'alerta-inline rec-aviso-ok mt-3';
-                avisoSist.textContent =
-                    `Coincide: ${textoSistema(bol)}.`;
-            } else {
-                avisoSist.className = 'alerta-inline rec-aviso-warn mt-3';
-                avisoSist.textContent =
-                    `No coincide: ${textoSistema(bol)}. ` +
-                    `Estás cargando ${fmt(monto)} — diferencia ${fmtDif(dif)}.`;
-            }
+            const c = compararConSistema(monto);
+            avisoSist.className = `alerta-inline ${c.tipo === 'ok' ? 'rec-aviso-ok' : 'rec-aviso-warn'} mt-3`;
+            avisoSist.textContent = c.texto;
             avisoSist.style.display = '';
         }
 

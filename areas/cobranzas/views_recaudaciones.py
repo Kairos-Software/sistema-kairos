@@ -49,6 +49,10 @@ ENTIDADES_SOLO_EFECTIVO = {RecaudacionDiaria.ENTIDAD_PAGOFACIL}
 
 CENT = Decimal('0.01')
 
+# Una diferencia mayor entre lo cargado y la boleta real ya no parece un
+# redondeo sino un error de carga (o un cobro que la plataforma no tomó).
+MAX_REDONDEO_FACTURA = Decimal('1000')
+
 
 def _pesos(valor) -> str:
     """Formato argentino para mensajes: Decimal('18246.86') -> '$18.246,86'."""
@@ -81,6 +85,10 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
     carga el cajero (en RapiPago, la columna "Débito" de su resumen).
     'adicionales' = SUM(monto_adicional) de todos los medios (ganancia, no se
     declara), que incluye 'redondeos'; 'adicionales_propios' = sin redondeos.
+    'tope_redondeo' = hasta cuánto de diferencia a favor del sistema se
+    puede tomar como redondeo cargado dentro de las facturas: $1.000 por cada
+    boleta declarada con factura "redonda" (sin centavos, múltiplo de $50),
+    que son las únicas que pueden tener un redondeo adentro.
     """
     solo_efectivo = entidad in ENTIDADES_SOLO_EFECTIVO
     com = ComisionEntidad.vigente(entidad, fecha)
@@ -94,6 +102,7 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
         'adicionales': Decimal('0'), 'redondeos': Decimal('0'),
         'adicionales_propios': Decimal('0'), 'total': Decimal('0'),
         'cant': 0, 'cant_otros': 0, 'cant_mixto': 0,
+        'cant_redondas': 0, 'tope_redondeo': Decimal('0'),
         'solo_efectivo': solo_efectivo,
     }
     canal = CANAL_POR_ENTIDAD.get(entidad)
@@ -111,12 +120,16 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
 
     boletas_cobro = {}
     unidades_cobro = {}   # boletas (unidades) de este canal por cobro, para la comisión
+    redondas_cobro = {}   # boletas con factura "redonda" (pueden tener un redondeo adentro)
     adicionales = Decimal('0')
     redondeos = Decimal('0')
     for it in items:
         cid = it['cobro_id']
         boletas_cobro[cid] = boletas_cobro.get(cid, Decimal('0')) + it['monto_servicio']
         unidades_cobro[cid] = unidades_cobro.get(cid, 0) + (it['cantidad'] or 1)
+        fac = it['monto_servicio']
+        if fac > 0 and fac == fac.to_integral_value() and int(fac) % 50 == 0:
+            redondas_cobro[cid] = redondas_cobro.get(cid, 0) + 1
         adicionales += it['monto_adicional']
         redondeos += it['monto_redondeo']
 
@@ -131,6 +144,7 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
 
     r = dict(vacio)
     unidades_declaradas = 0
+    redondas_declaradas = 0
     for cid, bol in boletas_cobro.items():
         tot = pagado.get(cid, Decimal('0'))
         efe = efectivo.get(cid, Decimal('0'))
@@ -140,14 +154,17 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
             r['cant_otros'] += 1
             if not solo_efectivo:
                 unidades_declaradas += unidades_cobro[cid]
+                redondas_declaradas += redondas_cobro.get(cid, 0)
         elif efe >= tot:
             r['boletas_efectivo'] += bol
             unidades_declaradas += unidades_cobro[cid]
+            redondas_declaradas += redondas_cobro.get(cid, 0)
         else:
             r['boletas_mixto'] += bol
             r['mixto_efectivo_estimado'] += (bol * efe / tot).quantize(CENT)
             r['cant_mixto'] += 1
             unidades_declaradas += unidades_cobro[cid]
+            redondas_declaradas += redondas_cobro.get(cid, 0)
 
     r['adicionales'] = adicionales
     r['redondeos'] = redondeos
@@ -159,7 +176,52 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
     r['comision_cant'] = unidades_declaradas
     r['comision'] = (comision_unit * unidades_declaradas).quantize(CENT)
     r['boletas'] = r['valor_facial'] - r['comision']
+    r['cant_redondas'] = redondas_declaradas
+    r['tope_redondeo'] = MAX_REDONDEO_FACTURA * redondas_declaradas
     return r
+
+
+def redondeo_detectado(sist: dict, monto) -> Decimal:
+    """
+    Redondeo que quedó cargado DENTRO de las facturas, deducido del ticket:
+    si el sistema tiene un poco más que lo que se declara (el ticket de la
+    plataforma), esa diferencia es lo que se cobró de más al redondear, y es
+    ganancia. Ej. PagoFácil 24/11/2026: sistema $248.200 en efectivo, ticket
+    $248.065,60 -> $134,40 de redondeo.
+
+    Solo se toma como redondeo si la diferencia es a favor del sistema y no
+    pasa el tope (ver 'tope_redondeo'). Si el ticket tiene MÁS que el sistema,
+    o la diferencia es demasiado grande, no es redondeo: es algo para revisar.
+    """
+    if monto is None:
+        return Decimal('0')
+    dif = (sist['boletas'] - Decimal(monto)).quantize(CENT)
+    if dif > 0 and dif <= sist['tope_redondeo']:
+        return dif
+    return Decimal('0')
+
+
+def recalcular_redondeo_recaudaciones(fechas=None) -> int:
+    """
+    Vuelve a calcular RecaudacionDiaria.redondeo (todas, o las de esas fechas).
+    Se llama al registrar una recaudación y cada vez que cambian los cobros de
+    un día que ya tiene recaudación, para que el redondeo nunca se cuente dos
+    veces (si después se corrigen las boletas una por una, la diferencia con
+    el ticket baja y este redondeo baja en lo mismo). Devuelve cuántas cambió.
+    """
+    qs = RecaudacionDiaria.objects.all()
+    if fechas is not None:
+        fechas = {f for f in fechas if f}
+        if not fechas:
+            return 0
+        qs = qs.filter(fecha__in=fechas)
+    cambiadas = 0
+    for rec in qs:
+        nuevo = redondeo_detectado(_sistema_por_canal(rec.entidad, rec.fecha), rec.monto)
+        if nuevo != rec.redondeo:
+            RecaudacionDiaria.objects.filter(pk=rec.pk).update(redondeo=nuevo)
+            cambiadas += 1
+    return cambiadas
 
 
 def _sistema_json(s: dict) -> dict:
@@ -483,10 +545,13 @@ class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
 
         totales = _totales_por_entidad(entidad)
         sist = _sistema_por_canal(entidad, rec.fecha)
+        rec.redondeo = redondeo_detectado(sist, rec.monto)
+        rec.save(update_fields=['redondeo'])
 
         return JsonResponse({
             'success':              True,
             'recaudacion':          _recaudacion_as_dict(rec),
+            'redondeo':             float(rec.redondeo),
             'es_nueva':             es_nueva,
             'total_recaudado':      float(totales['recaudado']),
             'recaudado_pendiente':  float(totales['recaudado_pendiente']),
@@ -599,10 +664,6 @@ class SistemaPorCanalAjax(LoginRequiredMixin, View):
 # ─────────────────────────────────────────────────────────────
 # BOLETAS DEL DÍA + CORRECCIÓN DE FACTURAS REDONDEADAS
 # ─────────────────────────────────────────────────────────────
-
-# Una diferencia mayor entre lo cargado y la boleta real ya no parece un
-# redondeo sino un error de carga: no se deja pasar a ganancia desde acá.
-MAX_REDONDEO_FACTURA = Decimal('1000')
 
 
 def _boletas_del_dia(entidad: str, fecha) -> list:
@@ -781,6 +842,7 @@ class BoletasCanalAjax(LoginRequiredMixin, View):
                     cierre.save(update_fields=['total_adicionales', 'total_redondeos'])
                 total += dif
 
+        recalcular_redondeo_recaudaciones([fecha])
         s = _sistema_json(_sistema_por_canal(entidad, fecha))
         s.update({'entidad': entidad, 'fecha': str(fecha)})
         return JsonResponse({

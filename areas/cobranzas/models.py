@@ -754,6 +754,14 @@ class RecaudacionDiaria(models.Model):
     monto          = models.DecimalField(
                          max_digits=12, decimal_places=2,
                          help_text="Monto recaudado en el día")
+    # Se calcula solo (views_recaudaciones.recalcular_redondeo_recaudaciones):
+    # si el sistema tiene un poco MÁS que lo declarado, es el redondeo que el
+    # cajero cargó dentro de las facturas (ej. boleta de 18.246,86 cargada como
+    # 18.300). Es ganancia, igual que ItemCobro.monto_redondeo.
+    redondeo       = models.DecimalField(
+                         max_digits=12, decimal_places=2, default=0,
+                         help_text="Redondeo que quedó dentro de las facturas ese día "
+                                   "(sistema − lo declarado). Se calcula solo.")
     cubierta_por   = models.ForeignKey(
                          'DepositoBancario', on_delete=models.SET_NULL,
                          null=True, blank=True, related_name='recaudaciones_cubiertas',

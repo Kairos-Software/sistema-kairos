@@ -18,7 +18,7 @@ from django.views import View
 
 from core.models import Usuario
 
-from .models import Cobro, ItemCobro, GastoGanancia
+from .models import Cobro, ItemCobro, GastoGanancia, RecaudacionDiaria
 
 
 # ─────────────────────────────────────────────────────────────
@@ -39,15 +39,20 @@ def _gastado_total() -> Decimal:
 
 
 def _totales() -> dict:
-    ganado  = _ganado_total()
+    # Redondeo que quedó cargado DENTRO de las facturas (no en el adicional) y
+    # se detectó con el ticket de cada recaudación: también es ganancia.
+    redondeo_recaudaciones = (
+        RecaudacionDiaria.objects.aggregate(t=Sum('redondeo'))['t'] or Decimal('0')
+    )
+    ganado  = _ganado_total() + redondeo_recaudaciones
     gastado = _gastado_total()
     saldo   = ganado - gastado
-    # Parte de 'ganado' que vino de redondear el total cobrado. Ya está
-    # incluida en monto_adicional (y por lo tanto en 'ganado'): es solo informativa.
+    # Parte de 'ganado' que vino de redondear el total cobrado. La de los
+    # cobros ya está incluida en monto_adicional: es solo informativa.
     redondeos = (
         ItemCobro.objects.filter(cobro__estado=Cobro.ESTADO_CERRADO)
         .aggregate(t=Sum('monto_redondeo'))['t'] or Decimal('0')
-    )
+    ) + redondeo_recaudaciones
     return {
         'ganado':      ganado,
         'gastado':     gastado,
