@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from core.models import Usuario
 
-from .models import CierreDiario, Cobro, ItemCobro, PagoCobro, Servicio, Turno
+from .models import CierreDiario, Cobro, ComisionEntidad, ItemCobro, PagoCobro, Servicio, Turno
 from .views_recaudaciones import _sistema_por_canal
 
 
@@ -31,7 +31,7 @@ def _cobro(turno, items, pagos):
 
 
 class RecaudacionSegunEntidadTests(TestCase):
-    """PagoFácil se recauda solo en efectivo; RapiPago todo junto."""
+    """PagoFácil se recauda solo en efectivo; RapiPago todo junto (menos su comisión)."""
 
     def setUp(self):
         self.turno = Turno.objects.create(monto_inicial=D('0'))
@@ -55,7 +55,9 @@ class RecaudacionSegunEntidadTests(TestCase):
         _cobro(self.turno, [(self.srv, '500', '50', 'rapipago')], [('transferencia', '550')])
         s = _sistema_por_canal('rapipago', self.hoy)
         self.assertFalse(s['solo_efectivo'])
-        self.assertEqual(s['boletas'], D('1500'))
+        self.assertEqual(s['valor_facial'], D('1500'))
+        self.assertEqual(s['comision'], D('110.00'))    # 2 boletas × $55 (cargado por la migración)
+        self.assertEqual(s['boletas'], D('1390.00'))
 
     def test_pago_mixto_se_estima_en_proporcion(self):
         # 1000 de factura, se pagó 600 efectivo + 600 débito → mitad en efectivo.
@@ -71,7 +73,54 @@ class RecaudacionSegunEntidadTests(TestCase):
         _cobro(self.turno, [(self.srv, '1000', '0', 'pagofacil'), (self.srv, '700', '0', 'rapipago')],
                [('efectivo', '1700')])
         self.assertEqual(_sistema_por_canal('pagofacil', self.hoy)['boletas'], D('1000'))
-        self.assertEqual(_sistema_por_canal('rapipago', self.hoy)['boletas'], D('700'))
+        self.assertEqual(_sistema_por_canal('rapipago', self.hoy)['valor_facial'], D('700'))
+
+
+class ComisionRapipagoTests(TestCase):
+    """RapiPago descuenta $55 por boleta de lo que se declara (columna "Débito")."""
+
+    def setUp(self):
+        self.turno = Turno.objects.create(monto_inicial=D('0'))
+        self.srv = _servicio()
+        self.hoy = timezone.localdate()
+
+    def test_resumen_real_de_rapipago(self):
+        # Los 4 cobros del resumen "Transacciones Online PosPago" del 24/11/2026
+        # (Valor facial − $55 = Débito en cada fila; total Débito = facial − 4 × 55).
+        faciales = ['295485.48', '84415.24', '22000.00', '12487.00']
+        for facial, medio in zip(faciales, ['efectivo', 'debito', 'efectivo', 'transferencia']):
+            _cobro(self.turno, [(self.srv, facial, '500', 'rapipago')], [(medio, D(facial) + 500)])
+        s = _sistema_por_canal('rapipago', self.hoy)
+        self.assertEqual(s['valor_facial'], D('414387.72'))
+        self.assertEqual(s['comision_cant'], 4)
+        self.assertEqual(s['comision'], D('220.00'))
+        self.assertEqual(s['boletas'], D('414167.72'))    # lo que se declara
+
+    def test_cada_cambio_de_comision_rige_desde_su_fecha(self):
+        _cobro(self.turno, [(self.srv, '1000', '0', 'rapipago')], [('efectivo', '1000')])
+        ComisionEntidad.objects.create(entidad='rapipago', monto_por_boleta=D('70'),
+                                       vigente_desde=self.hoy + timezone.timedelta(days=1))
+        self.assertEqual(_sistema_por_canal('rapipago', self.hoy)['comision'], D('55.00'))
+        ComisionEntidad.objects.create(entidad='rapipago', monto_por_boleta=D('60'), vigente_desde=self.hoy)
+        self.assertEqual(_sistema_por_canal('rapipago', self.hoy)['comision'], D('60.00'))
+
+    def test_pagofacil_no_tiene_comision(self):
+        _cobro(self.turno, [(self.srv, '1000', '0', 'pagofacil')], [('efectivo', '1000')])
+        s = _sistema_por_canal('pagofacil', self.hoy)
+        self.assertEqual(s['comision'], D('0'))
+        self.assertEqual(s['boletas'], D('1000'))
+
+    def test_solo_staff_cambia_la_comision(self):
+        url = reverse('cobranzas:recaudaciones_comision')
+        body = json.dumps({'entidad': 'rapipago', 'monto': '60', 'vigente_desde': str(self.hoy)})
+        cajero = Usuario.objects.create_user('cajero_comun', 'x@test.local', 'x')
+        self.client.force_login(cajero)
+        self.assertEqual(self.client.post(url, body, content_type='application/json').status_code, 403)
+        admin = Usuario.objects.create_superuser('admin_test', 'a@test.local', 'x')
+        self.client.force_login(admin)
+        r = self.client.post(url, body, content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(ComisionEntidad.vigente('rapipago', self.hoy).monto_por_boleta, D('60'))
 
 
 class RedondeoAlConfirmarTests(TestCase):
@@ -97,9 +146,11 @@ class RedondeoAlConfirmarTests(TestCase):
         item = cobro.items.get()
         self.assertEqual(item.monto_servicio, D('142'))     # la factura no se toca
         self.assertEqual(item.monto_adicional, D('158'))    # 100 + 58 de redondeo
-        self.assertEqual(cobro.redondeo, D('58'))
+        self.assertEqual(item.monto_redondeo, D('58'))
+        self.assertEqual(cobro.total_redondeo(), D('58'))
         self.assertEqual(self.turno.total_efectivo(), D('300'))
         self.assertEqual(self.turno.total_adicionales(), D('158'))
+        self.assertEqual(self.turno.total_redondeos(), D('58'))
         self.assertEqual(r.json()['redondeo'], 58.0)
 
     def test_el_redondeo_va_a_un_item_con_cantidad_1(self):
@@ -111,6 +162,8 @@ class RedondeoAlConfirmarTests(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         adic = dict(ItemCobro.objects.values_list('servicio__codigo', 'monto_adicional'))
         self.assertEqual(adic, {'CF1': D('30'), 'ACN1': D('20')})
+        red = dict(ItemCobro.objects.values_list('servicio__codigo', 'monto_redondeo'))
+        self.assertEqual(red, {'CF1': D('20'), 'ACN1': D('0')})
 
     def test_los_pagos_tienen_que_cubrir_el_redondeo(self):
         r = self._confirmar(
@@ -131,27 +184,39 @@ class RedondeoAlConfirmarTests(TestCase):
             [{'metodo': 'efectivo', 'monto': '28746.28'}])
         self.assertEqual(r.status_code, 200, r.content)
         cobro = Cobro.objects.get()
-        self.assertEqual(cobro.redondeo, D('0'))
+        self.assertEqual(cobro.total_redondeo(), D('0'))
         self.assertEqual(cobro.items.get().monto_servicio, D('28246.28'))
 
-    def test_editar_conserva_el_redondeo_y_lo_limita_al_adicional(self):
+    def test_editar_conserva_y_corrige_el_redondeo(self):
         self._confirmar(
             [{'servicio_id': self.srv.pk, 'monto_servicio': 142, 'monto_adicional': 100, 'canal': 'pagofacil'}],
             [{'metodo': 'efectivo', 'monto': 300}], redondeo=58)
         cobro = Cobro.objects.get()
         url = reverse('cobranzas:cobro_editar', args=[cobro.pk])
+
+        def editar(fac, adi, pago, red=None):
+            item = {'servicio_id': self.srv.pk, 'monto_servicio': fac, 'monto_adicional': adi,
+                    'canal': 'rapipago'}
+            if red is not None:
+                item['monto_redondeo'] = red
+            return self.client.post(url, json.dumps({
+                'items': [item], 'pagos': [{'metodo': 'efectivo', 'monto': pago}]}),
+                content_type='application/json')
+
         # Edición sin tocar montos (ej. solo cambia el canal): el redondeo queda.
-        self.client.post(url, json.dumps({
-            'items': [{'servicio_id': self.srv.pk, 'monto_servicio': 142, 'monto_adicional': 158, 'canal': 'rapipago'}],
-            'pagos': [{'metodo': 'efectivo', 'monto': 300}]}), content_type='application/json')
-        cobro.refresh_from_db()
-        self.assertEqual(cobro.redondeo, D('58'))
-        # Se baja el adicional a 40: el redondeo no puede quedar mayor que eso.
-        self.client.post(url, json.dumps({
-            'items': [{'servicio_id': self.srv.pk, 'monto_servicio': 142, 'monto_adicional': 40, 'canal': 'rapipago'}],
-            'pagos': [{'metodo': 'efectivo', 'monto': 182}]}), content_type='application/json')
-        cobro.refresh_from_db()
-        self.assertEqual(cobro.redondeo, D('40'))
+        self.assertEqual(editar(142, 158, 300, red=58).status_code, 200)
+        self.assertEqual(cobro.items.get().monto_redondeo, D('58'))
+        # El redondeo nunca puede ser mayor que el adicional de la boleta.
+        editar(142, 40, 182, red=58)
+        self.assertEqual(cobro.items.get().monto_redondeo, D('40'))
+        # Corregir un cobro viejo con el redondeo metido en la factura (196,28 en vez de 142):
+        # se baja la factura y se marca la diferencia como redondeo; el total no cambia.
+        editar(142, 158, 300, red=58)
+        self.assertEqual(cobro.items.get().monto_servicio, D('142'))
+        self.assertEqual(cobro.total_general(), D('300'))
+        # Si el front no manda el campo (versión vieja en caché), queda en 0 sin romper.
+        self.assertEqual(editar(142, 158, 300).status_code, 200)
+        self.assertEqual(cobro.items.get().monto_redondeo, D('0'))
 
 
 class ConvertirExcedentesTests(TestCase):
@@ -168,8 +233,7 @@ class ConvertirExcedentesTests(TestCase):
         c = _cobro(self.turno, [(self.srv, '142', '100', 'pagofacil')], [('efectivo', '300')])
         salida = self._correr()
         self.assertIn('Cobros a convertir: 1', salida)
-        c.refresh_from_db()
-        self.assertEqual(c.redondeo, D('0'))
+        self.assertEqual(c.total_redondeo(), D('0'))
         self.assertEqual(c.items.get().monto_adicional, D('100'))
 
     def test_aplicar_convierte_el_excedente_sin_tocar_caja_ni_facturas(self):
@@ -184,24 +248,21 @@ class ConvertirExcedentesTests(TestCase):
 
         self._correr('--aplicar')
 
-        c.refresh_from_db()
         item = c.items.get()
-        self.assertEqual(c.redondeo, D('58'))
+        self.assertEqual(item.monto_redondeo, D('58'))
         self.assertEqual(item.monto_adicional, D('158'))   # 100 → 158 (el ejemplo)
         self.assertEqual(item.monto_servicio, D('142'))    # factura intacta
         self.assertEqual(self.turno.total_efectivo(), efectivo_antes)  # caja intacta
         cierre.refresh_from_db()
         self.assertEqual(cierre.total_adicionales, D('158'))
+        self.assertEqual(cierre.total_redondeos, D('58'))
         # El excedente grande (1.200 > 1.000) se deja para revisar a mano.
-        grande.refresh_from_db()
-        self.assertEqual(grande.redondeo, D('0'))
+        self.assertEqual(grande.total_redondeo(), D('0'))
         self.assertEqual(grande.items.get().monto_adicional, D('500'))
-        exacto.refresh_from_db()
-        self.assertEqual(exacto.redondeo, D('0'))
+        self.assertEqual(exacto.total_redondeo(), D('0'))
 
         # Correrlo de nuevo no suma dos veces.
         self._correr('--aplicar')
-        c.refresh_from_db()
         self.assertEqual(c.items.get().monto_adicional, D('158'))
         cierre.refresh_from_db()
         self.assertEqual(cierre.total_adicionales, D('158'))

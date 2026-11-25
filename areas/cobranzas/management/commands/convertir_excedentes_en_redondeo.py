@@ -8,15 +8,16 @@ un "excedente" que no figuraba en ningún lado: estaban en la caja (porque el
 pago en efectivo sí se registró) pero no en las ganancias.
 
 Este comando convierte esos excedentes en lo que son: redondeo, que se suma
-al adicional del cobro (100 → 158) y queda registrado en Cobro.redondeo (58).
+al adicional del cobro (100 → 158) y queda registrado en ItemCobro.monto_redondeo (58).
 
 QUÉ NO CAMBIA (para no "romper los números"):
   - Los pagos (PagoCobro): el efectivo de caja y los cierres de turno siguen igual.
   - Las facturas (monto_servicio): las recaudaciones siguen igual.
 QUÉ SÍ CAMBIA:
   - El adicional del cobro sube en el excedente → Ganancias sube en ese total.
-  - Si el turno del cobro ya tiene cierre diario, su total_adicionales guardado
-    también sube en lo mismo, para que el historial de cierres coincida.
+  - Si el turno del cobro ya tiene cierre diario, su total_adicionales y
+    total_redondeos guardados también suben en lo mismo, para que el historial
+    de cierres coincida.
 
 Los excedentes mayores a --maximo (default $1.000) NO se convierten: pueden
 ser errores de carga (por ejemplo, haber puesto el billete que dio el cliente
@@ -65,7 +66,8 @@ def _cobros_con_excedente():
     )
     qs = (
         Cobro.objects
-        .filter(estado=Cobro.ESTADO_CERRADO, redondeo=0)
+        .filter(estado=Cobro.ESTADO_CERRADO)
+        .exclude(items__monto_redondeo__gt=0)
         .annotate(t_items=Coalesce(sub_items, Value(CERO), output_field=dec),
                   t_pagos=Coalesce(sub_pagos, Value(CERO), output_field=dec))
         .order_by('fecha_cierre', 'pk')
@@ -131,19 +133,19 @@ class Command(BaseCommand):
                 t_items = sum((i.monto_servicio + i.monto_adicional for i in items), CERO)
                 t_pagos = cobro.pagos.aggregate(t=Sum('monto'))['t'] or CERO
                 exc = (t_pagos - t_items).quantize(Decimal('0.01'))
-                if cobro.redondeo != 0 or exc <= UMBRAL or exc > maximo or not items:
+                if any(i.monto_redondeo for i in items) or exc <= UMBRAL or exc > maximo or not items:
                     continue
                 destino = items[indice_item_redondeo([i.cantidad or 1 for i in items])]
                 destino.monto_adicional += exc
-                destino.save(update_fields=['monto_adicional'])
-                cobro.redondeo = exc
-                cobro.save(update_fields=['redondeo'])
+                destino.monto_redondeo = exc
+                destino.save(update_fields=['monto_adicional', 'monto_redondeo'])
                 cierre_id = (Cobro.objects.filter(pk=cobro.pk)
                              .values_list('turno__cierre_diario_id', flat=True).first())
                 if cierre_id:
                     cierre = CierreDiario.objects.select_for_update().get(pk=cierre_id)
                     cierre.total_adicionales += exc
-                    cierre.save(update_fields=['total_adicionales'])
+                    cierre.total_redondeos += exc
+                    cierre.save(update_fields=['total_adicionales', 'total_redondeos'])
                 hechos += exc
 
         out(self.style.SUCCESS(f'\nListo: {_m(hechos)} pasaron a adicional como redondeo.'))

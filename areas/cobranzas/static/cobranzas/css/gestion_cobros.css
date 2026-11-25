@@ -708,7 +708,6 @@
 }
 .cobro-excedente-aviso .cobro-redondeo-aplicar { width: 100%; }
 
-.cobro-exito-redondeo span   { padding-left: .6rem; color: #aaa; }
 .cobro-exito-redondeo strong { color: #E85C0D; }
 
 /* Foco visible (teclado y control remoto de TV) en los controles nuevos */
@@ -957,12 +956,14 @@
 /* Resumen del período */
 .hist-resumen-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: .75rem;
     margin-bottom: 1.1rem;
 }
 @media (max-width: 700px) {
     .hist-resumen-grid { grid-template-columns: repeat(2, 1fr); }
+    /* 5 tarjetas en 2 columnas: el total ocupa toda la fila de abajo */
+    .hist-resumen-grid .hist-resumen-card-total { grid-column: 1 / -1; }
 }
 
 .hist-resumen-card {
@@ -1094,6 +1095,7 @@
 
 @media (max-width: 900px) {
     .hist-resumen-grid { grid-template-columns: repeat(2, 1fr); }
+    .hist-resumen-grid .hist-resumen-card-total { grid-column: 1 / -1; }
     .filtros-bar { flex-wrap: wrap; gap: .5rem; }
     .filtro-fecha-wrap { flex: 1 1 140px; }
     #tablaHistorial th, #tablaHistorial td { padding: 0.55rem 0.45rem; font-size: 0.78rem; }

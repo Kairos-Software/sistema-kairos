@@ -25,6 +25,7 @@ from decimal import Decimal
 
 from .models import (
     RecaudacionDiaria, DepositoBancario, AjusteSaldoFavor, ItemCobro, Cobro, PagoCobro,
+    ComisionEntidad,
 )
 
 
@@ -64,17 +65,27 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
         sistema no sabe qué boleta se pagó con qué, así que estima la parte en
         efectivo en proporción a lo pagado en efectivo ('mixto_efectivo_estimado').
 
-    'boletas' es el número que se compara con lo que carga el cajero:
+    'valor_facial' es la suma de facturas que corresponde declarar:
       - PagoFácil  → boletas_efectivo + mixto_efectivo_estimado (solo efectivo)
       - RapiPago/WU → boletas_todos (todos los medios)
-    'adicionales' = SUM(monto_adicional) de todos los medios (ganancia, no se declara).
+    'comision' = comisión por boleta de la entidad (ComisionEntidad vigente en
+    esa fecha) × cantidad de boletas declaradas. Ej. RapiPago: 4 × $55 = $220.
+    'boletas' = valor_facial − comision → el número que se compara con lo que
+    carga el cajero (en RapiPago, la columna "Débito" de su resumen).
+    'adicionales' = SUM(monto_adicional) de todos los medios (ganancia, no se
+    declara), que incluye 'redondeos'; 'adicionales_propios' = sin redondeos.
     """
     solo_efectivo = entidad in ENTIDADES_SOLO_EFECTIVO
+    com = ComisionEntidad.vigente(entidad, fecha)
+    comision_unit = com.monto_por_boleta if com else Decimal('0')
     vacio = {
-        'boletas': Decimal('0'), 'boletas_todos': Decimal('0'),
+        'boletas': Decimal('0'), 'valor_facial': Decimal('0'), 'boletas_todos': Decimal('0'),
         'boletas_efectivo': Decimal('0'), 'boletas_otros': Decimal('0'),
         'boletas_mixto': Decimal('0'), 'mixto_efectivo_estimado': Decimal('0'),
-        'adicionales': Decimal('0'), 'total': Decimal('0'),
+        'comision': Decimal('0'), 'comision_unit': comision_unit, 'comision_cant': 0,
+        'comision_desde': str(com.vigente_desde) if com else None,
+        'adicionales': Decimal('0'), 'redondeos': Decimal('0'),
+        'adicionales_propios': Decimal('0'), 'total': Decimal('0'),
         'cant': 0, 'cant_otros': 0, 'cant_mixto': 0,
         'solo_efectivo': solo_efectivo,
     }
@@ -86,16 +97,21 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
         ItemCobro.objects
         .filter(cobro__estado=Cobro.ESTADO_CERRADO, canal=canal,
                 cobro__fecha_cierre__date=fecha)
-        .values('cobro_id', 'monto_servicio', 'monto_adicional')
+        .values('cobro_id', 'monto_servicio', 'monto_adicional', 'monto_redondeo', 'cantidad')
     )
     if not items:
         return vacio
 
     boletas_cobro = {}
+    unidades_cobro = {}   # boletas (unidades) de este canal por cobro, para la comisión
     adicionales = Decimal('0')
+    redondeos = Decimal('0')
     for it in items:
-        boletas_cobro[it['cobro_id']] = boletas_cobro.get(it['cobro_id'], Decimal('0')) + it['monto_servicio']
+        cid = it['cobro_id']
+        boletas_cobro[cid] = boletas_cobro.get(cid, Decimal('0')) + it['monto_servicio']
+        unidades_cobro[cid] = unidades_cobro.get(cid, 0) + (it['cantidad'] or 1)
         adicionales += it['monto_adicional']
+        redondeos += it['monto_redondeo']
 
     # Lo pagado por cada cobro (todo el cobro, aunque mezcle canales).
     pagado = {}
@@ -107,6 +123,7 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
             efectivo[p['cobro_id']] = efectivo.get(p['cobro_id'], Decimal('0')) + p['s']
 
     r = dict(vacio)
+    unidades_declaradas = 0
     for cid, bol in boletas_cobro.items():
         tot = pagado.get(cid, Decimal('0'))
         efe = efectivo.get(cid, Decimal('0'))
@@ -114,18 +131,27 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
         if efe <= 0 or tot <= 0:
             r['boletas_otros'] += bol
             r['cant_otros'] += 1
+            if not solo_efectivo:
+                unidades_declaradas += unidades_cobro[cid]
         elif efe >= tot:
             r['boletas_efectivo'] += bol
+            unidades_declaradas += unidades_cobro[cid]
         else:
             r['boletas_mixto'] += bol
             r['mixto_efectivo_estimado'] += (bol * efe / tot).quantize(CENT)
             r['cant_mixto'] += 1
+            unidades_declaradas += unidades_cobro[cid]
 
     r['adicionales'] = adicionales
+    r['redondeos'] = redondeos
+    r['adicionales_propios'] = adicionales - redondeos
     r['total'] = r['boletas_todos'] + adicionales
     r['cant'] = len(boletas_cobro)
-    r['boletas'] = (r['boletas_efectivo'] + r['mixto_efectivo_estimado']
-                    if solo_efectivo else r['boletas_todos'])
+    r['valor_facial'] = (r['boletas_efectivo'] + r['mixto_efectivo_estimado']
+                         if solo_efectivo else r['boletas_todos'])
+    r['comision_cant'] = unidades_declaradas
+    r['comision'] = (comision_unit * unidades_declaradas).quantize(CENT)
+    r['boletas'] = r['valor_facial'] - r['comision']
     return r
 
 
@@ -330,6 +356,9 @@ class RecaudacionesView(LoginRequiredMixin, View):
             'cant_wu':          cant_wu,
             'recaudacion_hoy':  recaudacion_hoy,
             'solo_efectivo':    entidad in ENTIDADES_SOLO_EFECTIVO,
+            'comision_actual':  ComisionEntidad.vigente(entidad, hoy),
+            'comisiones_hist':  ComisionEntidad.objects.filter(entidad=entidad)
+                                .select_related('registrado_por')[:6],
             'ENTIDAD_PF':       PF,
             'ENTIDAD_RP':       RP,
             'ENTIDAD_WU':       WU,
@@ -558,6 +587,44 @@ class SistemaPorCanalAjax(LoginRequiredMixin, View):
         s = _sistema_json(_sistema_por_canal(entidad, fecha))
         s.update({'entidad': entidad, 'fecha': str(fecha)})
         return JsonResponse(s)
+
+
+class ComisionEntidadAjax(LoginRequiredMixin, View):
+    """
+    POST JSON { entidad, monto, vigente_desde (AAAA-MM-DD) } — solo staff.
+    Registra un nuevo monto de comisión por boleta para la entidad. No pisa
+    los anteriores: cada cambio es una fila nueva con su fecha de vigencia,
+    así los días viejos se siguen calculando con el monto de ese momento.
+    """
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return JsonResponse({'error': 'Solo administradores pueden cambiar la comisión.'}, status=403)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        entidad = (data.get('entidad') or '').strip()
+        if entidad not in ENTIDADES_VALIDAS:
+            return JsonResponse({'error': 'Entidad inválida.'}, status=400)
+        try:
+            monto = Decimal(str(data.get('monto', ''))).quantize(CENT)
+            if monto < 0:
+                raise ValueError
+        except (InvalidOperation, ValueError):
+            return JsonResponse({'error': 'El monto tiene que ser un número mayor o igual a 0.'}, status=400)
+        desde = parse_date((data.get('vigente_desde') or '').strip())
+        if desde is None:
+            return JsonResponse({'error': 'Fecha "desde" inválida.'}, status=400)
+
+        c = ComisionEntidad.objects.create(entidad=entidad, monto_por_boleta=monto,
+                                           vigente_desde=desde, registrado_por=request.user)
+        return JsonResponse({
+            'success':       True,
+            'id':            c.pk,
+            'monto':         float(c.monto_por_boleta),
+            'vigente_desde': str(c.vigente_desde),
+        })
 
 
 # ─────────────────────────────────────────────────────────────

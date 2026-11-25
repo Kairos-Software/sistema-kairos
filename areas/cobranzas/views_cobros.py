@@ -46,9 +46,10 @@ def _parse_cantidad(valor):
 # (ej. factura 142 + adicional 100 = 242 → se cobran 300). Esa diferencia
 # es ganancia nuestra: se suma al ADICIONAL de un ítem, nunca a la factura,
 # porque la factura tiene que coincidir con el ticket de PagoFácil/RapiPago.
-# Además queda guardada en Cobro.redondeo para saber qué parte del
+# Además queda guardada en ItemCobro.monto_redondeo para saber qué parte del
 # adicional vino del redondeo. Como queda adentro de monto_adicional, todas
-# las sumas existentes (caja, ganancias, cierres) la incluyen sin cambios.
+# las sumas existentes (caja, ganancias, cierres) la incluyen sin cambios;
+# para mostrar el adicional "propio" se resta monto_redondeo.
 # ═══════════════════════════════════════════════════════════
 
 def _parse_redondeo(valor) -> Decimal:
@@ -79,11 +80,27 @@ def indice_item_redondeo(cantidades) -> int:
 
 def _aplicar_redondeo(items_data, redondeo: Decimal):
     """Suma el redondeo al monto_adicional (total de línea) de un ítem del payload."""
+    for item in items_data:
+        item['monto_redondeo'] = '0'
     if redondeo <= 0 or not items_data:
         return
     idx = indice_item_redondeo([_parse_cantidad(i.get('cantidad')) for i in items_data])
     item = items_data[idx]
     item['monto_adicional'] = str(Decimal(str(item.get('monto_adicional', 0) or 0)) + redondeo)
+    item['monto_redondeo'] = str(redondeo)
+
+
+def _redondeo_item_editado(item) -> Decimal:
+    """
+    Redondeo de un ítem que llega desde la edición de un cobro. Siempre entre
+    0 y su monto_adicional (el redondeo es una parte del adicional).
+    """
+    try:
+        r = Decimal(str(item.get('monto_redondeo', 0) or 0)).quantize(Decimal('0.01'))
+        adic = Decimal(str(item.get('monto_adicional', 0) or 0))
+    except (InvalidOperation, ValueError):
+        return Decimal('0')
+    return min(max(r, Decimal('0')), max(adic, Decimal('0')))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -382,8 +399,8 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
                     'error': 'El redondeo no puede ser mayor que el total de las boletas. '
                              'Si el cliente pagó con un billete más grande, eso es vuelto, no redondeo.'
                 }, status=400)
-            # El redondeo pasa a ser parte del adicional de un ítem (nunca de la factura).
-            _aplicar_redondeo(items_data, redondeo)
+        # El redondeo pasa a ser parte del adicional de un ítem (nunca de la factura).
+        _aplicar_redondeo(items_data, redondeo)
 
         total_items = sum(
             float(i.get('monto_servicio', 0)) + float(i.get('monto_adicional', 0))
@@ -407,7 +424,6 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
                 fecha_cierre=timezone.now(),
                 creado_por=request.user,
                 observaciones=observaciones,
-                redondeo=redondeo,
             )
             for orden, item in enumerate(items_data):
                 servicio = get_object_or_404(Servicio, pk=item['servicio_id'], activo=True)
@@ -416,6 +432,7 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
                     servicio=servicio,
                     monto_servicio=item.get('monto_servicio', 0),
                     monto_adicional=item.get('monto_adicional', 0),
+                    monto_redondeo=item.get('monto_redondeo', 0),
                     cantidad=_parse_cantidad(item.get('cantidad')),
                     canal=item.get('canal', ItemCobro.CANAL_PAGOFACIL),
                     orden=orden,
@@ -443,7 +460,7 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
             'total_general':     float(cobro.total_general()),
             'total_boletas':     float(cobro.total_boletas()),
             'total_adicionales': float(cobro.total_adicionales()),
-            'redondeo':          float(cobro.redondeo),
+            'redondeo':          float(cobro.total_redondeo()),
             'pagos':             totales_por_metodo,
             'fecha':             cobro.fecha_cierre.strftime('%d/%m/%Y %H:%M'),
             'turno_numero':      turno.numero,
@@ -594,6 +611,8 @@ class EditarCobroAjax(LoginRequiredMixin, View):
                     servicio=servicio,
                     monto_servicio=float(item.get('monto_servicio', 0)),
                     monto_adicional=float(item.get('monto_adicional', 0)),
+                    # El redondeo viene adentro del adicional; solo se marca qué parte es.
+                    monto_redondeo=_redondeo_item_editado(item),
                     cantidad=_parse_cantidad(item.get('cantidad')),
                     canal=item.get('canal', ItemCobro.CANAL_PAGOFACIL),
                     orden=orden,
@@ -615,16 +634,6 @@ class EditarCobroAjax(LoginRequiredMixin, View):
             if nueva_fecha:
                 cobro.fecha_cierre = nueva_fecha
                 campos_a_guardar.append('fecha_cierre')
-            # El redondeo ya viene adentro de los adicionales editados. Si al
-            # editar se bajó el adicional por debajo del redondeo registrado,
-            # el redondeo no puede ser mayor que lo que quedó de adicional.
-            nuevo_adicional = sum(
-                (Decimal(str(i.get('monto_adicional', 0) or 0)) for i in items_data),
-                Decimal('0'),
-            )
-            if cobro.redondeo > nuevo_adicional:
-                cobro.redondeo = max(nuevo_adicional, Decimal('0'))
-                campos_a_guardar.append('redondeo')
             cobro.save(update_fields=campos_a_guardar)
 
         # ── Respuesta ─────────────────────────────────────────────────────────
@@ -638,7 +647,7 @@ class EditarCobroAjax(LoginRequiredMixin, View):
             'total_general':     float(cobro.total_general()),
             'total_boletas':     float(cobro.total_boletas()),
             'total_adicionales': float(cobro.total_adicionales()),
-            'redondeo':          float(cobro.redondeo),
+            'redondeo':          float(cobro.total_redondeo()),
             'pagos':             totales_por_metodo,
             'fecha':             cobro.fecha_cierre.strftime('%d/%m/%Y %H:%M'),
         })

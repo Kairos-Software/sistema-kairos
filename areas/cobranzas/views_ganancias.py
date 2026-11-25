@@ -45,14 +45,15 @@ def _totales() -> dict:
     # Parte de 'ganado' que vino de redondear el total cobrado. Ya está
     # incluida en monto_adicional (y por lo tanto en 'ganado'): es solo informativa.
     redondeos = (
-        Cobro.objects.filter(estado=Cobro.ESTADO_CERRADO)
-        .aggregate(t=Sum('redondeo'))['t'] or Decimal('0')
+        ItemCobro.objects.filter(cobro__estado=Cobro.ESTADO_CERRADO)
+        .aggregate(t=Sum('monto_redondeo'))['t'] or Decimal('0')
     )
     return {
-        'ganado':    ganado,
-        'gastado':   gastado,
-        'saldo':     saldo,
-        'redondeos': redondeos,
+        'ganado':      ganado,
+        'gastado':     gastado,
+        'saldo':       saldo,
+        'redondeos':   redondeos,
+        'adicionales': ganado - redondeos,   # adicional propio, sin redondeos
     }
 
 

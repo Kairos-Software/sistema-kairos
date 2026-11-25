@@ -83,14 +83,19 @@ class Command(BaseCommand):
         out('\n1) LO QUE MUESTRA LA PANTALLA "Según el sistema"')
         regla = 'SOLO EFECTIVO' if sist['solo_efectivo'] else 'TODOS LOS MEDIOS'
         out(f'   Regla de esta entidad:                  se declara {regla}')
-        out(f'   Número que se compara:                  {_m(sist["boletas"])}')
         out(f'     facturas pagadas solo en efectivo:    {_m(sist["boletas_efectivo"])}')
         out(f'     facturas pagadas sin efectivo:        {_m(sist["boletas_otros"])}'
             f'  ({sist["cant_otros"]} cobros)')
         out(f'     facturas con pago mixto:              {_m(sist["boletas_mixto"])}'
             f'  ({sist["cant_mixto"]} cobros, estimado en efectivo {_m(sist["mixto_efectivo_estimado"])})')
         out(f'     total facturas (todos los medios):    {_m(sist["boletas_todos"])}')
-        out(f'   Adicionales (ganancia, no se comparan): {_m(sist["adicionales"])}')
+        out(f'   Valor facial a declarar:                {_m(sist["valor_facial"])}')
+        out(f'   − Comisión de la entidad:               {_m(sist["comision"])}'
+            f'  ({sist["comision_cant"]} boletas × {_m(sist["comision_unit"])}'
+            f'{", vigente desde " + sist["comision_desde"] if sist["comision_desde"] else ", sin comisión cargada"})')
+        out(f'   = Número que se compara:                {_m(sist["boletas"])}')
+        out(f'   Adicionales propios (no se comparan):   {_m(sist["adicionales_propios"])}')
+        out(f'   Redondeos (no se comparan):             {_m(sist["redondeos"])}')
         out(f'   Cobros:                                 {sist["cant"]}')
         if rec:
             out(f'   Recaudación cargada ese día:            {_m(rec.monto)}'

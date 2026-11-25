@@ -257,9 +257,12 @@
                             <strong id="turnoTotBoletas">$ 0,00</strong>
                         </div>
                         <div class="caja-eq-row caja-eq-mas caja-eq-ganancia">
-                            <span>Nuestros adicionales <em>(ganancia)</em>
-                                <em id="turnoTotRedondeos" style="display:none;"></em></span>
+                            <span>Nuestros adicionales <em>(ganancia)</em></span>
                             <strong id="turnoTotAdicionales">$ 0,00</strong>
+                        </div>
+                        <div class="caja-eq-row caja-eq-mas caja-eq-ganancia">
+                            <span>Redondeos <em>(ganancia: lo cobrado de más al redondear)</em></span>
+                            <strong id="turnoTotRedondeos">$ 0,00</strong>
                         </div>
                         <div class="caja-eq-row caja-eq-total">
                             <span>Total facturado</span>
@@ -268,7 +271,7 @@
                     </div>
                     <p class="caja-bloque-hint">
                         Las <strong>boletas de terceros</strong> se depositan a PagoFácil / Rapipago / Western Union
-                        (no son plata del negocio). Los <strong>adicionales</strong> son la ganancia.
+                        (no son plata del negocio). Los <strong>adicionales</strong> y los <strong>redondeos</strong> son la ganancia.
                     </p>
                 </div>
 
@@ -419,7 +422,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/caja.js' %}?v=20261125-1"></script>
+<script src="{% static 'cobranzas/js/caja.js' %}?v=20261125-2"></script>
 <script>
     window.cajaUrls = {
         estado:              "{% url 'cobranzas:caja_estado' %}",

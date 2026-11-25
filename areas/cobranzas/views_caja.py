@@ -67,8 +67,7 @@ def _resumen_turno(turno):
         'total_adicionales':    tot_adi,
         'total_facturado':      tot_bol + tot_adi,
         # Ya incluido en total_adicionales: solo informa qué parte fue redondeo.
-        'total_redondeos':      float(turno.cobros.filter(estado=Cobro.ESTADO_CERRADO)
-                                      .aggregate(t=Sum('redondeo'))['t'] or 0),
+        'total_redondeos':      float(turno.total_redondeos()),
         'efectivo_esperado':    float(turno.efectivo_esperado()),
         'cant_cobros':          turno.cobros.filter(estado=Cobro.ESTADO_CERRADO).count(),
         'retiros':              retiros,
@@ -188,6 +187,7 @@ class CerrarTurnoAjax(LoginRequiredMixin, View):
             'total_general':       float(turno.total_general()),
             'total_boletas':       tot_bol,
             'total_adicionales':   tot_adi,
+            'total_redondeos':     float(turno.total_redondeos()),
             'total_facturado':     tot_bol + tot_adi,
         })
 
@@ -440,6 +440,12 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
                 cobro__estado=Cobro.ESTADO_CERRADO,
             ).aggregate(t=Sum('monto_servicio'))['t'] or 0
         )
+        tot_redondeos = float(
+            ItemCobro.objects.filter(
+                cobro__turno_id__in=ids_turnos,
+                cobro__estado=Cobro.ESTADO_CERRADO,
+            ).aggregate(t=Sum('monto_redondeo'))['t'] or 0
+        )
 
         tot_efe   = _sum_metodo(PagoCobro.METODO_EFECTIVO)
         tot_tra   = _sum_metodo(PagoCobro.METODO_TRANSFERENCIA)
@@ -509,6 +515,7 @@ class PrevisualizarCierreDiarioAjax(LoginRequiredMixin, View):
             'total_general':      tot_general,
             'total_boletas':      tot_boletas,
             'total_adicionales':  tot_adicionales,
+            'total_redondeos':    tot_redondeos,
             'monto_inicial_dia':  monto_inicial_dia,
             'suma_monto_inicial': suma_monto_inicial,
             'efectivo_esperado':  efectivo_esperado_dia,
@@ -579,6 +586,12 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
                 cobro__estado=Cobro.ESTADO_CERRADO,
             ).aggregate(t=Sum('monto_adicional'))['t'] or 0
         )
+        tot_redondeos = Decimal(
+            ItemCobro.objects.filter(
+                cobro__turno_id__in=ids_turnos,
+                cobro__estado=Cobro.ESTADO_CERRADO,
+            ).aggregate(t=Sum('monto_redondeo'))['t'] or 0
+        )
 
         tot_efe  = _sum_metodo(PagoCobro.METODO_EFECTIVO)
         tot_tra  = _sum_metodo(PagoCobro.METODO_TRANSFERENCIA)
@@ -621,6 +634,7 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
                 total_extracciones  = tot_ext,
                 total_general       = tot_general,
                 total_adicionales   = tot_adicionales,
+                total_redondeos     = tot_redondeos,
                 efectivo_fisico     = efectivo_fisico,
                 diferencia_caja     = diferencia,
             )
@@ -632,6 +646,7 @@ class EjecutarCierreDiarioAjax(LoginRequiredMixin, View):
             'cant_turnos':       cierre.cant_turnos,
             'total_general':     float(cierre.total_general),
             'total_adicionales': float(cierre.total_adicionales),
+            'total_redondeos':   float(cierre.total_redondeos),
             'efectivo_fisico':   float(cierre.efectivo_fisico),
             'diferencia_caja':   float(cierre.diferencia_caja),
             'fecha':             cierre.fecha.strftime('%d/%m/%Y %H:%M'),

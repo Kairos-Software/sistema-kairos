@@ -150,9 +150,65 @@
             {% else %}
                 En <strong>{{ entidad_label }}</strong> se declara <strong>todo junto</strong>: efectivo, débito,
                 transferencia y QR, sin separar.
+                {% if comision_actual and comision_actual.monto_por_boleta > 0 %}
+                    Menos la comisión de <strong>${{ comision_actual.monto_por_boleta|floatformat:2 }} por boleta</strong>
+                    que nos paga {{ entidad_label }}: se declara la columna <strong>Débito</strong> de su resumen,
+                    no el Valor facial.
+                {% endif %}
             {% endif %}
         </p>
     </div>
+
+    {% if not solo_efectivo %}
+    {# ── Comisión por boleta de la entidad (se descuenta de lo que se declara) ── #}
+    <div class="rec-comision">
+        <span>
+            Comisión de {{ entidad_label }}:
+            {% if comision_actual and comision_actual.monto_por_boleta > 0 %}
+                <strong>${{ comision_actual.monto_por_boleta|floatformat:2 }} por boleta</strong>
+                <span class="rec-comision-desde">(desde el {{ comision_actual.vigente_desde|date:"d/m/Y" }})</span>
+            {% else %}
+                <strong>sin comisión por boleta</strong>
+            {% endif %}
+        </span>
+        {% if user.is_staff or user.is_superuser %}
+        <button type="button" class="rec-comision-btn" id="btnComisionCambiar"
+                aria-expanded="false" aria-controls="comisionForm">Cambiar</button>
+        {% endif %}
+    </div>
+    {% if user.is_staff or user.is_superuser %}
+    <div class="rec-comision-form" id="comisionForm" style="display:none;">
+        <div class="rec-comision-campos">
+            <div class="caja-field">
+                <label class="caja-label" for="inputComisionMonto">Monto por boleta</label>
+                <div class="dep-input-money">
+                    <span class="dep-signo">$</span>
+                    <input type="number" id="inputComisionMonto" class="dep-input dep-input-num" min="0" step="0.01"
+                           value="{% if comision_actual %}{{ comision_actual.monto_por_boleta|unlocalize }}{% endif %}">
+                </div>
+            </div>
+            <div class="caja-field">
+                <label class="caja-label" for="inputComisionDesde">Rige desde</label>
+                <input type="date" id="inputComisionDesde" class="dep-input" value="{{ hoy|date:'Y-m-d' }}">
+            </div>
+            <button type="button" class="btn-caja-principal" id="btnComisionGuardar">Guardar comisión</button>
+        </div>
+        <p class="rec-comision-hint">
+            Se guarda como un monto nuevo a partir de esa fecha: los días anteriores se siguen calculando
+            con el monto que regía entonces.
+        </p>
+        {% if comisiones_hist %}
+        <ul class="rec-comision-hist">
+            {% for c in comisiones_hist %}
+            <li>${{ c.monto_por_boleta|floatformat:2 }} desde el {{ c.vigente_desde|date:"d/m/Y" }}
+                <span>— {% if c.registrado_por %}cargado por {{ c.registrado_por.get_full_name|default:c.registrado_por.username }}{% else %}carga inicial{% endif %}</span></li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <div id="comisionError" class="alerta-inline alerta-error" style="display:none;"></div>
+    </div>
+    {% endif %}
+    {% endif %}
 
     <div class="dep-form-grid" style="margin-top:.8rem;">
         <div class="caja-field">
@@ -161,7 +217,7 @@
         </div>
         <div class="caja-field">
             <label class="caja-label" for="inputMonto">
-                {% if solo_efectivo %}Efectivo del ticket de cierre{% else %}Total del cierre (todos los medios){% endif %}
+                {% if solo_efectivo %}Efectivo del ticket de cierre{% elif comision_actual and comision_actual.monto_por_boleta > 0 %}Total a declarar (columna Débito){% else %}Total del cierre (todos los medios){% endif %}
             </label>
             <div class="dep-input-money">
                 <span class="dep-signo">$</span>
@@ -188,9 +244,19 @@
         </div>
         <div class="rec-sistema-nums">
             <div class="rec-sistema-principal">
-                <span>{% if solo_efectivo %}Boletas cobradas en efectivo{% else %}Boletas (todos los medios){% endif %}</span>
+                <span>{% if solo_efectivo %}Efectivo a declarar{% else %}Total a declarar{% endif %}</span>
                 <strong id="recSistBoletas">$0,00</strong>
-                <small>{% if solo_efectivo %}esto se compara con el efectivo del ticket{% else %}esto se compara con el total del cierre{% endif %}</small>
+                <small>esto se compara con lo que cargás</small>
+            </div>
+            <div id="recSistFacialWrap" style="display:none;">
+                <span>Valor facial {% if solo_efectivo %}(en efectivo){% else %}(todos los medios){% endif %}</span>
+                <strong id="recSistFacial">$0,00</strong>
+                <small>lo que pagaron los clientes</small>
+            </div>
+            <div id="recSistComisionWrap" class="rec-sistema-comision" style="display:none;">
+                <span>Comisión de {{ entidad_label }}</span>
+                <strong id="recSistComision">$0,00</strong>
+                <small id="recSistComisionDet"></small>
             </div>
             {% if solo_efectivo %}
             <div class="rec-sistema-excluido">
@@ -200,6 +266,7 @@
             </div>
             {% endif %}
             <div><span>Adicionales <em>(ganancia)</em></span><strong id="recSistAdic">$0,00</strong></div>
+            <div><span>Redondeos <em>(ganancia)</em></span><strong id="recSistRedondeos" class="rec-sistema-redondeo">$0,00</strong></div>
             <div><span>Cobros</span><strong id="recSistCant">0</strong></div>
         </div>
         <p class="rec-sistema-mixto" id="recSistMixto" style="display:none;"></p>
@@ -482,6 +549,33 @@
 }
 .rec-sistema-link:focus-visible { outline: 3px solid var(--accent, #E85C0D); outline-offset: 2px; border-radius: 3px; }
 
+.rec-sistema-comision strong { color: #b91c1c; }
+.rec-sistema-redondeo { color: var(--accent, #E85C0D) !important; }
+
+/* ── Comisión por boleta de la entidad ── */
+.rec-comision {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem;
+    margin-top: .55rem; font-size: .85rem; color: #4b5563;
+}
+.rec-comision strong { color: #111; }
+.rec-comision-desde { color: #9ca3af; font-size: .8rem; }
+.rec-comision-btn {
+    min-height: 34px; padding: .25rem .8rem;
+    border: 1.5px solid #d1d5db; border-radius: 7px; background: #fff;
+    font-size: .8rem; font-weight: 600; color: #374151; cursor: pointer;
+}
+.rec-comision-btn:hover, .rec-comision-btn[aria-expanded="true"] { border-color: var(--accent, #E85C0D); color: var(--accent, #E85C0D); }
+.rec-comision-btn:focus-visible { outline: 3px solid var(--accent, #E85C0D); outline-offset: 2px; }
+.rec-comision-form {
+    margin-top: .6rem; padding: .75rem .85rem;
+    border: 1px solid #e5e7eb; border-radius: 9px; background: #fafafa;
+}
+.rec-comision-campos { display: flex; flex-wrap: wrap; gap: .7rem 1rem; align-items: flex-end; }
+.rec-comision-campos .caja-field { flex: 1 1 180px; }
+.rec-comision-hint { margin: .55rem 0 0; font-size: .78rem; color: #6b7280; }
+.rec-comision-hist { margin: .45rem 0 0; padding-left: 1.1rem; font-size: .78rem; color: #374151; }
+.rec-comision-hist span { color: #9ca3af; }
+
 /* ── Regla de qué se declara en la entidad activa ── */
 .rec-regla {
     display: flex;
@@ -615,11 +709,18 @@ document.addEventListener('DOMContentLoaded', function () {
     let sistemaFecha  = sistemaRaw.fecha;
     // PagoFácil: solo se declara el efectivo. RapiPago/WU: todos los medios.
     const soloEfectivo = {{ solo_efectivo|yesno:"true,false" }};
-    const queSeCompara = soloEfectivo ? 'cobrado en efectivo' : 'cobrado en boletas (todos los medios)';
+    // Frase que describe el número que se compara (depende de si hay comisión ese día).
+    function textoSistema(monto) {
+        if (soloEfectivo) return `el sistema tiene ${fmt(monto)} cobrado en efectivo`;
+        return (sistemaActual.comision > 0)
+            ? `según el sistema hay que declarar ${fmt(monto)} (valor facial menos la comisión)`
+            : `el sistema tiene ${fmt(monto)} cobrado en boletas (todos los medios)`;
+    }
 
     const elSistBoletas = document.getElementById('recSistBoletas');
     const elSistOtros   = document.getElementById('recSistOtros');
     const elSistAdic    = document.getElementById('recSistAdic');
+    const elSistRedond  = document.getElementById('recSistRedondeos');
     const elSistCant    = document.getElementById('recSistCant');
     const elSistFecha   = document.getElementById('recSistFecha');
     const elSistDiff    = document.getElementById('recSistDiff');
@@ -657,11 +758,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const dif = monto - boletas;
         if (Math.abs(dif) < 1) {
             elSistDiff.classList.add('diff-ok');
-            elSistDiff.textContent = `Coincide con lo ${queSeCompara} según el sistema.`;
+            elSistDiff.textContent = `Coincide: ${textoSistema(boletas)}.`;
         } else {
             elSistDiff.classList.add('diff-warn');
             elSistDiff.textContent =
-                `No coincide: el sistema tiene ${fmt(boletas)} ${queSeCompara}. ` +
+                `No coincide: ${textoSistema(boletas)}. ` +
                 `Diferencia ${fmtDif(dif)}. Revisá el ticket o los cobros de ese día.`;
         }
     }
@@ -669,7 +770,19 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderSistema() {
         elSistBoletas.textContent = fmt(sistemaActual.boletas);
         if (elSistOtros) elSistOtros.textContent = fmt(sistemaActual.boletas_otros || 0);
-        elSistAdic.textContent    = fmt(sistemaActual.adicionales);
+        // 'adicionales' incluye los redondeos: se muestran separados.
+        elSistAdic.textContent    = fmt(sistemaActual.adicionales_propios ?? sistemaActual.adicionales);
+        elSistRedond.textContent  = fmt(sistemaActual.redondeos || 0);
+        const hayComision = sistemaActual.comision > 0;
+        document.getElementById('recSistFacialWrap').style.display   = hayComision ? '' : 'none';
+        document.getElementById('recSistComisionWrap').style.display = hayComision ? '' : 'none';
+        if (hayComision) {
+            document.getElementById('recSistFacial').textContent      = fmt(sistemaActual.valor_facial);
+            document.getElementById('recSistComision').textContent    = '-' + fmt(sistemaActual.comision);
+            document.getElementById('recSistComisionDet').textContent =
+                `${sistemaActual.comision_cant} boleta${sistemaActual.comision_cant === 1 ? '' : 's'} × ` +
+                `${fmt(sistemaActual.comision_unit)}`;
+        }
         elSistCant.textContent    = sistemaActual.cant;
         elSistFecha.textContent   = fmtFechaISO(sistemaFecha);
         if (soloEfectivo && sistemaActual.cant_mixto > 0) {
@@ -706,6 +819,42 @@ document.addEventListener('DOMContentLoaded', function () {
     inputFechaEl.addEventListener('change', () => fetchSistema(inputFechaEl.value));
     inputMontoEl.addEventListener('input', evaluarDiffSistema);
     renderSistema();
+
+    // ── Cambiar la comisión por boleta (solo administradores) ──
+    const btnComision = document.getElementById('btnComisionCambiar');
+    if (btnComision) {
+        const formCom = document.getElementById('comisionForm');
+        btnComision.addEventListener('click', () => {
+            const abierto = formCom.style.display !== 'none';
+            formCom.style.display = abierto ? 'none' : '';
+            btnComision.setAttribute('aria-expanded', String(!abierto));
+            if (!abierto) document.getElementById('inputComisionMonto').focus();
+        });
+        document.getElementById('btnComisionGuardar').addEventListener('click', async () => {
+            const errEl = document.getElementById('comisionError');
+            errEl.style.display = 'none';
+            const monto = document.getElementById('inputComisionMonto').value;
+            const desde = document.getElementById('inputComisionDesde').value;
+            if (monto === '' || parseFloat(monto) < 0 || !desde) {
+                errEl.textContent = 'Completá el monto (0 o más) y desde qué fecha rige.';
+                errEl.style.display = '';
+                return;
+            }
+            try {
+                const r = await fetch("{% url 'cobranzas:recaudaciones_comision' %}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                    body: JSON.stringify({ entidad: entidadActual, monto, vigente_desde: desde }),
+                });
+                const d = await r.json();
+                if (d.success) { location.reload(); return; }
+                errEl.textContent = d.error || 'No se pudo guardar.';
+            } catch {
+                errEl.textContent = 'Error de red. Intentá de nuevo.';
+            }
+            errEl.style.display = '';
+        });
+    }
 
     // ── Verificar si ya existe recaudación para la fecha seleccionada ──
     // (excluye la propia fila si se está editando, para no "chocar consigo misma")
@@ -817,11 +966,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (Math.abs(dif) < 1) {
                 avisoSist.className = 'alerta-inline rec-aviso-ok mt-3';
                 avisoSist.textContent =
-                    `Coincide con el sistema: ${fmt(bol)} ${queSeCompara}.`;
+                    `Coincide: ${textoSistema(bol)}.`;
             } else {
                 avisoSist.className = 'alerta-inline rec-aviso-warn mt-3';
                 avisoSist.textContent =
-                    `El sistema tiene ${fmt(bol)} ${queSeCompara} por este canal. ` +
+                    `No coincide: ${textoSistema(bol)}. ` +
                     `Estás cargando ${fmt(monto)} — diferencia ${fmtDif(dif)}.`;
             }
             avisoSist.style.display = '';

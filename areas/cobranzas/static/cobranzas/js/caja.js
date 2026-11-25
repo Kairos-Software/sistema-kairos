@@ -81,13 +81,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('turnoTotExtracciones').textContent        = fmt(t.total_extracciones);
         document.getElementById('turnoTotBoletas').textContent             = fmt(t.total_boletas);
         document.getElementById('turnoTotGeneral').textContent             = fmt(t.total_facturado);
-        document.getElementById('turnoTotAdicionales').textContent         = fmt(t.total_adicionales);
-        // Parte de los adicionales que vino de redondear totales cobrados (ya está incluida).
-        const elRed = document.getElementById('turnoTotRedondeos');
-        if (elRed) {
-            elRed.textContent   = t.total_redondeos > 0 ? `· incluye ${fmt(t.total_redondeos)} de redondeo` : '';
-            elRed.style.display = t.total_redondeos > 0 ? '' : 'none';
-        }
+        // total_adicionales incluye los redondeos: se muestran separados.
+        document.getElementById('turnoTotAdicionales').textContent         = fmt(t.total_adicionales - (t.total_redondeos || 0));
+        document.getElementById('turnoTotRedondeos').textContent           = fmt(t.total_redondeos || 0);
         document.getElementById('turnoEfEsperado').textContent             = fmt(t.efectivo_esperado);
 
         Object.keys(retirosPorId).forEach(k => delete retirosPorId[k]);
@@ -384,7 +380,8 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('cierreTurnoDetalle').innerHTML = `
                 <div class="caja-modal-fila"><span>Turno</span><strong>#${data.numero}</strong></div>
                 <div class="caja-modal-fila"><span>Boletas de terceros</span><strong>${fmt(data.total_boletas)}</strong></div>
-                <div class="caja-modal-fila"><span>Nuestros adicionales (ganancia)</span><strong>${fmt(data.total_adicionales)}</strong></div>
+                <div class="caja-modal-fila"><span>Nuestros adicionales (ganancia)</span><strong>${fmt(data.total_adicionales - (data.total_redondeos || 0))}</strong></div>
+                <div class="caja-modal-fila"><span>Redondeos (ganancia)</span><strong>${fmt(data.total_redondeos || 0)}</strong></div>
                 <div class="caja-modal-fila"><span>Total facturado</span><strong>${fmt(data.total_facturado)}</strong></div>
                 <div class="caja-modal-fila caja-modal-sep"><span>Efectivo esperado en el cajón</span><strong>${fmt(data.efectivo_esperado)}</strong></div>
                 <div class="caja-modal-fila"><span>Efectivo que contaste</span><strong>${fmt(data.efectivo_declarado)}</strong></div>
@@ -484,7 +481,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="caja-bloque-titulo">Facturación y ganancia</div>
                     <div class="caja-eq">
                         <div class="caja-eq-row"><span>Boletas de terceros</span><strong>${fmt(data.total_boletas)}</strong></div>
-                        <div class="caja-eq-row caja-eq-mas caja-eq-ganancia"><span>Nuestros adicionales <em>(ganancia)</em></span><strong>${fmt(data.total_adicionales)}</strong></div>
+                        <div class="caja-eq-row caja-eq-mas caja-eq-ganancia"><span>Nuestros adicionales <em>(ganancia)</em></span><strong>${fmt(data.total_adicionales - (data.total_redondeos || 0))}</strong></div>
+                        <div class="caja-eq-row caja-eq-mas caja-eq-ganancia"><span>Redondeos <em>(ganancia)</em></span><strong>${fmt(data.total_redondeos || 0)}</strong></div>
                         <div class="caja-eq-row caja-eq-total"><span>Total facturado</span><strong>${fmt(data.total_boletas + data.total_adicionales)}</strong></div>
                     </div>
                 </div>
@@ -545,7 +543,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     <h3>Cierre #${data.cierre_id} ejecutado</h3>
                     <div class="caja-modal-fila"><span>Turnos cerrados</span><strong>${data.cant_turnos}</strong></div>
                     <div class="caja-modal-fila"><span>Total recaudado</span><strong>${fmt(data.total_general)}</strong></div>
-                    <div class="caja-modal-fila"><span>Adicionales (ganancia)</span><strong>${fmt(data.total_adicionales)}</strong></div>
+                    <div class="caja-modal-fila"><span>Adicionales (ganancia)</span><strong>${fmt(data.total_adicionales - (data.total_redondeos || 0))}</strong></div>
+                    <div class="caja-modal-fila"><span>Redondeos (ganancia)</span><strong>${fmt(data.total_redondeos || 0)}</strong></div>
                     <div class="caja-modal-fila"><span>Efectivo físico</span><strong>${fmt(data.efectivo_fisico)}</strong></div>
                     <div class="caja-modal-fila ${diff > 0 ? 'texto-sobrante' : diff < 0 ? 'texto-faltante' : 'texto-ok'}">
                         <span>Diferencia de caja</span>

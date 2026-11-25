@@ -6,7 +6,7 @@
 {% block extra_css %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
-<link rel="stylesheet" href="{% static 'cobranzas/css/ganancias.css' %}?v=20261125-1">
+<link rel="stylesheet" href="{% static 'cobranzas/css/ganancias.css' %}?v=20261125-2">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -30,11 +30,12 @@
                 </svg>
             </span>
             <span class="gan-stat-textos">
-                <span class="gan-stat-label">Total ganado (adicionales)</span>
+                <span class="gan-stat-label">Total ganado</span>
                 <span class="gan-stat-valor" id="ganGanado">${{ totales.ganado|floatformat:2 }}</span>
-                {% if totales.redondeos > 0 %}
-                <span class="gan-stat-sub">incluye ${{ totales.redondeos|floatformat:2 }} de redondeos</span>
-                {% endif %}
+                <span class="gan-stat-desglose">
+                    <span>Adicionales <strong>${{ totales.adicionales|floatformat:2 }}</strong></span>
+                    <span>Redondeos <strong class="gan-redondeo">${{ totales.redondeos|floatformat:2 }}</strong></span>
+                </span>
             </span>
         </div>
         <div class="gan-stat-card gan-stat-gastado">
@@ -65,7 +66,8 @@
     </div>
     <p class="gan-hint">
         El total ganado suma el adicional cobrado en todos los cobros cerrados (histórico completo, no
-        se reinicia). Cada gasto registrado abajo se descuenta del saldo disponible.
+        se reinicia), separado en lo que es adicional propio y lo que vino de redondear el total cobrado.
+        Cada gasto registrado abajo se descuenta del saldo disponible.
     </p>
 </div>
 

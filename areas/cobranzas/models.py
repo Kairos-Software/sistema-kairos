@@ -281,6 +281,15 @@ class Turno(models.Model):
             .aggregate(t=Sum('monto_adicional'))['t'] or 0
         )
 
+    def total_redondeos(self):
+        """Parte de total_adicionales() que vino de redondear totales cobrados."""
+        from django.db.models import Sum
+        return (
+            ItemCobro.objects
+            .filter(cobro__turno=self, cobro__estado=Cobro.ESTADO_CERRADO)
+            .aggregate(t=Sum('monto_redondeo'))['t'] or 0
+        )
+
     def total_boletas(self):
         """
         Suma de las boletas/servicios cobrados (sin el adicional propio).
@@ -351,14 +360,6 @@ class Cobro(models.Model):
     creado_por      = models.ForeignKey(Usuario, on_delete=models.SET_NULL,
                                          null=True, blank=True, related_name='cobros_creados')
     observaciones   = models.TextField(blank=True)
-    redondeo        = models.DecimalField(
-                          max_digits=12, decimal_places=2, default=Decimal('0'),
-                          help_text="Cuánto se sumó al total por redondear lo cobrado (ej. 242 → 300 = 58). "
-                                    "Es ganancia propia y YA está incluido en el monto_adicional de uno de "
-                                    "los ítems del cobro (ver views_cobros._aplicar_redondeo), así que las "
-                                    "sumas de adicionales/ganancias/caja no deben sumarlo de nuevo. Es solo "
-                                    "para saber qué parte del adicional vino del redondeo. La factura "
-                                    "(monto_servicio) nunca se toca: tiene que coincidir con la plataforma.")
 
     class Meta:
         ordering = ['-fecha_creacion']
@@ -376,6 +377,15 @@ class Cobro(models.Model):
 
     def total_general(self):
         return self.total_boletas() + self.total_adicionales()
+
+    def total_redondeo(self):
+        """Parte de total_adicionales() que vino de redondear el total cobrado."""
+        # items.all() aprovecha el prefetch del historial (sin una consulta por fila).
+        return sum((i.monto_redondeo for i in self.items.all()), Decimal('0'))
+
+    def total_adicionales_propios(self):
+        """Adicionales sin los redondeos."""
+        return sum((i.monto_adicional - i.monto_redondeo for i in self.items.all()), Decimal('0'))
 
     def total_pagado(self):
         from django.db.models import Sum
@@ -402,6 +412,14 @@ class ItemCobro(models.Model):
     servicio        = models.ForeignKey(Servicio, on_delete=models.PROTECT, related_name='cobros')
     monto_servicio  = models.DecimalField(max_digits=12, decimal_places=2)
     monto_adicional = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    monto_redondeo  = models.DecimalField(
+                          max_digits=12, decimal_places=2, default=Decimal('0'),
+                          help_text="Parte de monto_adicional que vino de redondear el total cobrado "
+                                    "(ej. 142 + 100 = 242, se cobran 300 → adicional 158, redondeo 58). "
+                                    "YA está incluida en monto_adicional, así que las sumas de "
+                                    "adicionales/ganancias/caja no deben sumarla de nuevo: "
+                                    "adicional propio = monto_adicional − monto_redondeo. La factura "
+                                    "(monto_servicio) nunca absorbe el redondeo.")
     cantidad        = models.PositiveIntegerField(
                           default=1,
                           help_text="Unidades de este servicio en la línea (ej: 10 certificados iguales). "
@@ -490,7 +508,9 @@ class CierreDiario(models.Model):
     total_general       = models.DecimalField(max_digits=12, decimal_places=2, default=0,
                                                help_text="Suma de todos los métodos de pago")
     total_adicionales   = models.DecimalField(max_digits=12, decimal_places=2, default=0,
-                                               help_text="Nuestra ganancia del día")
+                                               help_text="Nuestra ganancia del día (incluye total_redondeos)")
+    total_redondeos     = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+                                               help_text="Parte de total_adicionales que vino de redondeos")
 
     # Total físico declarado al cierre
     efectivo_fisico     = models.DecimalField(max_digits=12, decimal_places=2, default=0,
@@ -503,6 +523,11 @@ class CierreDiario(models.Model):
 
     def __str__(self):
         return f"Cierre #{self.pk} — {self.fecha:%d/%m/%Y %H:%M} — {self.cant_turnos} turno(s)"
+
+    @property
+    def adicionales_propios(self):
+        """Adicionales sin los redondeos (total_adicionales los incluye)."""
+        return self.total_adicionales - self.total_redondeos
 
 
 # ─────────────────────────────────────────────────────────────
@@ -755,6 +780,45 @@ class RecaudacionDiaria(models.Model):
             f"Recaudación {self.get_entidad_display()} "
             f"${self.monto} — {self.fecha:%d/%m/%Y}"
         )
+
+
+# ─────────────────────────────────────────────────────────────
+# COMISIÓN POR BOLETA DE CADA ENTIDAD
+#
+# Algunas entidades le pagan al negocio un monto fijo por cada boleta
+# cobrada, y ese monto se descuenta de lo que hay que declarar/depositar.
+# Ej. RapiPago: $55 por boleta → en su resumen "Valor facial" 414.387,72 −
+# 4 boletas × 55 = "Débito" 414.167,72, que es lo que se declara.
+#
+# Se guarda con fecha de vigencia (cada cambio es una fila nueva) para que
+# los días viejos se sigan calculando con la comisión que regía entonces.
+# ─────────────────────────────────────────────────────────────
+
+class ComisionEntidad(models.Model):
+    entidad          = models.CharField(max_length=20, choices=DepositoBancario.ENTIDADES)
+    monto_por_boleta = models.DecimalField(max_digits=12, decimal_places=2,
+                                           help_text="Lo que la entidad nos paga por cada boleta cobrada "
+                                                     "(se descuenta de lo que se declara). 0 = sin comisión.")
+    vigente_desde    = models.DateField(help_text="Desde qué día rige este monto")
+    registrado_por   = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+                                         related_name='comisiones_registradas')
+    fecha_registro   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['entidad', '-vigente_desde', '-fecha_registro']
+        verbose_name        = 'Comisión por boleta'
+        verbose_name_plural = 'Comisiones por boleta'
+
+    def __str__(self):
+        return f"{self.get_entidad_display()} ${self.monto_por_boleta}/boleta desde {self.vigente_desde:%d/%m/%Y}"
+
+    @classmethod
+    def vigente(cls, entidad, fecha):
+        """La fila que rige para esa entidad en esa fecha, o None si no hay ninguna."""
+        if fecha is None:
+            return None
+        return (cls.objects.filter(entidad=entidad, vigente_desde__lte=fecha)
+                .order_by('-vigente_desde', '-fecha_registro').first())
 
 
 # ─────────────────────────────────────────────────────────────

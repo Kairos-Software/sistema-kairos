@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}">
+<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}?v=20261125-2">
 <link rel="stylesheet" href="{% static 'cobranzas/css/historial_cobros.css' %}">
 <style>
 /* ── Modal edición ── */
@@ -57,6 +57,20 @@
     background: #fffaf6; font-size: .8rem; color: #555; line-height: 1.4;
 }
 .hist-redondeo-nota strong { color: #E85C0D; }
+
+/* Boletas del cobro: código + descripción (para distinguir, ej. una extracción) */
+.hist-boletas-cell, .hist-boletas-cell * { white-space: normal; }
+.hist-boletas-lista {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: .3rem;
+    width: 280px; max-width: 100%;
+}
+.hist-boletas-lista li { display: flex; gap: .4rem; align-items: flex-start; }
+.hist-boletas-lista .codigo-badge { flex-shrink: 0; }
+.hist-boleta-desc { font-size: .78rem; color: #555; line-height: 1.3; overflow-wrap: anywhere; }
+.hist-boleta-desc strong { color: #E85C0D; }
+.hist-redondeo-mini { display: block; font-size: .72rem; font-weight: 600; color: #E85C0D; white-space: nowrap; }
+.edit-input-redondeo { color: #E85C0D; }
 .edit-balance-sobra  { color:#b45309; }
 .edit-section-label {
     font-size:.75rem; font-weight:700; color:#888;
@@ -152,6 +166,10 @@
     <div class="hist-resumen-card hist-resumen-card-destacado">
         <span class="hist-resumen-label" id="resumenLabelAdicionales">Total adicionales</span>
         <strong class="hist-resumen-valor" id="resumenAdicionales">$0,00</strong>
+    </div>
+    <div class="hist-resumen-card hist-resumen-card-destacado">
+        <span class="hist-resumen-label" id="resumenLabelRedondeos">Total redondeos</span>
+        <strong class="hist-resumen-valor" id="resumenRedondeos">$0,00</strong>
     </div>
     <div class="hist-resumen-card hist-resumen-card-total">
         <span class="hist-resumen-label" id="resumenLabelGeneral">Total general</span>
@@ -251,6 +269,7 @@
                 data-id="{{ cobro.pk }}"
                 data-total-boletas="{{ cobro.total_boletas|unlocalize }}"
                 data-total-adicionales="{{ cobro.total_adicionales|unlocalize }}"
+                data-total-redondeos="{{ cobro.total_redondeo|unlocalize }}"
                 data-total-general="{{ cobro.total_general|unlocalize }}">
 
                 {% if user.is_staff or user.is_superuser %}
@@ -271,11 +290,23 @@
                         <span>{{ cobro.creado_por.username|default:"—" }}</span>
                     </div>
                 </td>
-                <td>
-                    <span class="cobro-badge-count" style="margin:0;">{{ cobro.items.count }}</span>
+                <td class="hist-boletas-cell">
+                    <ul class="hist-boletas-lista">
+                        {% for item in cobro.items.all %}
+                        <li>
+                            <span class="codigo-badge">{{ item.servicio.codigo }}</span>
+                            <span class="hist-boleta-desc">{{ item.servicio.descripcion }}{% if item.cantidad > 1 %} <strong>×{{ item.cantidad }}</strong>{% endif %}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </td>
                 <td><strong>${{ cobro.total_boletas|floatformat:2 }}</strong></td>
-                <td class="hist-adicional">${{ cobro.total_adicionales|floatformat:2 }}</td>
+                <td>
+                    <span class="hist-adicional">${{ cobro.total_adicionales_propios|floatformat:2 }}</span>
+                    {% with red=cobro.total_redondeo %}
+                    <small class="hist-redondeo-mini"{% if not red %} style="display:none;"{% endif %}>+${{ red|floatformat:2 }} redondeo</small>
+                    {% endwith %}
+                </td>
                 <td><strong class="hist-total">${{ cobro.total_general|floatformat:2 }}</strong></td>
                 <td>
                     <div class="hist-metodos">
@@ -292,10 +323,9 @@
                         {# ── Botón Ver detalle ── #}
                         <button class="btn-accion btn-editar hist-btn-detalle"
                                 data-id="{{ cobro.pk }}"
-                                data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio|unlocalize }}|{{ item.monto_adicional|unlocalize }}|{{ item.canal }}|{{ item.cantidad }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion }}|{{ item.monto_servicio|unlocalize }}|{{ item.monto_adicional|unlocalize }}|{{ item.canal }}|{{ item.cantidad }}|{{ item.monto_redondeo|unlocalize }}{% if not forloop.last %};;{% endif %}{% endfor %}"
                                 data-pagos="{% for pago in cobro.pagos.all %}{{ pago.get_metodo_display }}|{{ pago.monto|unlocalize }}{% if not forloop.last %};;{% endif %}{% endfor %}"
-                                data-obs="{{ cobro.observaciones }}"
-                                data-redondeo="{{ cobro.redondeo|unlocalize }}">
+                                data-obs="{{ cobro.observaciones }}">
                             Ver detalle
                         </button>
 
@@ -305,9 +335,8 @@
                                 data-id="{{ cobro.pk }}"
                                 data-fecha="{{ cobro.fecha_cierre|date:'Y-m-d' }}T{{ cobro.fecha_cierre|date:'H:i' }}"
                                 data-obs="{{ cobro.observaciones }}"
-                                data-items-full="{% for item in cobro.items.all %}{{ item.servicio.pk }}|{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:40 }}|{{ item.monto_servicio|unlocalize }}|{{ item.monto_adicional|unlocalize }}|{{ item.canal }}|{{ item.cantidad }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-items-full="{% for item in cobro.items.all %}{{ item.servicio.pk }}|{{ item.servicio.codigo }}|{{ item.servicio.descripcion }}|{{ item.monto_servicio|unlocalize }}|{{ item.monto_adicional|unlocalize }}|{{ item.canal }}|{{ item.cantidad }}|{{ item.monto_redondeo|unlocalize }}{% if not forloop.last %};;{% endif %}{% endfor %}"
                                 data-pagos-full="{% for pago in cobro.pagos.all %}{{ pago.metodo }}|{{ pago.monto|unlocalize }}{% if not forloop.last %};;{% endif %}{% endfor %}"
-                                data-redondeo="{{ cobro.redondeo|unlocalize }}"
                                 title="Editar este cobro">
                             <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
                                 <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z"
@@ -360,7 +389,6 @@
             <div class="modal-body">
                 <p class="cobro-pagos-hint" style="margin-bottom:.8rem;">Boletas incluidas</p>
                 <div id="detalleItems" class="cobro-items-lista" style="margin-bottom:1rem;"></div>
-                <p class="hist-redondeo-nota" id="detalleRedondeo" style="display:none;"></p>
                 <p class="cobro-pagos-hint" style="margin-bottom:.5rem;">Métodos de pago</p>
                 <div id="detallePagos" class="cobro-pagos-lista" style="margin-bottom:.8rem;"></div>
                 <div id="detalleObs" style="display:none;">
@@ -399,7 +427,12 @@
                     <span class="edit-badge-editando">editable</span>
                 </p>
                 <div id="editItemsLista" class="edit-items-lista"></div>
-                <p class="hist-redondeo-nota" id="editRedondeo" style="display:none;"></p>
+                <p class="hist-redondeo-nota">
+                    <strong>Redondeo</strong> = lo que el cliente pagó de más por redondear el total (es ganancia).
+                    La <strong>factura</strong> tiene que quedar igual que en la boleta: si en un cobro viejo el
+                    redondeo quedó metido en la factura, bajá la factura y pasá esa diferencia a Redondeo
+                    (el total no cambia).
+                </p>
                 <p style="font-size:.75rem;color:#999;margin-top:.4rem;">
                     <i class="bi bi-info-circle" aria-hidden="true"></i> Podés modificar montos y canal. No podés cambiar el servicio — si es incorrecto, eliminá el cobro y hacé uno nuevo.
                 </p>
@@ -608,17 +641,6 @@ async function postJSON(url, body) {
 }
 const el = id => document.getElementById(id);
 
-// Cobro.redondeo ya está sumado dentro del adicional de una de las boletas;
-// esta nota solo aclara qué parte del adicional vino de redondear el total.
-function mostrarNotaRedondeo(nodo, redondeo, enEdicion) {
-    if (!nodo) return;
-    if (!(redondeo > 0)) { nodo.style.display = 'none'; return; }
-    nodo.innerHTML = `Los adicionales incluyen <strong>+${fmt(redondeo)}</strong> de redondeo ` +
-        `(ganancia: el cliente pagó un total redondeado).` +
-        (enEdicion ? ' Si bajás el adicional, el redondeo registrado baja con él.' : '');
-    nodo.style.display = '';
-}
-
 document.addEventListener('DOMContentLoaded', () => {
 
     // ── Toggle filtros avanzados ─────────────────────────────
@@ -641,11 +663,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const RESUMEN_LABELS = {
         todos: {
             cobros: 'Total cobros', facturas: 'Total facturas',
-            adicionales: 'Total adicionales', general: 'Total general',
+            adicionales: 'Total adicionales', redondeos: 'Total redondeos', general: 'Total general',
         },
         seleccion: {
             cobros: 'Cobros seleccionados', facturas: 'Facturas seleccionadas',
-            adicionales: 'Adicionales seleccionados', general: 'Total seleccionado',
+            adicionales: 'Adicionales seleccionados', redondeos: 'Redondeos seleccionados',
+            general: 'Total seleccionado',
         },
     };
 
@@ -654,9 +677,10 @@ document.addEventListener('DOMContentLoaded', () => {
             acc.count       += 1;
             acc.boletas     += parseFloat(f.dataset.totalBoletas     || 0);
             acc.adicionales += parseFloat(f.dataset.totalAdicionales || 0);
+            acc.redondeos   += parseFloat(f.dataset.totalRedondeos   || 0);
             acc.general     += parseFloat(f.dataset.totalGeneral     || 0);
             return acc;
-        }, { count: 0, boletas: 0, adicionales: 0, general: 0 });
+        }, { count: 0, boletas: 0, adicionales: 0, redondeos: 0, general: 0 });
     }
 
     // Pinta las 4 cards: con la selección actual si hay algo tildado,
@@ -672,12 +696,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (el('resumenCobros'))      el('resumenCobros').textContent      = t.count;
         if (el('resumenFacturas'))    el('resumenFacturas').textContent    = fmt(t.boletas);
-        if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(t.adicionales);
+        // data-total-adicionales incluye el redondeo: se muestran separados.
+        if (el('resumenAdicionales')) el('resumenAdicionales').textContent = fmt(t.adicionales - t.redondeos);
+        if (el('resumenRedondeos'))   el('resumenRedondeos').textContent   = fmt(t.redondeos);
         if (el('resumenGeneral'))     el('resumenGeneral').textContent     = fmt(t.general);
 
         if (el('resumenLabelCobros'))      el('resumenLabelCobros').textContent      = labels.cobros;
         if (el('resumenLabelFacturas'))    el('resumenLabelFacturas').textContent    = labels.facturas;
         if (el('resumenLabelAdicionales')) el('resumenLabelAdicionales').textContent = labels.adicionales;
+        if (el('resumenLabelRedondeos'))   el('resumenLabelRedondeos').textContent   = labels.redondeos;
         if (el('resumenLabelGeneral'))     el('resumenLabelGeneral').textContent     = labels.general;
 
         el('histResumenGrid').classList.toggle('is-seleccion', modoSeleccion);
@@ -693,16 +720,22 @@ document.addEventListener('DOMContentLoaded', () => {
             el('detalleTitle').textContent    = `Cobro #${btn.dataset.id}`;
             el('detalleSubtitle').textContent = `${items.length} boleta${items.length !== 1 ? 's' : ''}`;
             el('detalleItems').innerHTML = items.map(raw => {
-                const [cod, desc, factura, adicional, canal, cantidad] = raw.split('|');
+                const [cod, desc, factura, adicional, canal, cantidad, redondeo] = raw.split('|');
                 const cant = parseInt(cantidad, 10) || 1;
-                // factura/adicional guardados = total de la línea (ya × cantidad)
+                // factura/adicional guardados = total de la línea (ya × cantidad).
+                // El adicional guardado incluye el redondeo: se muestran separados.
                 const fac = parseFloat(factura) || 0;
-                const adi = parseFloat(adicional) || 0;
+                const red = parseFloat(redondeo) || 0;
+                const adi = (parseFloat(adicional) || 0) - red;
                 const cantBadge = cant > 1
                     ? `<span class="codigo-badge" style="background:#fff4ec;color:#E85C0D;border:1px solid rgba(232,92,13,.3);">×${cant}</span>`
                     : '';
                 const unitInfo = cant > 1
                     ? `<div class="cobro-item-desc" style="color:#999;">Unitario: ${fmt(fac / cant)} + ${fmt(adi / cant)}</div>`
+                    : '';
+                const colRedondeo = red > 0
+                    ? `<span class="cobro-monto-mas">+</span>
+                       <div class="cobro-item-monto-col"><span class="cobro-monto-label">Redondeo</span><span class="cobro-monto-val cobro-monto-adicional">${fmt(red)}</span></div>`
                     : '';
                 return `<div class="cobro-item-row">
                     <div class="cobro-item-header">
@@ -716,8 +749,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="cobro-item-monto-col"><span class="cobro-monto-label">Factura${cant > 1 ? ' (total)' : ''}</span><span class="cobro-monto-val">${fmt(fac)}</span></div>
                         <span class="cobro-monto-mas">+</span>
                         <div class="cobro-item-monto-col"><span class="cobro-monto-label">Adicional${cant > 1 ? ' (total)' : ''}</span><span class="cobro-monto-val cobro-monto-adicional">${fmt(adi)}</span></div>
+                        ${colRedondeo}
                         <span class="cobro-monto-mas">=</span>
-                        <div class="cobro-item-monto-col cobro-item-subtotal"><span class="cobro-monto-label">Subtotal</span><span class="cobro-monto-val cobro-monto-total">${fmt(fac + adi)}</span></div>
+                        <div class="cobro-item-monto-col cobro-item-subtotal"><span class="cobro-monto-label">Subtotal</span><span class="cobro-monto-val cobro-monto-total">${fmt(fac + adi + red)}</span></div>
                     </div>
                 </div>`;
             }).join('');
@@ -731,7 +765,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const obs = btn.dataset.obs || '';
             el('detalleObs').style.display = obs ? '' : 'none';
             if (obs) el('detalleObsTexto').textContent = obs;
-            mostrarNotaRedondeo(el('detalleRedondeo'), parseFloat(btn.dataset.redondeo) || 0);
             new bootstrap.Modal(el('modalDetalle')).show();
         });
     });
@@ -948,14 +981,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // Parsear items: srvId|codigo|desc|montoSrv|montoAd|canal
             const itemsRaw = btn.dataset.itemsFull ? btn.dataset.itemsFull.split(';;') : [];
             editState.items = itemsRaw.map(raw => {
-                const [srvId, codigo, desc, montoSrv, montoAd, canal, cantidad] = raw.split('|');
+                const [srvId, codigo, desc, montoSrv, montoAd, canal, cantidad, montoRed] = raw.split('|');
+                const red = parseFloat(montoRed) || 0;
                 return {
                     servicio_id:     parseInt(srvId),
                     codigo,
                     desc,
-                    // montoSrv / montoAd = total de la línea (ya × cantidad)
+                    // montoSrv / montoAd = total de la línea (ya × cantidad).
+                    // En el modal el adicional va SIN el redondeo (se edita aparte);
+                    // al guardar se vuelven a sumar.
                     monto_servicio:  parseFloat(montoSrv)  || 0,
-                    monto_adicional: parseFloat(montoAd)   || 0,
+                    monto_adicional: (parseFloat(montoAd) || 0) - red,
+                    monto_redondeo:  red,
                     cantidad:        parseInt(cantidad, 10) || 1,
                     canal:           canal || 'pagofacil',
                 };
@@ -977,7 +1014,6 @@ document.addEventListener('DOMContentLoaded', () => {
             renderEditItems();
             renderEditPagos();
             actualizarEditBalance();
-            mostrarNotaRedondeo(el('editRedondeo'), parseFloat(btn.dataset.redondeo) || 0, true);
             modalEditar.show();
         });
     });
@@ -1011,13 +1047,20 @@ document.addEventListener('DOMContentLoaded', () => {
                                data-idx="${idx}" data-field="monto_adicional"
                                value="${it.monto_adicional.toFixed(2)}">
                     </div>
+                    <span style="color:#aaa;font-size:.9rem;">+</span>
+                    <div>
+                        <span class="edit-monto-label">Redondeo $</span>
+                        <input type="number" class="edit-input-monto edit-input-redondeo" min="0" step="0.01"
+                               data-idx="${idx}" data-field="monto_redondeo"
+                               value="${it.monto_redondeo.toFixed(2)}">
+                    </div>
                     <span style="color:#aaa;font-size:.9rem;">=</span>
                     <div>
                         <span class="edit-monto-label">Subtotal</span>
                         <span class="edit-input-monto" style="display:inline-flex;align-items:center;
                               justify-content:flex-end;background:#f0f0f0;border-color:#e0e0e0;
                               font-weight:700;" id="editSubt${idx}">
-                            ${fmt(it.monto_servicio + it.monto_adicional)}
+                            ${fmt(subtotalEdit(it))}
                         </span>
                     </div>
                 </div>
@@ -1025,14 +1068,14 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
 
         // Listeners montos
-        el('editItemsLista').querySelectorAll('[data-field="monto_servicio"],[data-field="monto_adicional"]')
+        el('editItemsLista').querySelectorAll('[data-field="monto_servicio"],[data-field="monto_adicional"],[data-field="monto_redondeo"]')
             .forEach(inp => {
                 inp.addEventListener('input', () => {
                     const idx = parseInt(inp.dataset.idx);
-                    editState.items[idx][inp.dataset.field] = parseFloat(inp.value) || 0;
+                    editState.items[idx][inp.dataset.field] = Math.max(0, parseFloat(inp.value) || 0);
                     const it = editState.items[idx];
                     const subtEl = document.getElementById(`editSubt${idx}`);
-                    if (subtEl) subtEl.textContent = fmt(it.monto_servicio + it.monto_adicional);
+                    if (subtEl) subtEl.textContent = fmt(subtotalEdit(it));
                     actualizarEditBalance();
                 });
             });
@@ -1094,8 +1137,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ── Balance ──────────────────────────────────────────────
+    function subtotalEdit(it) {
+        return it.monto_servicio + it.monto_adicional + (it.monto_redondeo || 0);
+    }
     function actualizarEditBalance() {
-        const total    = editState.items.reduce((s, i) => s + i.monto_servicio + i.monto_adicional, 0);
+        const total    = editState.items.reduce((s, i) => s + subtotalEdit(i), 0);
         const asignado = editState.pagos.reduce((s, p) => s + p.monto, 0);
         const diff     = asignado - total;
         const balEl    = el('editBalanceMonto');
@@ -1116,7 +1162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         el('editError').style.display = 'none';
 
         // Validar balance
-        const total    = editState.items.reduce((s, i) => s + i.monto_servicio + i.monto_adicional, 0);
+        const total    = editState.items.reduce((s, i) => s + subtotalEdit(i), 0);
         const asignado = editState.pagos.reduce((s, p) => s + p.monto, 0);
         if (Math.round(asignado * 100) < Math.round(total * 100)) {
             el('editError').textContent = `Los pagos (${fmt(asignado)}) no cubren el total (${fmt(total)}).`;
@@ -1128,7 +1174,9 @@ document.addEventListener('DOMContentLoaded', () => {
             items: editState.items.map(i => ({
                 servicio_id:     i.servicio_id,
                 monto_servicio:  i.monto_servicio,
-                monto_adicional: i.monto_adicional,
+                // En la base el adicional incluye el redondeo; monto_redondeo marca qué parte es.
+                monto_adicional: Math.round((i.monto_adicional + (i.monto_redondeo || 0)) * 100) / 100,
+                monto_redondeo:  i.monto_redondeo || 0,
                 cantidad:        i.cantidad || 1,
                 canal:           i.canal,
             })),
@@ -1154,6 +1202,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (fila) {
                     fila.dataset.totalBoletas     = data.total_boletas;
                     fila.dataset.totalAdicionales = data.total_adicionales;
+                    fila.dataset.totalRedondeos   = data.redondeo || 0;
                     fila.dataset.totalGeneral     = data.total_general;
 
                     // Celda fecha
@@ -1169,9 +1218,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     fila.querySelectorAll('.hist-total').forEach(el => {
                         el.textContent = fmt(data.total_general);
                     });
-                    // Celda adicional
+                    // Celda adicional (propio) + redondeo aparte
                     fila.querySelectorAll('.hist-adicional').forEach(el => {
-                        el.textContent = fmt(data.total_adicionales);
+                        el.textContent = fmt(data.total_adicionales - (data.redondeo || 0));
+                    });
+                    fila.querySelectorAll('.hist-redondeo-mini').forEach(el => {
+                        el.textContent = `+${fmt(data.redondeo || 0)} redondeo`;
+                        el.style.display = data.redondeo > 0 ? '' : 'none';
                     });
 
                     // Recalcular resumen de cabecera (respeta la selección activa)

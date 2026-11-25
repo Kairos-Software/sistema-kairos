@@ -38,7 +38,13 @@
 }
 .gan-stat-valor.gan-positivo { color: #16a34a; }
 .gan-stat-valor.gan-negativo { color: #dc2626; }
-.gan-stat-sub { font-size: .74rem; color: #E85C0D; font-weight: 600; }
+/* Desglose del total ganado: adicional propio + redondeos */
+.gan-stat-desglose {
+    display: flex; flex-wrap: wrap; gap: .15rem .9rem;
+    font-size: .76rem; color: #888;
+}
+.gan-stat-desglose strong { color: #333; font-weight: 700; }
+.gan-stat-desglose .gan-redondeo { color: #E85C0D; }
 
 .gan-hint { margin-top: 1rem; font-size: .8rem; color: #999; line-height: 1.5; }
 

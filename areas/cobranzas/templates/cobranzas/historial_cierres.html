@@ -97,6 +97,7 @@
                 <th>Extracciones</th>
                 <th>Total general</th>
                 <th>Adicionales</th>
+                <th>Redondeos</th>
                 <th>Ef. Físico</th>
                 <th>Diferencia</th>
                 <th>Realizado por</th>
@@ -125,7 +126,8 @@
                 <td>${{ c.total_ingresos|floatformat:2 }}</td>
                 <td>${{ c.total_extracciones|floatformat:2 }}</td>
                 <td><strong>${{ c.total_general|floatformat:2 }}</strong></td>
-                <td class="texto-adicionales"><strong>${{ c.total_adicionales|floatformat:2 }}</strong></td>
+                <td class="texto-adicionales"><strong>${{ c.adicionales_propios|floatformat:2 }}</strong></td>
+                <td class="texto-adicionales">${{ c.total_redondeos|floatformat:2 }}</td>
                 <td>${{ c.efectivo_fisico|floatformat:2 }}</td>
                 <td>
                     <span class="{% if c.diferencia_caja > 0 %}texto-sobrante{% elif c.diferencia_caja < 0 %}texto-faltante{% else %}texto-ok{% endif %}">
