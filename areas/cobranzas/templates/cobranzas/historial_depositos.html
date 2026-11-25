@@ -147,6 +147,7 @@
                     {% elif d.diferencia < 0 %}<span class="dep-dif-contra">${{ d.diferencia|floatformat:2 }} (EN CONTRA)</span>
                     {% else %}<span class="dep-dif-sindif">$0,00</span>
                     {% endif %}
+                    {% if d.diferencia_calculada is not None %}<small class="dep-dif-corregido">Corregido. El sistema calculaba ${{ d.diferencia_calculada|floatformat:2 }}</small>{% endif %}
                 </td>
                 <td>{{ d.numero_comprobante|default:"—" }}</td>
                 <td>{{ d.observaciones|default:"—" }}</td>
@@ -166,7 +167,7 @@
                         <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ya_en_banco' in d.tickets_cargados %}Transferencia cargada{% else %}Ticket transferencia{% endif %}
                     </button>
                     {% endif %}
-                    {% if d.monto_saldo_plataforma %}
+                    {% if d.monto_saldo_plataforma or d.diferencia_calculada is not None %}
                     <button type="button" class="btn-ver-ticket {% if 'saldo_plataforma' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
                             data-deposito-id="{{ d.pk }}" data-tipo="saldo_plataforma" data-label-cargado="Saldo a favor cargado">
                         <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'saldo_plataforma' in d.tickets_cargados %}Saldo a favor cargado{% else %}Ticket saldo a favor{% endif %}
@@ -212,9 +213,16 @@
                             <ul class="hist-composicion-lista">
                                 {% if d.monto_efectivo_fisico %}<li><span>Efectivo físico</span><strong>${{ d.monto_efectivo_fisico|floatformat:2 }}</strong></li>{% endif %}
                                 {% if d.monto_ya_en_banco %}<li><span>Ya estaba en el banco</span><strong>${{ d.monto_ya_en_banco|floatformat:2 }}</strong></li>{% endif %}
-                                {% if d.monto_saldo_plataforma %}<li><span>Corrección de saldo a favor</span><strong>${{ d.monto_saldo_plataforma|floatformat:2 }}</strong></li>{% endif %}
+                                {% if d.monto_saldo_plataforma %}<li><span>Corrección de saldo a favor (sumada)</span><strong>${{ d.monto_saldo_plataforma|floatformat:2 }}</strong></li>{% endif %}
                                 <li class="hist-composicion-total"><span>Total</span><strong>${{ d.monto|floatformat:2 }}</strong></li>
                             </ul>
+                            {% if d.diferencia_calculada is not None %}
+                            <ul class="hist-composicion-lista hist-correccion-lista">
+                                <li><span>Saldo según el sistema</span><strong>${{ d.diferencia_calculada|floatformat:2 }}</strong></li>
+                                <li><span>Saldo real (plataforma)</span><strong>${{ d.diferencia|floatformat:2 }}</strong></li>
+                                <li class="hist-composicion-total"><span>{% if d.ajuste_saldo < 0 %}Se descontaron{% else %}Se sumaron{% endif %}</span><strong>${{ d.ajuste_saldo_abs|floatformat:2 }}</strong></li>
+                            </ul>
+                            {% endif %}
                         </div>
                         {% with dias=d.recaudaciones_cubiertas.all %}
                         <div class="hist-detalle-box">
@@ -264,6 +272,8 @@
 .dep-dif-favor  { color: #16a34a; font-weight: 700; }
 .dep-dif-contra { color: #dc2626; font-weight: 700; }
 .dep-dif-sindif   { color: #888; }
+.dep-dif-corregido { display: block; margin-top: .15rem; font-size: .74rem; font-weight: 600; color: #e65100; white-space: normal; }
+.hist-correccion-lista { margin-top: .8rem !important; padding-top: .4rem !important; border-top: 1.5px dashed #f2ddc9; }
 /* ── Botón desplegar (bien visible, no un ícono perdido) ── */
 .btn-expandir-fila {
     display: flex; align-items: center; justify-content: center;

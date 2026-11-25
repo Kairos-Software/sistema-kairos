@@ -170,20 +170,25 @@
             </div>
         </div>
         <div class="caja-field">
-            <label class="caja-label">
-                Corrección de saldo a favor <span class="caja-hint">(dejar en 0 salvo corrección)</span>
+            <label class="caja-label" for="inputSaldoReal">
+                Corregir saldo a favor <span class="caja-hint">(opcional)</span>
             </label>
             <div class="dep-input-money">
                 <span class="dep-signo">$</span>
-                <input type="number" id="inputMontoPlataforma" class="dep-input dep-input-num dep-input-componente"
-                       min="0" step="0.01" placeholder="0,00">
+                <input type="number" id="inputSaldoReal" class="dep-input dep-input-num"
+                       min="0" step="0.01" placeholder="Lo calcula el sistema"
+                       aria-describedby="ayudaSaldoReal">
             </div>
+            <small class="dep-ayuda" id="ayudaSaldoReal">
+                El saldo a favor que muestra la plataforma <strong>después</strong> de este depósito.
+                No se suma: reemplaza al que calcula el sistema.
+            </small>
         </div>
     </div>
 
     <div class="dep-total-row">
         <span class="dep-total-label">Total a depositar: <strong id="totalADepositar">$0,00</strong></span>
-        <span class="dep-resultado-vivo" id="resultadoEnVivo"></span>
+        <span class="dep-resultado-vivo" id="resultadoEnVivo" aria-live="polite"></span>
     </div>
 
     <div class="caja-field" style="margin-top:.6rem;">
@@ -261,7 +266,8 @@
                     <td class="dep-composicion">
                         {% if d.monto_efectivo_fisico %}<span class="badge-tipo-deposito badge-tipo-efectivo">Efectivo ${{ d.monto_efectivo_fisico|floatformat:2 }}</span>{% endif %}
                         {% if d.monto_ya_en_banco %}<span class="badge-tipo-deposito badge-tipo-banco">Banco ${{ d.monto_ya_en_banco|floatformat:2 }}</span>{% endif %}
-                        {% if d.monto_saldo_plataforma %}<span class="badge-tipo-deposito badge-tipo-plataforma">A favor ${{ d.monto_saldo_plataforma|floatformat:2 }}</span>{% endif %}
+                        {% if d.monto_saldo_plataforma %}<span class="badge-tipo-deposito badge-tipo-plataforma">Corrección ${{ d.monto_saldo_plataforma|floatformat:2 }}</span>{% endif %}
+                        {% if not d.monto %}<span class="badge-tipo-deposito badge-tipo-plataforma">Solo corrección de saldo</span>{% endif %}
                     </td>
                     <td>
                         {% if d.diferencia is None %}—
@@ -269,6 +275,7 @@
                         {% elif d.diferencia < 0 %}<span class="dep-dif-contra">${{ d.diferencia|floatformat:2 }} (EN CONTRA)</span>
                         {% else %}<span class="dep-dif-sindif">$0,00</span>
                         {% endif %}
+                        {% if d.diferencia_calculada is not None %}<small class="dep-dif-corregido">Corregido. El sistema calculaba ${{ d.diferencia_calculada|floatformat:2 }}</small>{% endif %}
                     </td>
                     <td>{{ d.numero_comprobante|default:"—" }}</td>
                     <td>{{ d.observaciones|default:"—" }}</td>
@@ -287,7 +294,7 @@
                             <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'ya_en_banco' in d.tickets_cargados %}Transferencia cargada{% else %}Ticket transferencia{% endif %}
                         </button>
                         {% endif %}
-                        {% if d.monto_saldo_plataforma %}
+                        {% if d.monto_saldo_plataforma or d.diferencia_calculada is not None %}
                         <button type="button" class="btn-ver-ticket {% if 'saldo_plataforma' in d.tickets_cargados %}btn-ver-ticket-cargado{% endif %}"
                                 data-deposito-id="{{ d.pk }}" data-tipo="saldo_plataforma" data-label-cargado="Saldo a favor cargado">
                             <i class="bi bi-receipt" aria-hidden="true"></i> {% if 'saldo_plataforma' in d.tickets_cargados %}Saldo a favor cargado{% else %}Ticket saldo a favor{% endif %}
@@ -405,13 +412,17 @@
                     <span>Ya estaba en el banco</span>
                     <strong id="modalMontoBanco">—</strong>
                 </div>
-                <div class="caja-modal-fila" id="modalFilaPlataforma" style="display:none;">
-                    <span>Corrección de saldo a favor</span>
-                    <strong id="modalMontoPlataforma">—</strong>
-                </div>
                 <div class="caja-modal-fila">
                     <span>Monto depositado (total)</span>
                     <strong id="modalMonto">—</strong>
+                </div>
+                <div class="caja-modal-fila" id="modalFilaCalculado" style="display:none;">
+                    <span>El sistema calculaba</span>
+                    <strong id="modalCalculado">—</strong>
+                </div>
+                <div class="caja-modal-fila">
+                    <span id="modalResultadoLabel">Queda</span>
+                    <strong id="modalResultado">—</strong>
                 </div>
                 <div class="caja-modal-fila" id="modalFilaComprobante" style="display:none;">
                     <span>Comprobante</span>
@@ -624,7 +635,8 @@
 .dep-dif-sindif   { color: var(--text-muted, #888); }
 
 /* ── Composición del depósito (efectivo / banco / corrección de saldo) ── */
-.dep-composicion { display: flex; flex-direction: column; gap: .25rem; align-items: flex-start; }
+/* Sin display:flex en la <td>: la saca del layout de tabla y su fondo no llega al alto de la fila */
+.dep-composicion .badge-tipo-deposito { display: block; width: fit-content; margin: .12rem 0; }
 .badge-tipo-deposito { display:inline-block; padding:.2rem .55rem; border-radius:20px; font-size:.78rem; font-weight:600; white-space:nowrap; }
 .badge-tipo-efectivo   { background:#e8f5e9; color:#2e7d32; }
 .badge-tipo-banco      { background:#e3f2fd; color:#1565c0; }
@@ -657,7 +669,12 @@
 }
 .btn-eliminar-uso:hover { background: #fee2e2; }
 
-/* ── Total en vivo (suma de los 3 componentes) ── */
+/* ── Corrección del saldo a favor ── */
+.dep-ayuda { display: block; margin-top: .3rem; font-size: .76rem; line-height: 1.35; color: var(--text-muted, #6b7280); }
+.dep-dif-corregido { display: block; margin-top: .15rem; font-size: .74rem; font-weight: 600; color: #e65100; white-space: normal; }
+.dep-resultado-vivo .dep-resultado-detalle { display: block; font-weight: 500; color: var(--text-muted, #6b7280); }
+
+/* ── Total en vivo (efectivo + banco) ── */
 .dep-total-row { display: flex; align-items: baseline; gap: 1rem; margin-top: .8rem; flex-wrap: wrap; }
 .dep-total-label { font-size: .9rem; color: var(--text-muted, #6b7280); }
 .dep-total-label strong { font-size: 1rem; color: var(--text-primary, #111); }
@@ -762,43 +779,74 @@
     let saldoAnteriorSigned = JSON.parse(document.getElementById('saldoAnteriorData').textContent);
     saldoAnteriorSigned = (saldoAnteriorSigned === null) ? null : parseFloat(saldoAnteriorSigned);
 
-    const inputMontoEfectivo   = document.getElementById('inputMontoEfectivo');
-    const inputMontoBanco      = document.getElementById('inputMontoBanco');
-    const inputMontoPlataforma = document.getElementById('inputMontoPlataforma');
-    const elTotalADepositar    = document.getElementById('totalADepositar');
-    const elResultadoVivo      = document.getElementById('resultadoEnVivo');
+    const inputMontoEfectivo = document.getElementById('inputMontoEfectivo');
+    const inputMontoBanco    = document.getElementById('inputMontoBanco');
+    const inputSaldoReal     = document.getElementById('inputSaldoReal');
+    const elTotalADepositar  = document.getElementById('totalADepositar');
+    const elResultadoVivo    = document.getElementById('resultadoEnVivo');
+
+    // Lo que falta depositar CON signo (negativo = el saldo a favor ya cubre
+    // de más). Igual que el servidor: diferencia = monto − pendienteSigned.
+    let pendienteSigned = isNaN(netoADepositar) ? 0 : netoADepositar;
 
     function componentesActuales() {
         return {
-            efectivo:   parseFloat(inputMontoEfectivo.value) || 0,
-            banco:      parseFloat(inputMontoBanco.value) || 0,
-            plataforma: parseFloat(inputMontoPlataforma.value) || 0,
+            efectivo: parseFloat(inputMontoEfectivo.value) || 0,
+            banco:    parseFloat(inputMontoBanco.value) || 0,
         };
     }
 
     function totalComponentes() {
         const c = componentesActuales();
-        return c.efectivo + c.banco + c.plataforma;
+        return c.efectivo + c.banco;
+    }
+
+    // Saldo a favor real escrito a mano: null = vacío (lo calcula el sistema).
+    function saldoRealActual() {
+        const v = inputSaldoReal.value.trim();
+        if (v === '') return null;
+        const n = parseFloat(v);
+        return isNaN(n) ? NaN : n;
+    }
+
+    function saldoConColor(v) {
+        if (v > 0) return `<span class="dep-dif-favor">${fmt(v)} A FAVOR</span>`;
+        if (v < 0) return `<span class="dep-dif-contra">${fmt(Math.abs(v))} EN CONTRA</span>`;
+        return `<span class="dep-dif-sindif">$0,00, sin diferencia</span>`;
+    }
+
+    function saldoEnTexto(v) {
+        if (v > 0) return `${fmt(v)} a favor`;
+        if (v < 0) return `${fmt(Math.abs(v))} en contra`;
+        return '$0,00';
+    }
+
+    // Cómo queda el saldo después del depósito; null si todavía no hay nada cargado.
+    function resultadoActual() {
+        const monto = totalComponentes();
+        const real  = saldoRealActual();
+        const hayReal = real !== null && !isNaN(real);
+        if (monto <= 0 && !hayReal) return null;
+        const calculado = Math.round((monto - pendienteSigned) * 100) / 100;
+        const corregido = hayReal && Math.abs(real - calculado) >= 0.005;
+        return { calculado, final: corregido ? real : calculado, corregido };
+    }
+
+    function htmlResultado(r) {
+        if (!r) return '—';
+        if (!r.corregido) return `Quedaría ${saldoConColor(r.final)}`;
+        const ajuste = r.final - r.calculado;
+        return `Queda ${saldoConColor(r.final)}` +
+            `<span class="dep-resultado-detalle">El sistema calculaba ${saldoEnTexto(r.calculado)}: ` +
+            `${ajuste < 0 ? 'se descuentan' : 'se suman'} ${fmt(Math.abs(ajuste))}.</span>`;
     }
 
     function actualizarResultadoEnVivo() {
-        const monto = totalComponentes();
-        elTotalADepositar.textContent = fmt(monto);
-
-        if (!monto || monto <= 0 || isNaN(netoADepositar)) {
-            elResultadoVivo.textContent = '';
-            return;
-        }
-        const diferencia = monto - netoADepositar;
-        if (diferencia > 0) {
-            elResultadoVivo.innerHTML = `<span class="dep-dif-favor">Quedaría ${fmt(diferencia)} A FAVOR</span>`;
-        } else if (diferencia < 0) {
-            elResultadoVivo.innerHTML = `<span class="dep-dif-contra">Quedaría ${fmt(Math.abs(diferencia))} EN CONTRA</span>`;
-        } else {
-            elResultadoVivo.innerHTML = `<span class="dep-dif-sindif">Queda exacto, sin diferencia</span>`;
-        }
+        elTotalADepositar.textContent = fmt(totalComponentes());
+        const r = resultadoActual();
+        elResultadoVivo.innerHTML = r ? htmlResultado(r) : '';
     }
-    [inputMontoEfectivo, inputMontoBanco, inputMontoPlataforma].forEach(inp => {
+    [inputMontoEfectivo, inputMontoBanco, inputSaldoReal].forEach(inp => {
         inp.addEventListener('input', actualizarResultadoEnVivo);
     });
 
@@ -866,7 +914,8 @@
         }
 
         const saldoAnt = saldoAnteriorSigned || 0;
-        netoADepositar = Math.max(recaudadoSeleccionado - saldoAnt, 0);
+        pendienteSigned = recaudadoSeleccionado - saldoAnt;
+        netoADepositar = Math.max(pendienteSigned, 0);
         document.getElementById('msgNetoADepositar').textContent = fmt(netoADepositar);
 
         actualizarResultadoEnVivo();
@@ -915,22 +964,28 @@
         const comp   = document.getElementById('inputComprobante').value.trim();
         const obs    = document.getElementById('inputObservaciones').value.trim();
         const componentes = componentesActuales();
-        const monto  = componentes.efectivo + componentes.banco + componentes.plataforma;
+        const monto  = componentes.efectivo + componentes.banco;
+        const real   = saldoRealActual();
         const errEl  = document.getElementById('depositoError');
         const okEl   = document.getElementById('depositoExito');
 
         errEl.style.display = 'none';
         okEl.style.display  = 'none';
 
-        if (!fecha) {
-            errEl.textContent = 'La fecha es obligatoria.';
+        function error(msg) {
+            errEl.textContent = msg;
             errEl.style.display = '';
-            return;
         }
-        if (!monto || monto <= 0) {
-            errEl.textContent = 'El monto total debe ser mayor a cero (completá al menos uno de los 3 campos).';
-            errEl.style.display = '';
-            return;
+        if (!fecha) return error('La fecha es obligatoria.');
+        if (real !== null && (isNaN(real) || real < 0)) {
+            return error('El saldo a favor corregido tiene que ser un número, no negativo.');
+        }
+        if (monto <= 0 && real === null) {
+            return error('Cargá cuánto se depositó (efectivo o banco). Si solo querés corregir el saldo, ' +
+                         'completá "Corregir saldo a favor".');
+        }
+        if (monto <= 0 && seleccionadosActuales().length > 0) {
+            return error('Sin plata depositada solo se puede corregir el saldo: destildá los días de recaudación.');
         }
 
         // Poblar modal
@@ -959,13 +1014,11 @@
         } else {
             filaBanco.style.display = 'none';
         }
-        const filaPlataforma = document.getElementById('modalFilaPlataforma');
-        if (componentes.plataforma > 0) {
-            document.getElementById('modalMontoPlataforma').textContent = fmt(componentes.plataforma);
-            filaPlataforma.style.display = '';
-        } else {
-            filaPlataforma.style.display = 'none';
-        }
+        const res = resultadoActual();
+        document.getElementById('modalResultado').innerHTML = saldoConColor(res.final);
+        document.getElementById('modalResultadoLabel').textContent = res.corregido ? 'Queda (corregido)' : 'Queda';
+        document.getElementById('modalCalculado').textContent = saldoEnTexto(res.calculado);
+        document.getElementById('modalFilaCalculado').style.display = res.corregido ? '' : 'none';
 
         // Los mensajes clave (neto a depositar / saldo anterior / período) ya
         // están calculados y mostrados en el formulario — se copian tal cual.
@@ -1026,7 +1079,7 @@
                     fecha,
                     monto_efectivo_fisico:   componentes.efectivo,
                     monto_ya_en_banco:       componentes.banco,
-                    monto_saldo_plataforma:  componentes.plataforma,
+                    saldo_favor_real:        saldoRealActual(),
                     numero_comprobante:      comp,
                     observaciones:           obs,
                     recaudaciones_ids:       seleccionadosActuales().map(c => parseInt(c.value)),
@@ -1097,11 +1150,15 @@
                     difHtml = `<span class="dep-dif-sindif">$0,00</span>`;
                 }
             }
+            const corregido = data.diferencia_calculada !== null && data.diferencia_calculada !== undefined;
+            if (corregido) {
+                difHtml += `<small class="dep-dif-corregido">Corregido. El sistema calculaba ${fmt(data.diferencia_calculada)}</small>`;
+            }
 
             let composicionHtml = '';
             if (data.monto_efectivo_fisico > 0) composicionHtml += `<span class="badge-tipo-deposito badge-tipo-efectivo">Efectivo ${fmt(data.monto_efectivo_fisico)}</span>`;
             if (data.monto_ya_en_banco > 0)     composicionHtml += `<span class="badge-tipo-deposito badge-tipo-banco">Banco ${fmt(data.monto_ya_en_banco)}</span>`;
-            if (data.monto_saldo_plataforma > 0) composicionHtml += `<span class="badge-tipo-deposito badge-tipo-plataforma">A favor ${fmt(data.monto_saldo_plataforma)}</span>`;
+            if (!(data.monto > 0))              composicionHtml += `<span class="badge-tipo-deposito badge-tipo-plataforma">Solo corrección de saldo</span>`;
 
             let saldoAntHtml = '—';
             if (data.saldo_anterior_momento !== null && data.saldo_anterior_momento !== undefined) {
@@ -1135,7 +1192,7 @@
                     ` : `
                         ${data.monto_efectivo_fisico > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="efectivo_fisico" data-label-cargado="Efectivo cargado"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket efectivo</button>` : ''}
                         ${data.monto_ya_en_banco > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="ya_en_banco" data-label-cargado="Transferencia cargada"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket transferencia</button>` : ''}
-                        ${data.monto_saldo_plataforma > 0 ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="saldo_plataforma" data-label-cargado="Saldo a favor cargado"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket saldo a favor</button>` : ''}
+                        ${corregido ? `<button type="button" class="btn-ver-ticket" data-deposito-id="${data.deposito_id}" data-tipo="saldo_plataforma" data-label-cargado="Saldo a favor cargado"><i class="bi bi-receipt" aria-hidden="true"></i> Ticket saldo a favor</button>` : ''}
                     `}
                 </td>
             `;
@@ -1146,15 +1203,18 @@
             let difMsg = '';
             if (data.diferencia > 0) difMsg = ` A favor: ${fmt(data.diferencia)}.`;
             else if (data.diferencia < 0) difMsg = ` En contra: ${fmt(Math.abs(data.diferencia))}.`;
-            okEl.textContent =
-                `Depósito de ${fmt(data.monto)} registrado para ${data.entidad_label}.${difMsg}`;
+            else difMsg = ' Saldo: $0,00.';
+            if (corregido) difMsg += ` Corregido (el sistema calculaba ${saldoEnTexto(data.diferencia_calculada)}).`;
+            okEl.textContent = data.monto > 0
+                ? `Depósito de ${fmt(data.monto)} registrado para ${data.entidad_label}.${difMsg}`
+                : `Saldo corregido para ${data.entidad_label}.${difMsg}`;
             okEl.style.display = '';
 
             // Limpiar campos (antes de recalcular, para que el total en vivo
             // arranque en $0 y no quede pisado por lo que se acaba de depositar)
             inputMontoEfectivo.value   = '';
             inputMontoBanco.value      = '';
-            inputMontoPlataforma.value = '';
+            inputSaldoReal.value       = '';
             document.getElementById('inputComprobante').value    = '';
             document.getElementById('inputObservaciones').value  = '';
 

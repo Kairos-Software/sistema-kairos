@@ -480,3 +480,87 @@ class RedondeoDesdeElTicketTests(TestCase):
         self.assertEqual(r.context['redondeo_recaudaciones'], D('0'))
         r = self.client.get(url, {'desde': str(self.hoy), 'metodos': 'efectivo'})
         self.assertEqual(r.context['redondeo_recaudaciones'], D('0'))
+
+
+class CorregirSaldoAFavorTests(TestCase):
+    """
+    "Corregir saldo a favor" al depositar: el saldo que se escribe REEMPLAZA
+    al calculado (la plataforma descuenta cosas que el sistema no ve); antes
+    se sumaba al depósito y el saldo a favor crecía sin parar.
+    """
+
+    def setUp(self):
+        from datetime import timedelta
+        from .models import DepositoBancario, RecaudacionDiaria
+        self.DB, self.RD = DepositoBancario, RecaudacionDiaria
+        self.user = Usuario.objects.create_user('dep_test', 'd@test.local', 'x', is_staff=True)
+        self.client.force_login(self.user)
+        self.hoy = timezone.localdate()
+        self.url = reverse('cobranzas:depositos_registrar')
+        # Depósito anterior que dejó $5.000 a favor.
+        self.DB.objects.create(entidad='pagofacil', fecha=self.hoy - timedelta(days=3),
+                               monto_efectivo_fisico=D('100000'), monto=D('100000'),
+                               diferencia=D('5000'), realizado_por=self.user)
+        self.rec = self.RD.objects.create(entidad='pagofacil', fecha=self.hoy - timedelta(days=1),
+                                          monto=D('500000'), registrado_por=self.user)
+
+    def _depositar(self, **extra):
+        body = {'entidad': 'pagofacil', 'fecha': str(self.hoy), 'monto_efectivo_fisico': 500000,
+                'monto_ya_en_banco': 0, 'recaudaciones_ids': [self.rec.pk]}
+        body.update(extra)
+        return self.client.post(self.url, json.dumps(body), content_type='application/json')
+
+    def test_la_correccion_reemplaza_el_saldo_no_lo_suma(self):
+        from .views_recaudaciones import _totales_por_entidad, _ultima_diferencia
+        r = self._depositar(saldo_favor_real=3000)
+        self.assertEqual(r.status_code, 200, r.content)
+        dep = self.DB.objects.get(pk=r.json()['deposito_id'])
+        self.assertEqual(dep.monto, D('500000'))              # la corrección no es plata depositada
+        self.assertEqual(dep.diferencia, D('3000'))           # no 8.000 ni 5.000
+        self.assertEqual(dep.diferencia_calculada, D('5000'))
+        self.assertEqual(dep.ajuste_saldo, D('-2000'))
+        self.assertEqual(r.json()['diferencia_calculada'], 5000.0)
+        self.assertEqual(_ultima_diferencia('pagofacil'), D('3000'))
+        self.rec.refresh_from_db()
+        self.assertEqual(self.rec.cubierta_por, dep)
+        # El ciclo siguiente arranca desde los $3.000 corregidos.
+        self.RD.objects.create(entidad='pagofacil', fecha=self.hoy, monto=D('100000'),
+                               registrado_por=self.user)
+        self.assertEqual(_totales_por_entidad('pagofacil')['pendiente'], D('97000'))
+        # Las pantallas lo muestran.
+        for nombre in ('cobranzas:depositos', 'cobranzas:depositos_historial'):
+            self.assertContains(self.client.get(reverse(nombre), {'entidad': 'pagofacil'}),
+                                'El sistema calculaba $5000,00')
+
+    def test_vacio_lo_calcula_el_sistema_como_siempre(self):
+        r = self._depositar(saldo_favor_real='')
+        dep = self.DB.objects.get(pk=r.json()['deposito_id'])
+        self.assertEqual(dep.diferencia, D('5000'))
+        self.assertIsNone(dep.diferencia_calculada)
+        # Escribir el mismo saldo que calcula el sistema tampoco es una corrección.
+        self.rec.cubierta_por = None
+        self.rec.save()
+        dep2 = self.DB.objects.get(pk=self._depositar(saldo_favor_real=5000).json()['deposito_id'])
+        self.assertEqual(dep2.diferencia, D('5000'))
+        self.assertIsNone(dep2.diferencia_calculada)
+
+    def test_corregir_sin_depositar_no_cubre_dias(self):
+        # Sin plata y con días tildados: no (taparía una deuda con un número).
+        r = self._depositar(monto_efectivo_fisico=0, saldo_favor_real=0)
+        self.assertEqual(r.status_code, 400)
+        # Sin plata ni corrección: no.
+        r = self._depositar(monto_efectivo_fisico=0, recaudaciones_ids=[])
+        self.assertEqual(r.status_code, 400)
+        # Solo corregir el saldo (sin días): sí.
+        r = self._depositar(monto_efectivo_fisico=0, recaudaciones_ids=[], saldo_favor_real=0)
+        self.assertEqual(r.status_code, 200, r.content)
+        dep = self.DB.objects.get(pk=r.json()['deposito_id'])
+        self.assertEqual((dep.monto, dep.diferencia, dep.diferencia_calculada), (D('0'), D('0'), D('5000')))
+        self.rec.refresh_from_db()
+        self.assertIsNone(self.rec.cubierta_por)
+
+    def test_rechaza_negativos_y_la_pagina_vieja(self):
+        self.assertEqual(self._depositar(saldo_favor_real=-100).status_code, 400)
+        # Una página abierta antes del cambio todavía manda la corrección que se sumaba.
+        self.assertEqual(self._depositar(monto_saldo_plataforma=3000).status_code, 400)
+        self.assertFalse(self.DB.objects.filter(fecha=self.hoy).exists())

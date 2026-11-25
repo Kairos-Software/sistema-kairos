@@ -175,13 +175,25 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
 
         monto_efectivo_fisico  = _parse_componente('monto_efectivo_fisico')
         monto_ya_en_banco      = _parse_componente('monto_ya_en_banco')
-        monto_saldo_plataforma = _parse_componente('monto_saldo_plataforma')
-        if None in (monto_efectivo_fisico, monto_ya_en_banco, monto_saldo_plataforma):
+        if None in (monto_efectivo_fisico, monto_ya_en_banco):
             return JsonResponse({'error': 'Los montos deben ser números válidos, no negativos.'}, status=400)
+        # La vieja "corrección" se sumaba al depósito; si llega, la página
+        # quedó abierta desde antes de este cambio y calcularía distinto.
+        if _parse_componente('monto_saldo_plataforma'):
+            return JsonResponse({'error': 'La página está desactualizada. Recargala y volvé a cargar el depósito.'},
+                                status=400)
 
-        monto = monto_efectivo_fisico + monto_ya_en_banco + monto_saldo_plataforma
-        if monto <= 0:
-            return JsonResponse({'error': 'El monto total debe ser mayor a cero.'}, status=400)
+        # Saldo a favor REAL que muestra la plataforma después de este depósito
+        # (vacío = lo calcula el sistema). Ver DepositoBancario.diferencia_calculada.
+        saldo_real = None
+        if data.get('saldo_favor_real') not in (None, ''):
+            saldo_real = _parse_componente('saldo_favor_real')
+            if saldo_real is None:
+                return JsonResponse({'error': 'El saldo a favor real tiene que ser un número, no negativo.'},
+                                    status=400)
+            saldo_real = saldo_real.quantize(Decimal('0.01'))
+
+        monto = monto_efectivo_fisico + monto_ya_en_banco
 
         numero_comprobante = data.get('numero_comprobante', '').strip()
         observaciones      = data.get('observaciones', '').strip()
@@ -190,6 +202,15 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
             recaudaciones_ids = [int(i) for i in data.get('recaudaciones_ids', [])]
         except (ValueError, TypeError):
             return JsonResponse({'error': 'IDs de recaudación inválidos.'}, status=400)
+
+        # Sin plata depositada solo se puede corregir el saldo, sin cubrir días.
+        if monto <= 0:
+            if saldo_real is None:
+                return JsonResponse({'error': 'El monto total debe ser mayor a cero.'}, status=400)
+            if recaudaciones_ids:
+                return JsonResponse({'error': 'Para cubrir días de recaudación tiene que haber plata '
+                                              'depositada. Si solo querés corregir el saldo, destildá los días.'},
+                                    status=400)
 
         try:
             with transaction.atomic():
@@ -217,6 +238,9 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
                 pendiente_al_momento = recaudado_pendiente_momento - (saldo_anterior_momento or Decimal('0'))
                 neto_a_depositar_momento = max(pendiente_al_momento, Decimal('0'))
                 diferencia = monto - pendiente_al_momento
+                diferencia_calculada = None
+                if saldo_real is not None and saldo_real != diferencia:
+                    diferencia_calculada, diferencia = diferencia, saldo_real
 
                 if seleccionadas:
                     periodo_desde_momento = min(r.fecha for r in seleccionadas)
@@ -229,10 +253,10 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
                     fecha=fecha,
                     monto_efectivo_fisico=monto_efectivo_fisico,
                     monto_ya_en_banco=monto_ya_en_banco,
-                    monto_saldo_plataforma=monto_saldo_plataforma,
                     monto=monto,
                     numero_comprobante=numero_comprobante,
                     diferencia=diferencia,
+                    diferencia_calculada=diferencia_calculada,
                     recaudado_pendiente_momento=recaudado_pendiente_momento,
                     saldo_anterior_momento=saldo_anterior_momento,
                     neto_a_depositar_momento=neto_a_depositar_momento,
@@ -281,6 +305,8 @@ class RegistrarDepositoAjax(LoginRequiredMixin, View):
             'monto':              float(deposito.monto),
             'numero_comprobante': deposito.numero_comprobante or '',
             'diferencia':         float(deposito.diferencia) if deposito.diferencia is not None else None,
+            'diferencia_calculada': (float(deposito.diferencia_calculada)
+                                     if deposito.diferencia_calculada is not None else None),
             'recaudado_pendiente_momento': float(deposito.recaudado_pendiente_momento) if deposito.recaudado_pendiente_momento is not None else None,
             'saldo_anterior_momento':      float(deposito.saldo_anterior_momento) if deposito.saldo_anterior_momento is not None else None,
             'neto_a_depositar_momento':    float(deposito.neto_a_depositar_momento) if deposito.neto_a_depositar_momento is not None else None,

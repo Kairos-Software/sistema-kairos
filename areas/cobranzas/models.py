@@ -555,9 +555,8 @@ class DepositoBancario(models.Model):
     entidad            = models.CharField(max_length=20, choices=ENTIDADES)
     fecha              = models.DateField(help_text="Fecha en que se realizó el depósito")
 
-    # ── Composición del depósito (un cierre real suele mezclar los 3 orígenes
-    # a la vez: parte efectivo, parte transferencia directa al banco, y a
-    # veces una corrección de saldo a favor) ──
+    # ── Composición del depósito (un cierre real suele mezclar efectivo y
+    # transferencia directa al banco) ──
     monto_efectivo_fisico  = models.DecimalField(
                                  max_digits=12, decimal_places=2, default=Decimal('0'),
                                  help_text="Efectivo físico depositado en este registro")
@@ -566,20 +565,31 @@ class DepositoBancario(models.Model):
                                  help_text="Dinero que ya estaba en el banco (transferencias directas)")
     monto_saldo_plataforma = models.DecimalField(
                                  max_digits=12, decimal_places=2, default=Decimal('0'),
-                                 help_text="Corrección/agregado manual al saldo a favor en la "
-                                           "plataforma. Normalmente 0 — el saldo a favor ya se "
-                                           "arrastra solo vía 'diferencia', no hace falta cargarlo "
-                                           "cada ciclo. Completar solo para corregir un desvío.")
+                                 help_text="SOLO depósitos viejos: la corrección se SUMABA al monto "
+                                           "(y al saldo a favor). Los nuevos guardan 0 y corrigen "
+                                           "con 'diferencia_calculada'.")
     monto              = models.DecimalField(
                              max_digits=12, decimal_places=2,
-                             help_text="Monto total depositado (suma de los 3 componentes de arriba)")
+                             help_text="Monto total depositado (efectivo + banco; en depósitos "
+                                       "viejos también la corrección)")
     numero_comprobante = models.CharField(
                              max_length=100, blank=True,
                              help_text="Número de boleta o comprobante bancario")
     diferencia         = models.DecimalField(
                              max_digits=12, decimal_places=2, null=True, blank=True,
                              help_text="monto − pendiente de depositar en ese momento. "
-                                       "Positivo = sobrante, negativo = faltante.")
+                                       "Positivo = sobrante, negativo = faltante. Si se corrigió "
+                                       "el saldo a favor, es el saldo real de la plataforma.")
+    # Corrección del saldo a favor: la plataforma a veces descuenta cosas que
+    # el sistema no ve (ej. el uso de la plataforma para cargas virtuales), así
+    # que al depositar se puede escribir el saldo REAL que muestra. Entonces
+    # 'diferencia' pasa a ser ese saldo real y acá queda lo que calculaba el
+    # sistema; diferencia − diferencia_calculada = lo que se ajustó. Vacío =
+    # no se corrigió.
+    diferencia_calculada = models.DecimalField(
+                             max_digits=12, decimal_places=2, null=True, blank=True,
+                             help_text="Saldo que calculaba el sistema antes de corregirlo con "
+                                       "el de la plataforma. Vacío = no se corrigió.")
 
     # ── Snapshot del cálculo al momento de este depósito (auditoría) ──
     # Se guardan además de 'diferencia' para que el historial muestre el
@@ -613,6 +623,18 @@ class DepositoBancario(models.Model):
 
     def get_entidad_display_label(self):
         return dict(self.ENTIDADES).get(self.entidad, self.entidad)
+
+    @property
+    def ajuste_saldo(self):
+        """Cuánto se corrigió el saldo (negativo = la plataforma tenía menos). None = sin corregir."""
+        if self.diferencia_calculada is None or self.diferencia is None:
+            return None
+        return self.diferencia - self.diferencia_calculada
+
+    @property
+    def ajuste_saldo_abs(self):
+        a = self.ajuste_saldo
+        return None if a is None else abs(a)
 
     def __str__(self):
         return (
