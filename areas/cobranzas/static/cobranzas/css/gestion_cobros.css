@@ -565,6 +565,161 @@
 }
 .cobro-total-general strong { font-size: .95rem; color: #111; }
 
+/* ── Ayuda contextual (texto corto con ícono) ── */
+.cobro-ayuda {
+    display: flex;
+    gap: .4rem;
+    align-items: flex-start;
+    margin: .1rem .7rem .45rem;
+    padding: .45rem .6rem;
+    border-radius: 7px;
+    background: #f7f7f9;
+    color: #666;
+    font-size: .74rem;
+    line-height: 1.4;
+}
+.cobro-ayuda svg { flex-shrink: 0; margin-top: .1rem; color: #999; }
+.cobro-ayuda strong { color: #333; }
+
+/* ── Redondeo del total (ganancia → va al adicional) ── */
+.cobro-total-redondeo strong { color: #E85C0D; }
+.cobro-total-redondeo em { font-style: normal; color: #aaa; font-size: .72rem; }
+.cobro-redondeo-quitar {
+    margin-left: .3rem;
+    padding: .05rem .4rem;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: #fff;
+    color: #888;
+    font-size: .66rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.cobro-redondeo-quitar:hover { border-color: #dc2626; color: #dc2626; }
+
+.cobro-btn-redondear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .35rem;
+    width: 100%;
+    min-height: 38px;
+    margin-top: .5rem;
+    padding: .35rem .7rem;
+    border: 1.5px dashed rgba(232,92,13,.45);
+    border-radius: 8px;
+    background: #fff;
+    color: #E85C0D;
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+.cobro-btn-redondear:hover,
+.cobro-btn-redondear[aria-expanded="true"] { background: #fff4ec; border-style: solid; }
+
+.cobro-redondeo-panel {
+    margin-top: .45rem;
+    padding: .6rem .65rem .55rem;
+    border: 1px solid rgba(232,92,13,.3);
+    border-radius: 8px;
+    background: #fffaf6;
+}
+.cobro-redondeo-label {
+    display: block;
+    margin-bottom: .4rem;
+    font-size: .78rem;
+    font-weight: 700;
+    color: #333;
+}
+.cobro-redondeo-sugerencias {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-bottom: .45rem;
+}
+.cobro-redondeo-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex: 1 1 0;
+    min-width: 88px;
+    min-height: 40px;
+    padding: .3rem .55rem;
+    border: 1px solid #e3d5ca;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .12s, background .12s;
+}
+.cobro-redondeo-chip strong { font-size: .82rem; color: #111; }
+.cobro-redondeo-chip span   { font-size: .68rem; color: #E85C0D; font-weight: 700; }
+.cobro-redondeo-chip:hover  { border-color: #E85C0D; background: #fff4ec; }
+.cobro-redondeo-input-row {
+    display: flex;
+    gap: .4rem;
+    align-items: stretch;
+}
+.cobro-redondeo-input-row .cobro-pago-monto-wrap { min-height: 40px; }
+.cobro-redondeo-aplicar {
+    flex-shrink: 0;
+    min-height: 40px;
+    padding: .35rem .9rem;
+    border: none;
+    border-radius: 7px;
+    background: #111;
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+}
+.cobro-redondeo-aplicar:hover { background: #E85C0D; }
+.cobro-redondeo-preview {
+    margin: .45rem 0 0;
+    font-size: .76rem;
+    color: #555;
+    line-height: 1.4;
+}
+.cobro-redondeo-preview strong { color: #E85C0D; }
+.cobro-redondeo-preview.cobro-redondeo-error { color: #dc2626; font-weight: 600; }
+.cobro-redondeo-preview.cobro-redondeo-aviso { color: #b45309; }
+.cobro-redondeo-nota {
+    margin: .35rem 0 0;
+    font-size: .7rem;
+    color: #999;
+    line-height: 1.4;
+}
+
+/* Aviso cuando el pago supera el total (forma vieja de redondear) */
+.cobro-excedente-aviso {
+    margin: -.2rem 0 .6rem;
+    padding: .5rem .65rem;
+    border: 1px solid #fcd34d;
+    border-radius: 7px;
+    background: #fffbeb;
+}
+.cobro-excedente-aviso p {
+    margin: 0 0 .45rem;
+    font-size: .76rem;
+    color: #92400e;
+    line-height: 1.4;
+}
+.cobro-excedente-aviso .cobro-redondeo-aplicar { width: 100%; }
+
+.cobro-exito-redondeo span   { padding-left: .6rem; color: #aaa; }
+.cobro-exito-redondeo strong { color: #E85C0D; }
+
+/* Foco visible (teclado y control remoto de TV) en los controles nuevos */
+.cobro-btn-redondear:focus-visible,
+.cobro-redondeo-chip:focus-visible,
+.cobro-redondeo-aplicar:focus-visible,
+.cobro-redondeo-quitar:focus-visible {
+    outline: 3px solid #E85C0D;
+    outline-offset: 2px;
+}
+
 /* ── Bloque de pagos ── */
 .cobro-pagos-bloque { padding: 0 .7rem .85rem; }
 

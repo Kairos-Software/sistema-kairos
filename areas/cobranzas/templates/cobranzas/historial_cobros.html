@@ -1,5 +1,5 @@
 {% extends 'cobranzas/base_cobranzas.html' %}
-{% load static %}
+{% load static l10n %}
 
 {% block title %}Historial de Cobros — Cobranzas{% endblock %}
 
@@ -51,6 +51,12 @@
 }
 .edit-balance-ok    { color:#16a34a; }
 .edit-balance-faltan { color:#e85c0d; }
+.hist-redondeo-nota {
+    margin: -.4rem 0 .9rem; padding: .45rem .65rem;
+    border: 1px solid rgba(232,92,13,.3); border-radius: 7px;
+    background: #fffaf6; font-size: .8rem; color: #555; line-height: 1.4;
+}
+.hist-redondeo-nota strong { color: #E85C0D; }
 .edit-balance-sobra  { color:#b45309; }
 .edit-section-label {
     font-size:.75rem; font-weight:700; color:#888;
@@ -243,9 +249,9 @@
             {% for cobro in cobros %}
             <tr class="hist-fila"
                 data-id="{{ cobro.pk }}"
-                data-total-boletas="{{ cobro.total_boletas }}"
-                data-total-adicionales="{{ cobro.total_adicionales }}"
-                data-total-general="{{ cobro.total_general }}">
+                data-total-boletas="{{ cobro.total_boletas|unlocalize }}"
+                data-total-adicionales="{{ cobro.total_adicionales|unlocalize }}"
+                data-total-general="{{ cobro.total_general|unlocalize }}">
 
                 {% if user.is_staff or user.is_superuser %}
                 <td>
@@ -286,9 +292,10 @@
                         {# ── Botón Ver detalle ── #}
                         <button class="btn-accion btn-editar hist-btn-detalle"
                                 data-id="{{ cobro.pk }}"
-                                data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}|{{ item.cantidad }}{% if not forloop.last %};;{% endif %}{% endfor %}"
-                                data-pagos="{% for pago in cobro.pagos.all %}{{ pago.get_metodo_display }}|{{ pago.monto }}{% if not forloop.last %};;{% endif %}{% endfor %}"
-                                data-obs="{{ cobro.observaciones }}">
+                                data-items="{% for item in cobro.items.all %}{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:30 }}|{{ item.monto_servicio|unlocalize }}|{{ item.monto_adicional|unlocalize }}|{{ item.canal }}|{{ item.cantidad }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-pagos="{% for pago in cobro.pagos.all %}{{ pago.get_metodo_display }}|{{ pago.monto|unlocalize }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-obs="{{ cobro.observaciones }}"
+                                data-redondeo="{{ cobro.redondeo|unlocalize }}">
                             Ver detalle
                         </button>
 
@@ -298,8 +305,9 @@
                                 data-id="{{ cobro.pk }}"
                                 data-fecha="{{ cobro.fecha_cierre|date:'Y-m-d' }}T{{ cobro.fecha_cierre|date:'H:i' }}"
                                 data-obs="{{ cobro.observaciones }}"
-                                data-items-full="{% for item in cobro.items.all %}{{ item.servicio.pk }}|{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:40 }}|{{ item.monto_servicio }}|{{ item.monto_adicional }}|{{ item.canal }}|{{ item.cantidad }}{% if not forloop.last %};;{% endif %}{% endfor %}"
-                                data-pagos-full="{% for pago in cobro.pagos.all %}{{ pago.metodo }}|{{ pago.monto }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-items-full="{% for item in cobro.items.all %}{{ item.servicio.pk }}|{{ item.servicio.codigo }}|{{ item.servicio.descripcion|truncatechars:40 }}|{{ item.monto_servicio|unlocalize }}|{{ item.monto_adicional|unlocalize }}|{{ item.canal }}|{{ item.cantidad }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-pagos-full="{% for pago in cobro.pagos.all %}{{ pago.metodo }}|{{ pago.monto|unlocalize }}{% if not forloop.last %};;{% endif %}{% endfor %}"
+                                data-redondeo="{{ cobro.redondeo|unlocalize }}"
                                 title="Editar este cobro">
                             <svg viewBox="0 0 14 14" fill="none" width="11" height="11">
                                 <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z"
@@ -352,6 +360,7 @@
             <div class="modal-body">
                 <p class="cobro-pagos-hint" style="margin-bottom:.8rem;">Boletas incluidas</p>
                 <div id="detalleItems" class="cobro-items-lista" style="margin-bottom:1rem;"></div>
+                <p class="hist-redondeo-nota" id="detalleRedondeo" style="display:none;"></p>
                 <p class="cobro-pagos-hint" style="margin-bottom:.5rem;">Métodos de pago</p>
                 <div id="detallePagos" class="cobro-pagos-lista" style="margin-bottom:.8rem;"></div>
                 <div id="detalleObs" style="display:none;">
@@ -390,6 +399,7 @@
                     <span class="edit-badge-editando">editable</span>
                 </p>
                 <div id="editItemsLista" class="edit-items-lista"></div>
+                <p class="hist-redondeo-nota" id="editRedondeo" style="display:none;"></p>
                 <p style="font-size:.75rem;color:#999;margin-top:.4rem;">
                     <i class="bi bi-info-circle" aria-hidden="true"></i> Podés modificar montos y canal. No podés cambiar el servicio — si es incorrecto, eliminá el cobro y hacé uno nuevo.
                 </p>
@@ -598,6 +608,17 @@ async function postJSON(url, body) {
 }
 const el = id => document.getElementById(id);
 
+// Cobro.redondeo ya está sumado dentro del adicional de una de las boletas;
+// esta nota solo aclara qué parte del adicional vino de redondear el total.
+function mostrarNotaRedondeo(nodo, redondeo, enEdicion) {
+    if (!nodo) return;
+    if (!(redondeo > 0)) { nodo.style.display = 'none'; return; }
+    nodo.innerHTML = `Los adicionales incluyen <strong>+${fmt(redondeo)}</strong> de redondeo ` +
+        `(ganancia: el cliente pagó un total redondeado).` +
+        (enEdicion ? ' Si bajás el adicional, el redondeo registrado baja con él.' : '');
+    nodo.style.display = '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // ── Toggle filtros avanzados ─────────────────────────────
@@ -710,6 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const obs = btn.dataset.obs || '';
             el('detalleObs').style.display = obs ? '' : 'none';
             if (obs) el('detalleObsTexto').textContent = obs;
+            mostrarNotaRedondeo(el('detalleRedondeo'), parseFloat(btn.dataset.redondeo) || 0);
             new bootstrap.Modal(el('modalDetalle')).show();
         });
     });
@@ -955,6 +977,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderEditItems();
             renderEditPagos();
             actualizarEditBalance();
+            mostrarNotaRedondeo(el('editRedondeo'), parseFloat(btn.dataset.redondeo) || 0, true);
             modalEditar.show();
         });
     });

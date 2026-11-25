@@ -7,6 +7,15 @@
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
 <link rel="stylesheet" href="{% static 'cobranzas/css/historial_turnos.css' %}">
+<style>
+.hist-nota-canales {
+    margin: .6rem 0 0; padding: .55rem .8rem;
+    border-radius: 8px; background: #f7f7f9;
+    font-size: .8rem; color: #666; line-height: 1.45;
+}
+.hist-nota-canales strong { color: #333; }
+.hist-nota-canales a { color: #E85C0D; font-weight: 600; }
+</style>
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -215,6 +224,11 @@
         </tbody>
     </table>
 </div>
+<p class="hist-nota-canales">
+    Las columnas PagoFácil, Rapipago y Western Union suman las facturas cobradas por ese canal
+    con <strong>todos los medios de pago</strong>. Para comparar con el ticket de PagoFácil (que se
+    declara <strong>solo en efectivo</strong>) usá <a href="{% url 'cobranzas:recaudaciones' %}">Recaudaciones</a>.
+</p>
 {% else %}
 <div class="estado-vacio">
     <p>No se encontraron turnos con esos filtros.</p>

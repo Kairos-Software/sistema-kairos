@@ -24,7 +24,7 @@ from django.views import View
 from decimal import Decimal
 
 from .models import (
-    RecaudacionDiaria, DepositoBancario, AjusteSaldoFavor, ItemCobro, Cobro,
+    RecaudacionDiaria, DepositoBancario, AjusteSaldoFavor, ItemCobro, Cobro, PagoCobro,
 )
 
 
@@ -39,6 +39,16 @@ CANAL_POR_ENTIDAD = {
 }
 
 
+# Qué se declara en la recaudación de cada entidad (regla del negocio):
+#   - PagoFácil: SOLO lo cobrado en efectivo. Su ticket de cierre separa el
+#     efectivo de lo cobrado con otros medios, y solo el efectivo se recauda.
+#   - RapiPago: TODO junto (efectivo + débito + transferencia + QR), sin separar.
+#   - Western Union: igual que RapiPago por ahora (todavía no hay una regla propia).
+ENTIDADES_SOLO_EFECTIVO = {RecaudacionDiaria.ENTIDAD_PAGOFACIL}
+
+CENT = Decimal('0.01')
+
+
 def _sistema_por_canal(entidad: str, fecha) -> dict:
     """
     Lo que el SISTEMA registró en cobros por el canal de esa entidad, para
@@ -46,27 +56,82 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
     contra la recaudación que el cajero carga a mano leyéndola de la
     plataforma: si no coinciden, hay algo mal cargado de un lado o del otro.
 
-    - 'boletas'     = SUM(monto_servicio)  → plata de terceros, lo que se deposita
-    - 'adicionales' = SUM(monto_adicional) → nuestra ganancia (no se deposita)
+    Las facturas (monto_servicio, plata de terceros) se separan según cómo
+    pagó el cliente cada cobro:
+      - 'boletas_efectivo' : cobros pagados solo en efectivo.
+      - 'boletas_otros'    : cobros pagados sin nada de efectivo.
+      - 'boletas_mixto'    : cobros que combinan efectivo con otro medio. El
+        sistema no sabe qué boleta se pagó con qué, así que estima la parte en
+        efectivo en proporción a lo pagado en efectivo ('mixto_efectivo_estimado').
+
+    'boletas' es el número que se compara con lo que carga el cajero:
+      - PagoFácil  → boletas_efectivo + mixto_efectivo_estimado (solo efectivo)
+      - RapiPago/WU → boletas_todos (todos los medios)
+    'adicionales' = SUM(monto_adicional) de todos los medios (ganancia, no se declara).
     """
+    solo_efectivo = entidad in ENTIDADES_SOLO_EFECTIVO
+    vacio = {
+        'boletas': Decimal('0'), 'boletas_todos': Decimal('0'),
+        'boletas_efectivo': Decimal('0'), 'boletas_otros': Decimal('0'),
+        'boletas_mixto': Decimal('0'), 'mixto_efectivo_estimado': Decimal('0'),
+        'adicionales': Decimal('0'), 'total': Decimal('0'),
+        'cant': 0, 'cant_otros': 0, 'cant_mixto': 0,
+        'solo_efectivo': solo_efectivo,
+    }
     canal = CANAL_POR_ENTIDAD.get(entidad)
     if canal is None or fecha is None:
-        return {'boletas': Decimal('0'), 'adicionales': Decimal('0'),
-                'total': Decimal('0'), 'cant': 0}
-    qs = ItemCobro.objects.filter(
-        cobro__estado=Cobro.ESTADO_CERRADO,
-        canal=canal,
-        cobro__fecha_cierre__date=fecha,
+        return vacio
+
+    items = list(
+        ItemCobro.objects
+        .filter(cobro__estado=Cobro.ESTADO_CERRADO, canal=canal,
+                cobro__fecha_cierre__date=fecha)
+        .values('cobro_id', 'monto_servicio', 'monto_adicional')
     )
-    agg = qs.aggregate(b=Sum('monto_servicio'), a=Sum('monto_adicional'))
-    boletas = agg['b'] or Decimal('0')
-    adic = agg['a'] or Decimal('0')
-    return {
-        'boletas':     boletas,
-        'adicionales': adic,
-        'total':       boletas + adic,
-        'cant':        qs.values('cobro_id').distinct().count(),
-    }
+    if not items:
+        return vacio
+
+    boletas_cobro = {}
+    adicionales = Decimal('0')
+    for it in items:
+        boletas_cobro[it['cobro_id']] = boletas_cobro.get(it['cobro_id'], Decimal('0')) + it['monto_servicio']
+        adicionales += it['monto_adicional']
+
+    # Lo pagado por cada cobro (todo el cobro, aunque mezcle canales).
+    pagado = {}
+    efectivo = {}
+    for p in (PagoCobro.objects.filter(cobro_id__in=boletas_cobro.keys())
+              .values('cobro_id', 'metodo').annotate(s=Sum('monto'))):
+        pagado[p['cobro_id']] = pagado.get(p['cobro_id'], Decimal('0')) + p['s']
+        if p['metodo'] == PagoCobro.METODO_EFECTIVO:
+            efectivo[p['cobro_id']] = efectivo.get(p['cobro_id'], Decimal('0')) + p['s']
+
+    r = dict(vacio)
+    for cid, bol in boletas_cobro.items():
+        tot = pagado.get(cid, Decimal('0'))
+        efe = efectivo.get(cid, Decimal('0'))
+        r['boletas_todos'] += bol
+        if efe <= 0 or tot <= 0:
+            r['boletas_otros'] += bol
+            r['cant_otros'] += 1
+        elif efe >= tot:
+            r['boletas_efectivo'] += bol
+        else:
+            r['boletas_mixto'] += bol
+            r['mixto_efectivo_estimado'] += (bol * efe / tot).quantize(CENT)
+            r['cant_mixto'] += 1
+
+    r['adicionales'] = adicionales
+    r['total'] = r['boletas_todos'] + adicionales
+    r['cant'] = len(boletas_cobro)
+    r['boletas'] = (r['boletas_efectivo'] + r['mixto_efectivo_estimado']
+                    if solo_efectivo else r['boletas_todos'])
+    return r
+
+
+def _sistema_json(s: dict) -> dict:
+    """Versión serializable (Decimal → float) de _sistema_por_canal()."""
+    return {k: (float(v) if isinstance(v, Decimal) else v) for k, v in s.items()}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -243,14 +308,11 @@ class RecaudacionesView(LoginRequiredMixin, View):
         # (por defecto hoy, o la de la recaudación que ya exista para hoy).
         fecha_form = recaudacion_hoy.fecha if recaudacion_hoy else hoy
 
-        def _sist_json(ent):
-            s = _sistema_por_canal(ent, fecha_form)
-            return {k: (float(v) if k != 'cant' else v) for k, v in s.items()}
         sistema_json = {
             'fecha':  str(fecha_form),
-            PF: _sist_json(PF),
-            RP: _sist_json(RP),
-            WU: _sist_json(WU),
+            PF: _sistema_json(_sistema_por_canal(PF, fecha_form)),
+            RP: _sistema_json(_sistema_por_canal(RP, fecha_form)),
+            WU: _sistema_json(_sistema_por_canal(WU, fecha_form)),
         }
 
         return render(request, 'cobranzas/recaudaciones.html', {
@@ -267,6 +329,7 @@ class RecaudacionesView(LoginRequiredMixin, View):
             'cant_rp':          cant_rp,
             'cant_wu':          cant_wu,
             'recaudacion_hoy':  recaudacion_hoy,
+            'solo_efectivo':    entidad in ENTIDADES_SOLO_EFECTIVO,
             'ENTIDAD_PF':       PF,
             'ENTIDAD_RP':       RP,
             'ENTIDAD_WU':       WU,
@@ -393,6 +456,8 @@ class RegistrarRecaudacionAjax(LoginRequiredMixin, View):
             'recaudado_pendiente':  float(totales['recaudado_pendiente']),
             'total_depositado':     float(totales['depositado']),
             'pendiente':            float(totales['pendiente']),
+            'sistema':              _sistema_json(sist),
+            # Claves sueltas que ya usaba el front (se mantienen por compatibilidad).
             'sistema_boletas':      float(sist['boletas']),
             'sistema_adicionales':  float(sist['adicionales']),
             'sistema_total':        float(sist['total']),
@@ -490,15 +555,9 @@ class SistemaPorCanalAjax(LoginRequiredMixin, View):
         if fecha is None:
             return JsonResponse({'error': 'Fecha inválida.'}, status=400)
 
-        s = _sistema_por_canal(entidad, fecha)
-        return JsonResponse({
-            'entidad':     entidad,
-            'fecha':       str(fecha),
-            'boletas':     float(s['boletas']),
-            'adicionales': float(s['adicionales']),
-            'total':       float(s['total']),
-            'cant':        s['cant'],
-        })
+        s = _sistema_json(_sistema_por_canal(entidad, fecha))
+        s.update({'entidad': entidad, 'fecha': str(fecha)})
+        return JsonResponse(s)
 
 
 # ─────────────────────────────────────────────────────────────

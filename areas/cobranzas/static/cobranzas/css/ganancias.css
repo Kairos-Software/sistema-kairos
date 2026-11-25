@@ -38,6 +38,7 @@
 }
 .gan-stat-valor.gan-positivo { color: #16a34a; }
 .gan-stat-valor.gan-negativo { color: #dc2626; }
+.gan-stat-sub { font-size: .74rem; color: #E85C0D; font-weight: 600; }
 
 .gan-hint { margin-top: 1rem; font-size: .8rem; color: #999; line-height: 1.5; }
 

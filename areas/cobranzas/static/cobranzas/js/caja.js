@@ -82,6 +82,12 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('turnoTotBoletas').textContent             = fmt(t.total_boletas);
         document.getElementById('turnoTotGeneral').textContent             = fmt(t.total_facturado);
         document.getElementById('turnoTotAdicionales').textContent         = fmt(t.total_adicionales);
+        // Parte de los adicionales que vino de redondear totales cobrados (ya está incluida).
+        const elRed = document.getElementById('turnoTotRedondeos');
+        if (elRed) {
+            elRed.textContent   = t.total_redondeos > 0 ? `· incluye ${fmt(t.total_redondeos)} de redondeo` : '';
+            elRed.style.display = t.total_redondeos > 0 ? '' : 'none';
+        }
         document.getElementById('turnoEfEsperado').textContent             = fmt(t.efectivo_esperado);
 
         Object.keys(retirosPorId).forEach(k => delete retirosPorId[k]);

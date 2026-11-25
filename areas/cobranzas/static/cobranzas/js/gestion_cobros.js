@@ -39,6 +39,10 @@ const estado = {
     // Si está activo, las boletas se cargan sin cobrar el adicional
     // (ej: familiar, conocido) — ver btnToggleAdicional.
     sinAdicional:             false,
+    // Redondeo del total cobrado (ej. 242 → se cobran 300 = 58). Es ganancia:
+    // el backend lo suma al adicional de un ítem, nunca a la factura. Se
+    // borra cada vez que cambian las boletas (hay que volver a redondear).
+    redondeo:                 0,
 };
 
 const CANALES = {
@@ -86,6 +90,18 @@ function cantOf(item) {
 // Total de la línea = (factura unitaria + adicional unitario) × cantidad.
 function lineaTotal(item) {
     return (item.monto_factura + item.monto_adicional) * cantOf(item);
+}
+// Redondea a centavos para no arrastrar errores de punto flotante.
+function r2(n) {
+    return Math.round((n || 0) * 100) / 100;
+}
+// Suma de las boletas (facturas + adicionales), sin el redondeo.
+function totalItems() {
+    return r2(estado.items.reduce((s, i) => s + lineaTotal(i), 0));
+}
+// Lo que efectivamente se le cobra al cliente.
+function totalACobrar() {
+    return r2(totalItems() + (estado.redondeo || 0));
 }
 
 
@@ -716,6 +732,8 @@ const listaItems       = document.getElementById('listaItems');
 const cobroLayout      = document.getElementById('cobroLayout');
 
 function renderCarrito() {
+    // Cambiaron las boletas: el redondeo anterior ya no vale.
+    quitarRedondeo();
     const hay = estado.items.length > 0;
     cobroLayout.classList.toggle('cobro-layout--vacio', !hay);
     carritoVacio.style.display     = hay ? 'none' : '';
@@ -797,6 +815,7 @@ function renderCarrito() {
             const subtotalEl = listaItems.querySelector(`[data-subtotal-iid="${item._id}"]`);
             if (subtotalEl) subtotalEl.textContent = fmt(lineaTotal(item));
 
+            quitarRedondeo();
             actualizarTotales();
             sincronizarPago();
         });
@@ -820,6 +839,7 @@ function renderCarrito() {
             const labelEl = listaItems.querySelector(`[data-subtlabel-iid="${item._id}"]`);
             if (labelEl) labelEl.textContent = n > 1 ? `Subtotal (×${n})` : 'Subtotal';
 
+            quitarRedondeo();
             actualizarTotales();
             sincronizarPago();
         });
@@ -848,22 +868,159 @@ btnToggleAdicional.addEventListener('click', () => {
     renderCarrito();
 });
 
+function totalAdicionalesItems() {
+    return r2(estado.items.reduce((s, i) => s + i.monto_adicional * cantOf(i), 0));
+}
+
 function actualizarTotales() {
-    const totFacturas  = estado.items.reduce((s, i) => s + i.monto_factura  * cantOf(i), 0);
-    const totAdicional = estado.items.reduce((s, i) => s + i.monto_adicional * cantOf(i), 0);
-    const totGeneral   = totFacturas + totAdicional;
+    const totFacturas  = r2(estado.items.reduce((s, i) => s + i.monto_factura  * cantOf(i), 0));
+    const totAdicional = totalAdicionalesItems();
 
     document.getElementById('totalFacturas').textContent    = fmt(totFacturas);
     document.getElementById('totalAdicionales').textContent = fmt(totAdicional);
-    document.getElementById('totalGeneral').textContent     = fmt(totGeneral);
+    document.getElementById('totalGeneral').textContent     = fmt(totalACobrar());
+
+    const filaRed = document.getElementById('filaRedondeo');
+    filaRed.style.display = estado.redondeo > 0 ? '' : 'none';
+    document.getElementById('totalRedondeo').textContent = `+${fmt(estado.redondeo)}`;
+    btnRedondear.lastChild.textContent = estado.redondeo > 0 ? ' Cambiar redondeo' : ' Redondear total';
 
     actualizarBalance();
 }
 
+
+// ════════════════════════════════════════════════════════════
+// REDONDEO DEL TOTAL
+// El cajero escribe cuánto le cobra al cliente (ej. 300 en vez de 242) y
+// la diferencia queda como redondeo: se suma al ADICIONAL (ganancia), la
+// factura no se toca para que siga coincidiendo con la plataforma.
+// ════════════════════════════════════════════════════════════
+const btnRedondear       = document.getElementById('btnRedondear');
+const panelRedondeo      = document.getElementById('panelRedondeo');
+const inputTotalCobrado  = document.getElementById('inputTotalCobrado');
+const redondeoPreview    = document.getElementById('redondeoPreview');
+const redondeoSugerencias = document.getElementById('redondeoSugerencias');
+// Más que esto ya no parece un redondeo (puede ser el billete que dio el cliente).
+const REDONDEO_AVISO = 1000;
+
+function quitarRedondeo() {
+    estado.redondeo = 0;
+    cerrarPanelRedondeo();
+}
+
+function cerrarPanelRedondeo() {
+    panelRedondeo.style.display = 'none';
+    btnRedondear.setAttribute('aria-expanded', 'false');
+}
+
+// Próximos totales "redondos" por encima del total: múltiplos de 10/50/100/500.
+function sugerenciasRedondeo(total) {
+    const out = [];
+    [10, 50, 100, 500].forEach(m => {
+        const v = r2(Math.ceil((total + 0.001) / m) * m);
+        if (v > total && !out.includes(v)) out.push(v);
+    });
+    return out.slice(0, 3);
+}
+
+// Valida lo tipeado en "¿Cuánto le cobrás?" y devuelve el redondeo, o null.
+function evaluarRedondeo() {
+    const base   = totalItems();
+    const valor  = parseFloat(inputTotalCobrado.value);
+    redondeoPreview.className = 'cobro-redondeo-preview';
+    if (isNaN(valor) || valor <= 0) {
+        redondeoPreview.textContent = `El total de las boletas es ${fmt(base)}.`;
+        return null;
+    }
+    const dif = r2(valor - base);
+    if (dif < 0) {
+        redondeoPreview.classList.add('cobro-redondeo-error');
+        redondeoPreview.textContent =
+            `Es menos que el total (${fmt(base)}). Para cobrar menos, bajá el adicional de la boleta.`;
+        return null;
+    }
+    if (dif === 0) {
+        redondeoPreview.textContent = 'Es el total exacto: no hay redondeo.';
+        return 0;
+    }
+    if (dif > base) {
+        redondeoPreview.classList.add('cobro-redondeo-error');
+        redondeoPreview.textContent =
+            `Son ${fmt(dif)} de más: eso no es un redondeo. Si el cliente pagó con un billete más grande, es vuelto.`;
+        return null;
+    }
+    const adicNuevo = r2(totalAdicionalesItems() + dif);
+    redondeoPreview.innerHTML =
+        `Redondeo <strong>+${fmt(dif)}</strong>: el adicional pasa de ` +
+        `${fmt(totalAdicionalesItems())} a <strong>${fmt(adicNuevo)}</strong>.`;
+    if (dif >= REDONDEO_AVISO) {
+        redondeoPreview.classList.add('cobro-redondeo-aviso');
+        redondeoPreview.innerHTML += ' <br>Ojo: es mucho para un redondeo. Si el cliente pagó con un ' +
+            'billete más grande, eso es vuelto y no se carga acá.';
+    }
+    return dif;
+}
+
+function aplicarRedondeo() {
+    const dif = evaluarRedondeo();
+    if (dif === null) { inputTotalCobrado.focus(); return; }
+    estado.redondeo = dif;
+    cerrarPanelRedondeo();
+    actualizarTotales();
+    sincronizarPago();
+    btnRedondear.focus();
+}
+
+btnRedondear.addEventListener('click', () => {
+    if (panelRedondeo.style.display !== 'none') { cerrarPanelRedondeo(); return; }
+    const base = totalItems();
+    redondeoSugerencias.innerHTML = sugerenciasRedondeo(base).map(v =>
+        `<button type="button" class="cobro-redondeo-chip" data-valor="${v}">
+            <strong>${fmt(v)}</strong><span>+${fmt(r2(v - base))}</span>
+        </button>`).join('');
+    redondeoSugerencias.querySelectorAll('.cobro-redondeo-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            inputTotalCobrado.value = chip.dataset.valor;
+            aplicarRedondeo();
+        });
+    });
+    inputTotalCobrado.value = estado.redondeo > 0 ? totalACobrar().toFixed(2) : '';
+    panelRedondeo.style.display = '';
+    btnRedondear.setAttribute('aria-expanded', 'true');
+    evaluarRedondeo();
+    inputTotalCobrado.focus();
+});
+inputTotalCobrado.addEventListener('input', evaluarRedondeo);
+inputTotalCobrado.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); aplicarRedondeo(); }
+    if (e.key === 'Escape') { e.preventDefault(); cerrarPanelRedondeo(); btnRedondear.focus(); }
+});
+document.getElementById('btnAplicarRedondeo').addEventListener('click', aplicarRedondeo);
+document.getElementById('btnQuitarRedondeo').addEventListener('click', () => {
+    quitarRedondeo();
+    actualizarTotales();
+    sincronizarPago();
+    btnRedondear.focus();
+});
+
+// Si el pago registrado supera el total (la forma vieja de "redondear"),
+// ofrecer pasar esa diferencia a redondeo para que quede como ganancia.
+document.getElementById('btnExcedenteARedondeo').addEventListener('click', () => {
+    const asignado = estado.pagos.reduce((s, p) => s + p.monto, 0);
+    const exceso   = r2(asignado - totalACobrar());
+    if (exceso <= 0) return;
+    if (r2(estado.redondeo + exceso) > totalItems()) {
+        mostrarError(`Son ${fmt(exceso)} de más: eso no es un redondeo. Corregí el monto del pago.`);
+        return;
+    }
+    estado.redondeo = r2(estado.redondeo + exceso);
+    actualizarTotales();
+});
+
 function sincronizarPago() {
     // Si hay exactamente un método de pago, le auto-asigna el total
     if (estado.pagos.length === 1) {
-        const total = estado.items.reduce((s, i) => s + lineaTotal(i), 0);
+        const total = totalACobrar();
         estado.pagos[0].monto = total;
         const inp = document.querySelector(`[data-pago-id="${estado.pagos[0].id}"] .cobro-pago-monto`);
         if (inp) inp.value = total.toFixed(2);
@@ -933,14 +1090,16 @@ document.getElementById('btnAgregarPago').addEventListener('click', () => {
 });
 
 function actualizarBalance() {
-    const total     = estado.items.reduce((s, i) => s + lineaTotal(i), 0);
+    const total     = totalACobrar();
     const asignado  = estado.pagos.reduce((s, p) => s + p.monto, 0);
-    const pendiente = total - asignado;
+    const pendiente = r2(total - asignado);
 
     document.getElementById('totalAsignado').textContent = fmt(asignado);
 
     const balMonto = document.getElementById('balanceMonto');
     const balLabel = document.getElementById('balanceLabel');
+    const aviso    = document.getElementById('avisoExcedente');
+    aviso.style.display = 'none';
 
     if (Math.abs(pendiente) < 0.01) {
         balMonto.textContent = 'Cubierto';
@@ -954,6 +1113,15 @@ function actualizarBalance() {
         balMonto.textContent = `${fmt(Math.abs(pendiente))} de más`;
         balMonto.className   = 'cobro-balance-exceso';
         balLabel.textContent = 'Excedente';
+        // Antes, "cobrar redondeado" se hacía poniendo un pago mayor al total, y
+        // esa plata quedaba en la caja sin figurar como ganancia.
+        if (estado.items.length) {
+            document.getElementById('avisoExcedenteTexto').innerHTML =
+                `Estás registrando <strong>${fmt(-pendiente)}</strong> más que el total. ` +
+                `Si es porque redondeaste, sumalo al adicional. Si no, corregí el monto del pago ` +
+                `(el vuelto no se carga acá).`;
+            aviso.style.display = '';
+        }
     }
 }
 
@@ -969,7 +1137,7 @@ document.getElementById('btnConfirmarCobro').addEventListener('click', async () 
         return;
     }
 
-    const total    = estado.items.reduce((s, i) => s + lineaTotal(i), 0);
+    const total    = totalACobrar();
     const asignado = estado.pagos.reduce((s, p) => s + p.monto, 0);
 
     if (!asignado) {
@@ -978,6 +1146,11 @@ document.getElementById('btnConfirmarCobro').addEventListener('click', async () 
     }
     if (Math.round(asignado * 100) < Math.round(total * 100)) {
         mostrarError(`Los pagos (${fmt(asignado)}) no cubren el total (${fmt(total)}).`);
+        return;
+    }
+    if (Math.round(asignado * 100) > Math.round(total * 100)) {
+        mostrarError(`Los pagos superan el total por ${fmt(asignado - total)}. Si redondeaste, ` +
+                     `tocá "Es redondeo: sumarlo al adicional"; si no, corregí el monto del pago.`);
         return;
     }
 
@@ -995,6 +1168,8 @@ document.getElementById('btnConfirmarCobro').addEventListener('click', async () 
             metodo: p.metodo,
             monto:  p.monto,
         })),
+        // El backend lo suma al adicional de un ítem (nunca a la factura).
+        redondeo: r2(estado.redondeo),
         observaciones: document.getElementById('cobroObservaciones').value.trim(),
     };
 
@@ -1043,6 +1218,8 @@ function mostrarExito(data) {
     document.getElementById('exitoTotales').innerHTML = `
         <div class="cobro-exito-fila"><span>Facturas</span><strong>${fmt(data.total_boletas)}</strong></div>
         <div class="cobro-exito-fila"><span>Adicionales</span><strong>${fmt(data.total_adicionales)}</strong></div>
+        ${data.redondeo > 0 ? `
+        <div class="cobro-exito-fila cobro-exito-redondeo"><span>incluye redondeo</span><strong>+${fmt(data.redondeo)}</strong></div>` : ''}
         <div class="cobro-exito-fila cobro-exito-total"><span>Total cobrado</span><strong>${fmt(data.total_general)}</strong></div>
         ${data.monto_caja_grande_usado > 0 ? `
         <div class="cobro-exito-fila cobro-exito-caja-grande">
@@ -1076,6 +1253,7 @@ function resetear() {
     estado.pagoIdSeq                 = 0;
     estado.itemIdSeq                 = 0;
     estado.sinAdicional              = false;
+    estado.redondeo                  = 0;
     btnToggleAdicional.classList.remove('cobro-btn-sin-adicional-activo');
 
     // Limpiar tab inteligente

@@ -6,7 +6,7 @@
 {% block extra_css %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'cobranzas/css/caja.css' %}">
-<link rel="stylesheet" href="{% static 'cobranzas/css/ganancias.css' %}">
+<link rel="stylesheet" href="{% static 'cobranzas/css/ganancias.css' %}?v=20261125-1">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -32,6 +32,9 @@
             <span class="gan-stat-textos">
                 <span class="gan-stat-label">Total ganado (adicionales)</span>
                 <span class="gan-stat-valor" id="ganGanado">${{ totales.ganado|floatformat:2 }}</span>
+                {% if totales.redondeos > 0 %}
+                <span class="gan-stat-sub">incluye ${{ totales.redondeos|floatformat:2 }} de redondeos</span>
+                {% endif %}
             </span>
         </div>
         <div class="gan-stat-card gan-stat-gastado">

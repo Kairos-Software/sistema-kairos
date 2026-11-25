@@ -66,6 +66,9 @@ def _resumen_turno(turno):
         'total_boletas':        tot_bol,
         'total_adicionales':    tot_adi,
         'total_facturado':      tot_bol + tot_adi,
+        # Ya incluido en total_adicionales: solo informa qué parte fue redondeo.
+        'total_redondeos':      float(turno.cobros.filter(estado=Cobro.ESTADO_CERRADO)
+                                      .aggregate(t=Sum('redondeo'))['t'] or 0),
         'efectivo_esperado':    float(turno.efectivo_esperado()),
         'cant_cobros':          turno.cobros.filter(estado=Cobro.ESTADO_CERRADO).count(),
         'retiros':              retiros,

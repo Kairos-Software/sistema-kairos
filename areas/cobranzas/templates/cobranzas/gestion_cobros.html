@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}?v=20260905-2">
+<link rel="stylesheet" href="{% static 'cobranzas/css/gestion_cobros.css' %}?v=20261125-1">
 {% endblock %}
 
 {% block cobranzas_content %}
@@ -339,6 +339,15 @@
                 </button>
             </div>
 
+            <p class="cobro-ayuda cobro-ayuda-factura">
+                <svg viewBox="0 0 16 16" fill="none" width="13" height="13" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.3"/>
+                    <path d="M8 7.2v3.6M8 5.1v.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <span>La <strong>factura</strong> va igual que en la boleta: tiene que coincidir con el ticket de la plataforma.
+                Si le cobrás al cliente un total redondeado, usá <strong>Redondear total</strong>.</span>
+            </p>
+
             <div id="listaItems" class="cobro-items-lista"></div>
 
             <div class="cobro-totales-bloque">
@@ -350,9 +359,43 @@
                     <span>Total adicionales</span>
                     <strong id="totalAdicionales">$0,00</strong>
                 </div>
+                <div class="cobro-total-row cobro-total-redondeo" id="filaRedondeo" style="display:none;">
+                    <span>
+                        Redondeo <em>(se suma al adicional)</em>
+                        <button type="button" class="cobro-redondeo-quitar" id="btnQuitarRedondeo">Quitar</button>
+                    </span>
+                    <strong id="totalRedondeo">+$0,00</strong>
+                </div>
                 <div class="cobro-total-row cobro-total-general">
                     <span>Total a cobrar</span>
                     <strong id="totalGeneral">$0,00</strong>
+                </div>
+
+                <button type="button" class="cobro-btn-redondear" id="btnRedondear"
+                        aria-expanded="false" aria-controls="panelRedondeo">
+                    <svg viewBox="0 0 16 16" fill="none" width="13" height="13" aria-hidden="true">
+                        <path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" stroke-width="1.6"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Redondear total
+                </button>
+
+                <div class="cobro-redondeo-panel" id="panelRedondeo" style="display:none;">
+                    <label for="inputTotalCobrado" class="cobro-redondeo-label">¿Cuánto le cobrás al cliente?</label>
+                    <div class="cobro-redondeo-sugerencias" id="redondeoSugerencias"></div>
+                    <div class="cobro-redondeo-input-row">
+                        <div class="cobro-pago-monto-wrap">
+                            <span class="cobro-pago-signo">$</span>
+                            <input type="number" id="inputTotalCobrado" class="cobro-input-monto"
+                                   min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+                        </div>
+                        <button type="button" class="cobro-redondeo-aplicar" id="btnAplicarRedondeo">Aplicar</button>
+                    </div>
+                    <p class="cobro-redondeo-preview" id="redondeoPreview" aria-live="polite"></p>
+                    <p class="cobro-redondeo-nota">
+                        La diferencia es ganancia nuestra y se suma al <strong>adicional</strong>.
+                        La factura no cambia.
+                    </p>
                 </div>
             </div>
 
@@ -388,6 +431,13 @@
                         <span id="balanceLabel">Pendiente</span>
                         <strong id="balanceMonto" class="cobro-balance-pendiente">$0,00</strong>
                     </div>
+                </div>
+
+                <div class="cobro-excedente-aviso" id="avisoExcedente" role="status" style="display:none;">
+                    <p id="avisoExcedenteTexto"></p>
+                    <button type="button" class="cobro-redondeo-aplicar" id="btnExcedenteARedondeo">
+                        Es redondeo: sumarlo al adicional
+                    </button>
                 </div>
 
                 <textarea id="cobroObservaciones" class="cobro-textarea"
@@ -444,7 +494,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20260905-2"></script>
+<script src="{% static 'cobranzas/js/gestion_cobros.js' %}?v=20261125-1"></script>
 <script>
     window.cobroBuscarUrl    = "{% url 'cobranzas:cobro_buscar_servicio' %}";
     window.cobroConfirmarUrl = "{% url 'cobranzas:cobro_confirmar' %}";

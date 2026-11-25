@@ -351,6 +351,14 @@ class Cobro(models.Model):
     creado_por      = models.ForeignKey(Usuario, on_delete=models.SET_NULL,
                                          null=True, blank=True, related_name='cobros_creados')
     observaciones   = models.TextField(blank=True)
+    redondeo        = models.DecimalField(
+                          max_digits=12, decimal_places=2, default=Decimal('0'),
+                          help_text="Cuánto se sumó al total por redondear lo cobrado (ej. 242 → 300 = 58). "
+                                    "Es ganancia propia y YA está incluido en el monto_adicional de uno de "
+                                    "los ítems del cobro (ver views_cobros._aplicar_redondeo), así que las "
+                                    "sumas de adicionales/ganancias/caja no deben sumarlo de nuevo. Es solo "
+                                    "para saber qué parte del adicional vino del redondeo. La factura "
+                                    "(monto_servicio) nunca se toca: tiene que coincidir con la plataforma.")
 
     class Meta:
         ordering = ['-fecha_creacion']

@@ -11,7 +11,7 @@ CAMBIO: resolver_adicional ahora consulta los campos estructurados
 """
 import json
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -37,6 +37,53 @@ def _parse_cantidad(valor):
     except (TypeError, ValueError):
         return 1
     return n if n >= 1 else 1
+
+
+# ═══════════════════════════════════════════════════════════
+# REDONDEO DEL TOTAL COBRADO
+#
+# Cuando no hay cambio exacto se le cobra al cliente un total redondeado
+# (ej. factura 142 + adicional 100 = 242 → se cobran 300). Esa diferencia
+# es ganancia nuestra: se suma al ADICIONAL de un ítem, nunca a la factura,
+# porque la factura tiene que coincidir con el ticket de PagoFácil/RapiPago.
+# Además queda guardada en Cobro.redondeo para saber qué parte del
+# adicional vino del redondeo. Como queda adentro de monto_adicional, todas
+# las sumas existentes (caja, ganancias, cierres) la incluyen sin cambios.
+# ═══════════════════════════════════════════════════════════
+
+def _parse_redondeo(valor) -> Decimal:
+    """Redondeo enviado por el front: Decimal >= 0 con 2 decimales."""
+    if valor in (None, ''):
+        return Decimal('0')
+    try:
+        r = Decimal(str(valor)).quantize(Decimal('0.01'))
+    except (InvalidOperation, ValueError):
+        raise ValueError('Redondeo inválido.')
+    if r < 0:
+        raise ValueError('El redondeo no puede ser negativo. Para cobrar menos, '
+                         'bajá el adicional de la boleta.')
+    return r
+
+
+def indice_item_redondeo(cantidades) -> int:
+    """
+    Índice del ítem al que se le suma el redondeo: el último con cantidad 1
+    (así el adicional "por unidad" de un servicio ×N no queda con decimales
+    raros); si todos tienen cantidad > 1, el último.
+    """
+    for idx in range(len(cantidades) - 1, -1, -1):
+        if cantidades[idx] == 1:
+            return idx
+    return len(cantidades) - 1
+
+
+def _aplicar_redondeo(items_data, redondeo: Decimal):
+    """Suma el redondeo al monto_adicional (total de línea) de un ítem del payload."""
+    if redondeo <= 0 or not items_data:
+        return
+    idx = indice_item_redondeo([_parse_cantidad(i.get('cantidad')) for i in items_data])
+    item = items_data[idx]
+    item['monto_adicional'] = str(Decimal(str(item.get('monto_adicional', 0) or 0)) + redondeo)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -321,6 +368,23 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
         if not pagos_data:
             return JsonResponse({'error': 'Debe registrar al menos un método de pago.'}, status=400)
 
+        try:
+            redondeo = _parse_redondeo(data.get('redondeo'))
+        except ValueError as e:
+            return JsonResponse({'error': str(e)}, status=400)
+        if redondeo > 0:
+            total_sin_redondeo = sum(
+                Decimal(str(i.get('monto_servicio', 0) or 0)) + Decimal(str(i.get('monto_adicional', 0) or 0))
+                for i in items_data
+            )
+            if redondeo > total_sin_redondeo:
+                return JsonResponse({
+                    'error': 'El redondeo no puede ser mayor que el total de las boletas. '
+                             'Si el cliente pagó con un billete más grande, eso es vuelto, no redondeo.'
+                }, status=400)
+            # El redondeo pasa a ser parte del adicional de un ítem (nunca de la factura).
+            _aplicar_redondeo(items_data, redondeo)
+
         total_items = sum(
             float(i.get('monto_servicio', 0)) + float(i.get('monto_adicional', 0))
             for i in items_data
@@ -343,6 +407,7 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
                 fecha_cierre=timezone.now(),
                 creado_por=request.user,
                 observaciones=observaciones,
+                redondeo=redondeo,
             )
             for orden, item in enumerate(items_data):
                 servicio = get_object_or_404(Servicio, pk=item['servicio_id'], activo=True)
@@ -378,6 +443,7 @@ class ConfirmarCobroAjax(LoginRequiredMixin, View):
             'total_general':     float(cobro.total_general()),
             'total_boletas':     float(cobro.total_boletas()),
             'total_adicionales': float(cobro.total_adicionales()),
+            'redondeo':          float(cobro.redondeo),
             'pagos':             totales_por_metodo,
             'fecha':             cobro.fecha_cierre.strftime('%d/%m/%Y %H:%M'),
             'turno_numero':      turno.numero,
@@ -549,6 +615,16 @@ class EditarCobroAjax(LoginRequiredMixin, View):
             if nueva_fecha:
                 cobro.fecha_cierre = nueva_fecha
                 campos_a_guardar.append('fecha_cierre')
+            # El redondeo ya viene adentro de los adicionales editados. Si al
+            # editar se bajó el adicional por debajo del redondeo registrado,
+            # el redondeo no puede ser mayor que lo que quedó de adicional.
+            nuevo_adicional = sum(
+                (Decimal(str(i.get('monto_adicional', 0) or 0)) for i in items_data),
+                Decimal('0'),
+            )
+            if cobro.redondeo > nuevo_adicional:
+                cobro.redondeo = max(nuevo_adicional, Decimal('0'))
+                campos_a_guardar.append('redondeo')
             cobro.save(update_fields=campos_a_guardar)
 
         # ── Respuesta ─────────────────────────────────────────────────────────
@@ -562,6 +638,7 @@ class EditarCobroAjax(LoginRequiredMixin, View):
             'total_general':     float(cobro.total_general()),
             'total_boletas':     float(cobro.total_boletas()),
             'total_adicionales': float(cobro.total_adicionales()),
+            'redondeo':          float(cobro.redondeo),
             'pagos':             totales_por_metodo,
             'fecha':             cobro.fecha_cierre.strftime('%d/%m/%Y %H:%M'),
         })

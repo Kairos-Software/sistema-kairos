@@ -257,7 +257,8 @@
                             <strong id="turnoTotBoletas">$ 0,00</strong>
                         </div>
                         <div class="caja-eq-row caja-eq-mas caja-eq-ganancia">
-                            <span>Nuestros adicionales <em>(ganancia)</em></span>
+                            <span>Nuestros adicionales <em>(ganancia)</em>
+                                <em id="turnoTotRedondeos" style="display:none;"></em></span>
                             <strong id="turnoTotAdicionales">$ 0,00</strong>
                         </div>
                         <div class="caja-eq-row caja-eq-total">
@@ -418,7 +419,7 @@
 
 {% block extra_js %}
 {{ block.super }}
-<script src="{% static 'cobranzas/js/caja.js' %}?v=20260828-2"></script>
+<script src="{% static 'cobranzas/js/caja.js' %}?v=20261125-1"></script>
 <script>
     window.cajaUrls = {
         estado:              "{% url 'cobranzas:caja_estado' %}",
