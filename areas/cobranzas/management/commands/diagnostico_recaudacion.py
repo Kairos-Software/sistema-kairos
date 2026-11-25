@@ -81,14 +81,12 @@ class Command(BaseCommand):
         sist = _sistema_por_canal(entidad, fecha)
         rec = RecaudacionDiaria.objects.filter(entidad=entidad, fecha=fecha).first()
         out('\n1) LO QUE MUESTRA LA PANTALLA "Según el sistema"')
-        regla = 'SOLO EFECTIVO' if sist['solo_efectivo'] else 'TODOS LOS MEDIOS'
+        regla = ('TODO MENOS LO COBRADO CON TARJETA (Pago Electrónico)'
+                 if sist['sin_tarjeta'] else 'TODOS LOS MEDIOS')
         out(f'   Regla de esta entidad:                  se declara {regla}')
-        out(f'     facturas pagadas solo en efectivo:    {_m(sist["boletas_efectivo"])}')
-        out(f'     facturas pagadas sin efectivo:        {_m(sist["boletas_otros"])}'
-            f'  ({sist["cant_otros"]} cobros)')
-        out(f'     facturas con pago mixto:              {_m(sist["boletas_mixto"])}'
-            f'  ({sist["cant_mixto"]} cobros, estimado en efectivo {_m(sist["mixto_efectivo_estimado"])})')
         out(f'     total facturas (todos los medios):    {_m(sist["boletas_todos"])}')
+        out(f'     - pagado con tarjeta (no se declara): {_m(sist["boletas_tarjeta"])}'
+            f'  ({sist["cant_tarjeta"]} cobros, {sist["cant_tarjeta_parcial"]} solo en parte)')
         out(f'   Valor facial a declarar:                {_m(sist["valor_facial"])}')
         out(f'   - Comisión de la entidad:               {_m(sist["comision"])}'
             f'  ({sist["comision_cant"]} boletas × {_m(sist["comision_unit"])}'
@@ -146,8 +144,8 @@ class Command(BaseCommand):
             por_pago[k][0] += it.monto_servicio
             por_pago[k][1] += 1
         out('\n2) FACTURAS DEL CANAL SEGÚN CÓMO PAGÓ EL CLIENTE')
-        out('   (si el ticket de la plataforma solo cuenta efectivo, lo pagado con')
-        out('    tarjeta/transferencia/QR aparece en el sistema pero no en el ticket)')
+        out('   (en PagoFácil lo pagado con tarjeta en su terminal es "Pago Electrónico"')
+        out('    y no va en el ticket de efectivo; transferencias y efectivo sí van)')
         for k, (s, n) in sorted(por_pago.items(), key=lambda x: -x[1][0]):
             out(f'   {k:<45} {_m(s):>16}  ({n} boletas)')
 

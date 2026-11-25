@@ -139,14 +139,16 @@
     {% endif %}
 
     {# ── Qué se declara en esta entidad (regla del negocio) ── #}
-    <div class="rec-regla {% if solo_efectivo %}rec-regla-efectivo{% else %}rec-regla-todo{% endif %}" role="note">
+    <div class="rec-regla {% if sin_tarjeta %}rec-regla-efectivo{% else %}rec-regla-todo{% endif %}" role="note">
         <span class="rec-regla-chip">
-            {% if solo_efectivo %}Solo efectivo{% else %}Todos los medios juntos{% endif %}
+            {% if sin_tarjeta %}Todo menos tarjeta{% else %}Todos los medios juntos{% endif %}
         </span>
         <p>
-            {% if solo_efectivo %}
-                En <strong>{{ entidad_label }}</strong> se declara <strong>solo el efectivo</strong> del ticket
-                de cierre. Lo que el cliente pagó con débito, transferencia o QR <strong>no va acá</strong>.
+            {% if sin_tarjeta %}
+                En <strong>{{ entidad_label }}</strong> se declara el <strong>Efectivo</strong> del ticket de cierre.
+                Para {{ entidad_label }}, "Efectivo" es todo lo que cobraste vos, <strong>incluidas las
+                transferencias</strong>. Lo único que <strong>no va</strong> es lo cobrado con tarjeta (débito o
+                crédito) en la terminal de {{ entidad_label }}, que el ticket muestra como <strong>Pago Electrónico</strong>.
             {% else %}
                 En <strong>{{ entidad_label }}</strong> se declara <strong>todo junto</strong>: efectivo, débito,
                 transferencia y QR, sin separar.
@@ -159,7 +161,7 @@
         </p>
     </div>
 
-    {% if not solo_efectivo %}
+    {% if not sin_tarjeta %}
     {# ── Comisión por boleta de la entidad (se descuenta de lo que se declara) ── #}
     <div class="rec-comision">
         <span>
@@ -217,7 +219,7 @@
         </div>
         <div class="caja-field">
             <label class="caja-label" for="inputMonto">
-                {% if solo_efectivo %}Efectivo del ticket de cierre{% elif comision_actual and comision_actual.monto_por_boleta > 0 %}Total a declarar (columna Débito){% else %}Total del cierre (todos los medios){% endif %}
+                {% if sin_tarjeta %}Efectivo del ticket de cierre{% elif comision_actual and comision_actual.monto_por_boleta > 0 %}Total a declarar (columna Débito){% else %}Total del cierre (todos los medios){% endif %}
             </label>
             <div class="dep-input-money">
                 <span class="dep-signo">$</span>
@@ -244,12 +246,12 @@
         </div>
         <div class="rec-sistema-nums">
             <div class="rec-sistema-principal">
-                <span>{% if solo_efectivo %}Efectivo a declarar{% else %}Total a declarar{% endif %}</span>
+                <span>{% if sin_tarjeta %}Efectivo a declarar{% else %}Total a declarar{% endif %}</span>
                 <strong id="recSistBoletas">$0,00</strong>
                 <small>esto se compara con lo que cargás</small>
             </div>
             <div id="recSistFacialWrap" style="display:none;">
-                <span>Valor facial {% if solo_efectivo %}(en efectivo){% else %}(todos los medios){% endif %}</span>
+                <span>Valor facial {% if sin_tarjeta %}(sin tarjeta){% else %}(todos los medios){% endif %}</span>
                 <strong id="recSistFacial">$0,00</strong>
                 <small>lo que pagaron los clientes</small>
             </div>
@@ -258,11 +260,11 @@
                 <strong id="recSistComision">$0,00</strong>
                 <small id="recSistComisionDet"></small>
             </div>
-            {% if solo_efectivo %}
+            {% if sin_tarjeta %}
             <div class="rec-sistema-excluido">
-                <span>Cobradas con otros medios</span>
+                <span>Cobradas con tarjeta</span>
                 <strong id="recSistOtros">$0,00</strong>
-                <small>no se declaran en {{ entidad_label }}</small>
+                <small>Pago Electrónico: no se declara</small>
             </div>
             {% endif %}
             <div><span>Adicionales <em>(ganancia)</em></span><strong id="recSistAdic">$0,00</strong></div>
@@ -402,7 +404,7 @@
                     <strong id="modalFecha">—</strong>
                 </div>
                 <div class="caja-modal-fila">
-                    <span>{% if solo_efectivo %}Efectivo declarado{% else %}Total declarado (todos los medios){% endif %}</span>
+                    <span>{% if sin_tarjeta %}Efectivo declarado{% else %}Total declarado (todos los medios){% endif %}</span>
                     <strong id="modalMonto">—</strong>
                 </div>
                 <div class="caja-modal-fila" id="modalFilaObs" style="display:none;">
@@ -803,11 +805,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const sistemaRaw = JSON.parse(document.getElementById('sistemaInitData').textContent);
     let sistemaActual = sistemaRaw[entidadActual] || { boletas: 0, adicionales: 0, total: 0, cant: 0 };
     let sistemaFecha  = sistemaRaw.fecha;
-    // PagoFácil: solo se declara el efectivo. RapiPago/WU: todos los medios.
-    const soloEfectivo = {{ solo_efectivo|yesno:"true,false" }};
+    // PagoFácil: todo menos lo cobrado con tarjeta en su terminal. RapiPago/WU: todo.
+    const sinTarjeta = {{ sin_tarjeta|yesno:"true,false" }};
     // Frase que describe el número que se compara (depende de si hay comisión ese día).
     function textoSistema(monto) {
-        if (soloEfectivo) return `el sistema tiene ${fmt(monto)} cobrado en efectivo`;
+        if (sinTarjeta) return `el sistema tiene ${fmt(monto)} para declarar como efectivo`;
         return (sistemaActual.comision > 0)
             ? `según el sistema hay que declarar ${fmt(monto)} (valor facial menos la comisión)`
             : `el sistema tiene ${fmt(monto)} cobrado en boletas (todos los medios)`;
@@ -841,7 +843,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const S    = parseFloat(sistemaActual.boletas) || 0;
         const tope = parseFloat(sistemaActual.tope_redondeo) || 0;
         const dif  = Math.round((S - monto) * 100) / 100;   // > 0: el sistema tiene más
-        const que  = soloEfectivo ? 'en efectivo'
+        const que  = sinTarjeta ? 'para declarar como efectivo'
                    : (sistemaActual.comision > 0 ? 'para declarar' : 'en boletas');
         if (dif > 0 && dif <= tope) {
             return { tipo: 'ok', redondeo: dif, texto:
@@ -873,7 +875,7 @@ document.addEventListener('DOMContentLoaded', function () {
             elSistDiff.textContent = 'El sistema no tiene cobros por este canal para esta fecha.';
         } else if (!monto || monto <= 0) {
             elSistDiff.classList.add('diff-info');
-            elSistDiff.textContent = soloEfectivo
+            elSistDiff.textContent = sinTarjeta
                 ? 'Ingresá el efectivo del ticket de cierre para compararlo con el sistema.'
                 : 'Ingresá el total del cierre para compararlo con el sistema.';
         } else {
@@ -889,7 +891,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderSistema() {
         elSistBoletas.textContent = fmt(sistemaActual.boletas);
-        if (elSistOtros) elSistOtros.textContent = fmt(sistemaActual.boletas_otros || 0);
+        if (elSistOtros) elSistOtros.textContent = fmt(sistemaActual.boletas_tarjeta || 0);
         // 'adicionales' incluye los redondeos: se muestran separados.
         elSistAdic.textContent    = fmt(sistemaActual.adicionales_propios ?? sistemaActual.adicionales);
         const hayComision = sistemaActual.comision > 0;
@@ -904,13 +906,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         elSistCant.textContent    = sistemaActual.cant;
         elSistFecha.textContent   = fmtFechaISO(sistemaFecha);
-        if (soloEfectivo && sistemaActual.cant_mixto > 0) {
-            const n = sistemaActual.cant_mixto;
+        if (sinTarjeta && sistemaActual.cant_tarjeta_parcial > 0) {
+            const n = sistemaActual.cant_tarjeta_parcial;
             elSistMixto.textContent =
                 (n === 1 ? '1 cobro se pagó' : `${n} cobros se pagaron`) +
-                ` parte en efectivo y parte con otro medio (${fmt(sistemaActual.boletas_mixto)} en boletas). ` +
-                `El sistema no sabe qué boleta se pagó con qué, así que estimó ` +
-                `${fmt(sistemaActual.mixto_efectivo_estimado)} en efectivo. Si no coincide, ` +
+                ' parte con tarjeta y parte con otro medio. Se tomó que la tarjeta pagó la factura ' +
+                'primero (lo habitual: la factura con tarjeta y el adicional en efectivo). Si no coincide, ' +
                 (n === 1 ? 'revisalo.' : 'revisalos.');
             elSistMixto.style.display = '';
         } else {
@@ -1023,9 +1024,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const noDecl = b.factor === 0;
             let nota = '';
             if (noDecl) {
-                nota = `No se declara en ${esc(labelEntidad)}: se pagó con ${esc(b.pago)}.`;
-            } else if (b.clase === 'mixto' && soloEfectivo) {
-                nota = 'Pago mixto: solo la parte en efectivo se declara.';
+                nota = `No se declara en ${esc(labelEntidad)}: la factura se pagó con tarjeta (Pago Electrónico).`;
+            } else if (b.clase === 'mixto' && sinTarjeta) {
+                nota = 'La tarjeta pagó solo parte de la factura: se declara el resto.';
             }
             if (b.redondeo > 0) nota += (nota ? ' ' : '') + `Ya tiene ${fmt(b.redondeo)} de redondeo.`;
             const real = puedeCorregir ? `
@@ -1116,7 +1117,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const nuevo = r2((parseFloat(sistemaActual.boletas) || 0) - efecto);
         const n = correcciones.length;
         let txt = `${n} boleta${n === 1 ? '' : 's'}: ${fmt(total)} pasan a redondeo. ` +
-                  `${soloEfectivo ? 'Efectivo a declarar' : 'Total a declarar'} queda en ${fmt(nuevo)}`;
+                  `${sinTarjeta ? 'Efectivo a declarar' : 'Total a declarar'} queda en ${fmt(nuevo)}`;
         const monto = parseFloat(inputMontoEl.value);
         if (monto > 0) {
             const dif = r2(monto - nuevo);

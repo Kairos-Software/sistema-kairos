@@ -40,18 +40,61 @@ CANAL_POR_ENTIDAD = {
 }
 
 
-# Qué se declara en la recaudación de cada entidad (regla del negocio):
-#   - PagoFácil: SOLO lo cobrado en efectivo. Su ticket de cierre separa el
-#     efectivo de lo cobrado con otros medios, y solo el efectivo se recauda.
-#   - RapiPago: TODO junto (efectivo + débito + transferencia + QR), sin separar.
-#   - Western Union: igual que RapiPago por ahora (todavía no hay una regla propia).
-ENTIDADES_SOLO_EFECTIVO = {RecaudacionDiaria.ENTIDAD_PAGOFACIL}
+# Qué NO se declara en la recaudación de cada entidad (regla del negocio):
+#   - PagoFácil: su ticket de cierre separa "Efectivo" de "Pago Electrónico".
+#     Pago Electrónico es la TARJETA pasada por la terminal de PagoFácil (esa
+#     plata ya la tiene PagoFácil): no se declara. Todo lo demás figura como
+#     "Efectivo" en el ticket y SÍ se declara, incluidas las transferencias
+#     que el cliente le hizo al negocio (para PagoFácil, lo cobró el negocio).
+#     Verificado con el historial de producción (25/11/2026): con esta regla
+#     13 de 26 días cierran exacto (la diferencia es solo redondeo), contra 4
+#     con "solo efectivo"; el resto son días cargados acumulando varios.
+#   - RapiPago / Western Union: todo junto, sin separar.
+METODOS_NO_DECLARADOS = {
+    RecaudacionDiaria.ENTIDAD_PAGOFACIL: {PagoCobro.METODO_DEBITO, PagoCobro.METODO_CREDITO},
+}
 
 CENT = Decimal('0.01')
 
-# Una diferencia mayor entre lo cargado y la boleta real ya no parece un
-# redondeo sino un error de carga (o un cobro que la plataforma no tomó).
+# Corrección manual boleta por boleta: una diferencia mayor entre lo cargado y
+# la boleta real ya no parece un redondeo sino un error de carga.
 MAX_REDONDEO_FACTURA = Decimal('1000')
+
+# Redondeo deducido del ticket: se redondea hacia arriba al próximo $100
+# (18.246,86 -> 18.300; 295.485,48 -> 295.500), así que cada boleta puede
+# tener menos de $100 adentro. Más que eso ya no es redondeo: es algo para revisar.
+MAX_REDONDEO_AUTO_POR_BOLETA = Decimal('100')
+
+
+def _no_declarado_por_cobro(entidad: str, cobro_ids) -> dict:
+    """
+    {cobro_id: fracción (0 a 1) de sus facturas que NO se declara a la entidad}.
+    La tarjeta paga la factura primero: en el caso común "factura 31.200 con
+    débito + adicional 1.500 en efectivo", la factura entera fue Pago
+    Electrónico (fracción 1). Si un cobro mezcla canales, la parte con tarjeta
+    se reparte en proporción a las facturas de cada canal.
+    """
+    excluidos = METODOS_NO_DECLARADOS.get(entidad)
+    if not excluidos or not cobro_ids:
+        return {}
+    tarjeta = {
+        r['cobro_id']: r['s'] for r in
+        PagoCobro.objects.filter(cobro_id__in=cobro_ids, metodo__in=excluidos)
+        .order_by().values('cobro_id').annotate(s=Sum('monto'))
+    }
+    if not tarjeta:
+        return {}
+    fac_total = {
+        r['cobro_id']: r['s'] for r in
+        ItemCobro.objects.filter(cobro_id__in=tarjeta.keys())
+        .order_by().values('cobro_id').annotate(s=Sum('monto_servicio'))
+    }
+    out = {}
+    for cid, t in tarjeta.items():
+        ft = fac_total.get(cid) or Decimal('0')
+        if t > 0 and ft > 0:
+            out[cid] = min(t, ft) / ft
+    return out
 
 
 def _pesos(valor) -> str:
@@ -68,17 +111,11 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
     contra la recaudación que el cajero carga a mano leyéndola de la
     plataforma: si no coinciden, hay algo mal cargado de un lado o del otro.
 
-    Las facturas (monto_servicio, plata de terceros) se separan según cómo
-    pagó el cliente cada cobro:
-      - 'boletas_efectivo' : cobros pagados solo en efectivo.
-      - 'boletas_otros'    : cobros pagados sin nada de efectivo.
-      - 'boletas_mixto'    : cobros que combinan efectivo con otro medio. El
-        sistema no sabe qué boleta se pagó con qué, así que estima la parte en
-        efectivo en proporción a lo pagado en efectivo ('mixto_efectivo_estimado').
-
-    'valor_facial' es la suma de facturas que corresponde declarar:
-      - PagoFácil  → boletas_efectivo + mixto_efectivo_estimado (solo efectivo)
-      - RapiPago/WU → boletas_todos (todos los medios)
+    'valor_facial' es la suma de facturas (monto_servicio, plata de terceros)
+    que corresponde declarar: todas, menos en PagoFácil lo cobrado con tarjeta
+    en su terminal ('boletas_tarjeta', ver METODOS_NO_DECLARADOS y
+    _no_declarado_por_cobro). 'cant_tarjeta' = cobros con algo de tarjeta;
+    'cant_tarjeta_parcial' = de esos, los que también tienen parte declarada.
     'comision' = comisión por boleta de la entidad (ComisionEntidad vigente en
     esa fecha) × cantidad de boletas declaradas. Ej. RapiPago: 4 × $55 = $220.
     'boletas' = valor_facial − comision → el número que se compara con lo que
@@ -86,24 +123,21 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
     'adicionales' = SUM(monto_adicional) de todos los medios (ganancia, no se
     declara), que incluye 'redondeos'; 'adicionales_propios' = sin redondeos.
     'tope_redondeo' = hasta cuánto de diferencia a favor del sistema se
-    puede tomar como redondeo cargado dentro de las facturas: $1.000 por cada
+    puede tomar como redondeo cargado dentro de las facturas: $100 por cada
     boleta declarada con factura "redonda" (sin centavos, múltiplo de $50),
     que son las únicas que pueden tener un redondeo adentro.
     """
-    solo_efectivo = entidad in ENTIDADES_SOLO_EFECTIVO
     com = ComisionEntidad.vigente(entidad, fecha)
     comision_unit = com.monto_por_boleta if com else Decimal('0')
     vacio = {
         'boletas': Decimal('0'), 'valor_facial': Decimal('0'), 'boletas_todos': Decimal('0'),
-        'boletas_efectivo': Decimal('0'), 'boletas_otros': Decimal('0'),
-        'boletas_mixto': Decimal('0'), 'mixto_efectivo_estimado': Decimal('0'),
+        'boletas_tarjeta': Decimal('0'), 'cant_tarjeta': 0, 'cant_tarjeta_parcial': 0,
         'comision': Decimal('0'), 'comision_unit': comision_unit, 'comision_cant': 0,
         'comision_desde': str(com.vigente_desde) if com else None,
         'adicionales': Decimal('0'), 'redondeos': Decimal('0'),
         'adicionales_propios': Decimal('0'), 'total': Decimal('0'),
-        'cant': 0, 'cant_otros': 0, 'cant_mixto': 0,
-        'cant_redondas': 0, 'tope_redondeo': Decimal('0'),
-        'solo_efectivo': solo_efectivo,
+        'cant': 0, 'cant_redondas': 0, 'tope_redondeo': Decimal('0'),
+        'sin_tarjeta': entidad in METODOS_NO_DECLARADOS,
     }
     canal = CANAL_POR_ENTIDAD.get(entidad)
     if canal is None or fecha is None:
@@ -133,36 +167,22 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
         adicionales += it['monto_adicional']
         redondeos += it['monto_redondeo']
 
-    # Lo pagado por cada cobro (todo el cobro, aunque mezcle canales).
-    pagado = {}
-    efectivo = {}
-    for p in (PagoCobro.objects.filter(cobro_id__in=boletas_cobro.keys())
-              .values('cobro_id', 'metodo').annotate(s=Sum('monto'))):
-        pagado[p['cobro_id']] = pagado.get(p['cobro_id'], Decimal('0')) + p['s']
-        if p['metodo'] == PagoCobro.METODO_EFECTIVO:
-            efectivo[p['cobro_id']] = efectivo.get(p['cobro_id'], Decimal('0')) + p['s']
+    frac = _no_declarado_por_cobro(entidad, list(boletas_cobro))
 
     r = dict(vacio)
     unidades_declaradas = 0
     redondas_declaradas = 0
     for cid, bol in boletas_cobro.items():
-        tot = pagado.get(cid, Decimal('0'))
-        efe = efectivo.get(cid, Decimal('0'))
         r['boletas_todos'] += bol
-        if efe <= 0 or tot <= 0:
-            r['boletas_otros'] += bol
-            r['cant_otros'] += 1
-            if not solo_efectivo:
-                unidades_declaradas += unidades_cobro[cid]
-                redondas_declaradas += redondas_cobro.get(cid, 0)
-        elif efe >= tot:
-            r['boletas_efectivo'] += bol
-            unidades_declaradas += unidades_cobro[cid]
-            redondas_declaradas += redondas_cobro.get(cid, 0)
-        else:
-            r['boletas_mixto'] += bol
-            r['mixto_efectivo_estimado'] += (bol * efe / tot).quantize(CENT)
-            r['cant_mixto'] += 1
+        no_decl = (bol * frac.get(cid, Decimal('0'))).quantize(CENT)
+        decl = bol - no_decl
+        if no_decl > 0:
+            r['boletas_tarjeta'] += no_decl
+            r['cant_tarjeta'] += 1
+            if decl > 0:
+                r['cant_tarjeta_parcial'] += 1
+        if decl > 0:
+            r['valor_facial'] += decl
             unidades_declaradas += unidades_cobro[cid]
             redondas_declaradas += redondas_cobro.get(cid, 0)
 
@@ -171,13 +191,11 @@ def _sistema_por_canal(entidad: str, fecha) -> dict:
     r['adicionales_propios'] = adicionales - redondeos
     r['total'] = r['boletas_todos'] + adicionales
     r['cant'] = len(boletas_cobro)
-    r['valor_facial'] = (r['boletas_efectivo'] + r['mixto_efectivo_estimado']
-                         if solo_efectivo else r['boletas_todos'])
     r['comision_cant'] = unidades_declaradas
     r['comision'] = (comision_unit * unidades_declaradas).quantize(CENT)
     r['boletas'] = r['valor_facial'] - r['comision']
     r['cant_redondas'] = redondas_declaradas
-    r['tope_redondeo'] = MAX_REDONDEO_FACTURA * redondas_declaradas
+    r['tope_redondeo'] = MAX_REDONDEO_AUTO_POR_BOLETA * redondas_declaradas
     return r
 
 
@@ -424,7 +442,7 @@ class RecaudacionesView(LoginRequiredMixin, View):
             'cant_rp':          cant_rp,
             'cant_wu':          cant_wu,
             'recaudacion_hoy':  recaudacion_hoy,
-            'solo_efectivo':    entidad in ENTIDADES_SOLO_EFECTIVO,
+            'sin_tarjeta':      entidad in METODOS_NO_DECLARADOS,
             'comision_actual':  ComisionEntidad.vigente(entidad, hoy),
             'comisiones_hist':  ComisionEntidad.objects.filter(entidad=entidad)
                                 .select_related('registrado_por')[:6],
@@ -671,15 +689,14 @@ def _boletas_del_dia(entidad: str, fecha) -> list:
     Cada boleta (ItemCobro) del canal de la entidad en esa fecha, con cómo
     se pagó su cobro y cuánto pesa en el número que se declara:
       factor 1   → se declara completa
-      factor 0   → no se declara (PagoFácil: cobro pagado sin efectivo)
-      factor 0-1 → cobro mixto en PagoFácil: parte proporcional al efectivo
+      factor 0   → no se declara (PagoFácil: la factura se pagó con tarjeta)
+      factor 0-1 → PagoFácil: la tarjeta pagó solo parte de la factura
     Mismo criterio que _sistema_por_canal(), para que la vista previa de
     "cómo queda con las correcciones" coincida con lo que se va a comparar.
     """
     canal = CANAL_POR_ENTIDAD.get(entidad)
     if canal is None or fecha is None:
         return []
-    solo_efectivo = entidad in ENTIDADES_SOLO_EFECTIVO
     items = list(
         ItemCobro.objects
         .filter(cobro__estado=Cobro.ESTADO_CERRADO, canal=canal,
@@ -687,6 +704,7 @@ def _boletas_del_dia(entidad: str, fecha) -> list:
         .select_related('servicio', 'cobro')
         .order_by('cobro__fecha_cierre', 'cobro_id', 'orden', 'pk')
     )
+    frac = _no_declarado_por_cobro(entidad, list({i.cobro_id for i in items}))
     pagos = {}
     for p in (PagoCobro.objects.filter(cobro_id__in={i.cobro_id for i in items})
               .values('cobro_id', 'metodo').annotate(s=Sum('monto'))):
@@ -697,14 +715,9 @@ def _boletas_del_dia(entidad: str, fecha) -> list:
     out = []
     for it in items:
         pg = {m: v for m, v in pagos.get(it.cobro_id, {}).items() if v > 0}
-        tot = sum(pg.values(), Decimal('0'))
-        efe = pg.get(PagoCobro.METODO_EFECTIVO, Decimal('0'))
-        if efe <= 0 or tot <= 0:
-            clase, factor = 'otros', (Decimal('0') if solo_efectivo else Decimal('1'))
-        elif efe >= tot:
-            clase, factor = 'efectivo', Decimal('1')
-        else:
-            clase, factor = 'mixto', (efe / tot if solo_efectivo else Decimal('1'))
+        f = frac.get(it.cobro_id, Decimal('0'))
+        clase = 'efectivo' if f <= 0 else ('otros' if f >= 1 else 'mixto')
+        factor = Decimal('1') - f
         out.append({
             'id':          it.pk,
             'cobro_id':    it.cobro_id,

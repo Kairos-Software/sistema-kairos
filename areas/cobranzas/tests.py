@@ -31,43 +31,58 @@ def _cobro(turno, items, pagos):
 
 
 class RecaudacionSegunEntidadTests(TestCase):
-    """PagoFácil se recauda solo en efectivo; RapiPago todo junto (menos su comisión)."""
+    """
+    PagoFácil: todo menos lo cobrado con tarjeta en su terminal ("Pago
+    Electrónico"); las transferencias SÍ van en su "Efectivo".
+    RapiPago: todo junto (menos su comisión).
+    """
 
     def setUp(self):
         self.turno = Turno.objects.create(monto_inicial=D('0'))
         self.srv = _servicio()
         self.hoy = timezone.localdate()
 
-    def test_pagofacil_cuenta_solo_lo_cobrado_en_efectivo(self):
-        # El caso real: 248.200 en efectivo + 18.300 cobrados sin efectivo.
+    def test_pagofacil_deja_afuera_solo_la_tarjeta(self):
+        # El caso real 24/11: 248.200 en efectivo + 18.300 con débito (Pago Electrónico).
         _cobro(self.turno, [(self.srv, '248200', '1000', 'pagofacil')], [('efectivo', '249200')])
         _cobro(self.turno, [(self.srv, '18300', '300', 'pagofacil')], [('debito', '18600')])
         s = _sistema_por_canal('pagofacil', self.hoy)
-        self.assertTrue(s['solo_efectivo'])
+        self.assertTrue(s['sin_tarjeta'])
         self.assertEqual(s['boletas'], D('248200'))
-        self.assertEqual(s['boletas_otros'], D('18300'))
+        self.assertEqual(s['boletas_tarjeta'], D('18300'))
         self.assertEqual(s['boletas_todos'], D('266500'))
-        self.assertEqual(s['cant'], 2)
-        self.assertEqual(s['cant_otros'], 1)
+        self.assertEqual((s['cant'], s['cant_tarjeta']), (2, 1))
+
+    def test_pagofacil_cuenta_las_transferencias(self):
+        # Historial 17/09/2026: ticket $194.970,56 = efectivo + transferencias (- redondeo).
+        _cobro(self.turno, [(self.srv, '40200', '1000', 'pagofacil')], [('efectivo', '41200')])
+        _cobro(self.turno, [(self.srv, '154900', '2000', 'pagofacil')], [('transferencia', '156900')])
+        self.assertEqual(_sistema_por_canal('pagofacil', self.hoy)['boletas'], D('195100'))
 
     def test_rapipago_cuenta_todos_los_medios(self):
         _cobro(self.turno, [(self.srv, '1000', '100', 'rapipago')], [('efectivo', '1100')])
-        _cobro(self.turno, [(self.srv, '500', '50', 'rapipago')], [('transferencia', '550')])
+        _cobro(self.turno, [(self.srv, '500', '50', 'rapipago')], [('debito', '550')])
         s = _sistema_por_canal('rapipago', self.hoy)
-        self.assertFalse(s['solo_efectivo'])
+        self.assertFalse(s['sin_tarjeta'])
         self.assertEqual(s['valor_facial'], D('1500'))
         self.assertEqual(s['comision'], D('110.00'))    # 2 boletas × $55 (cargado por la migración)
         self.assertEqual(s['boletas'], D('1390.00'))
 
-    def test_pago_mixto_se_estima_en_proporcion(self):
-        # 1000 de factura, se pagó 600 efectivo + 600 débito → mitad en efectivo.
+    def test_tarjeta_paga_la_factura_primero(self):
+        # Cobro #800 (25/11): factura 31.200 con débito + adicional 1.500 en efectivo
+        # → la factura entera fue Pago Electrónico: no se declara nada.
+        _cobro(self.turno, [(self.srv, '31200', '1500', 'pagofacil')],
+               [('debito', '31200'), ('efectivo', '1500')])
+        s = _sistema_por_canal('pagofacil', self.hoy)
+        self.assertEqual((s['boletas'], s['boletas_tarjeta'], s['cant_tarjeta_parcial']),
+                         (D('0'), D('31200'), 0))
+
+    def test_tarjeta_que_paga_parte_de_la_factura(self):
+        # 1000 de factura + 200 adicional: 600 débito + 600 efectivo → se declaran 400.
         _cobro(self.turno, [(self.srv, '1000', '200', 'pagofacil')],
                [('efectivo', '600'), ('debito', '600')])
         s = _sistema_por_canal('pagofacil', self.hoy)
-        self.assertEqual(s['cant_mixto'], 1)
-        self.assertEqual(s['boletas_mixto'], D('1000'))
-        self.assertEqual(s['mixto_efectivo_estimado'], D('500.00'))
-        self.assertEqual(s['boletas'], D('500.00'))
+        self.assertEqual((s['boletas'], s['cant_tarjeta_parcial']), (D('400.00'), 1))
 
     def test_solo_cuenta_el_canal_pedido(self):
         _cobro(self.turno, [(self.srv, '1000', '0', 'pagofacil'), (self.srv, '700', '0', 'rapipago')],
@@ -424,9 +439,13 @@ class RedondeoDesdeElTicketTests(TestCase):
         # El ticket tiene MÁS que el sistema: falta algo, no es redondeo.
         self._registrar('248300')
         self.assertEqual(self._rec().redondeo, D('0'))
-        # El sistema tiene $8.200 más: más de $1.000 por boleta redonda (4) → revisar.
-        self._registrar('240000')
+        # El sistema tiene $434,40 más: más de $100 por boleta redonda (4) → revisar.
+        # (antes el tope era $1.000 y en producción tomó como redondeo, por ejemplo,
+        # $8.311,91 en RapiPago 19/10: $520 por boleta, eso no es redondeo).
+        self._registrar('247765.60')
         self.assertEqual(self._rec().redondeo, D('0'))
+        self._registrar('247800')                     # $400 = justo el tope: sí
+        self.assertEqual(self._rec().redondeo, D('400'))
 
     def test_corregir_boletas_despues_no_lo_cuenta_dos_veces(self):
         self._registrar('248065.60')
